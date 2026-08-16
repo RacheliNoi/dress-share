@@ -1,0 +1,128 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum DressStatus {
+  DRAFT
+  AI_PROCESSING
+  AI_READY
+  OWNER_REVIEW
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  passwordHash  String?
+  name          String?
+  role          UserRole       @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  clothingItems ClothingItem[]
+  dresses       Dress[]
+  bookings      Booking[]
+}
+
+model ClothingItem {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String
+  size      String?
+  color     String?
+  imageUrl  String?
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Dress {
+  id          Int         @id @default(autoincrement())
+  name        String
+  description String?
+  category    String?
+  color       String?
+  status      DressStatus @default(DRAFT)
+  ownerId     Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  photos   DressPhoto[]
+  sizes    DressSize[]
+  bookings Booking[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model DressPhoto {
+  id           Int      @id @default(autoincrement())
+  dressId      Int
+  originalUrl  String
+  processedUrl String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
+
+  @@index([dressId])
+}
+
+model DressSize {
+  id        Int      @id @default(autoincrement())
+  dressId   Int
+  size      String
+  price     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
+
+  @@unique([dressId, size])
+  @@index([dressId])
+}
+
+model Booking {
+  id        Int           @id @default(autoincrement())
+  dressId   Int
+  renterId  Int
+  size      String
+  startDate DateTime
+  endDate   DateTime
+  price     Int
+  status    BookingStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  dress  Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
+  renter User  @relation(fields: [renterId], references: [id], onDelete: Cascade)
+
+  @@index([dressId])
+  @@index([renterId])
+  @@index([startDate, endDate])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
