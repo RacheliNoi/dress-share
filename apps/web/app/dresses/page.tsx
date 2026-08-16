@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getToken, removeToken } from "@/lib/auth";
 
 type DressPhoto = {
 id: number;
@@ -28,7 +30,6 @@ sizes: DressSize[];
 };
 
 const API_URL = "http://localhost:3001";
-const USER_ID = 3;
 
 const statusConfig = {
 DRAFT: {
@@ -50,18 +51,36 @@ className: "bg-red-50 text-red-700",
 };
 
 export default function DressesPage() {
+const router = useRouter();
+
 const [dresses, setDresses] = useState<Dress[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
+const [checkingAuth, setCheckingAuth] = useState(true);
 
 async function loadDresses() {
+const token = getToken();
+
+if (!token) {
+  router.push("/login");
+  return;
+}
+
 try {
 setLoading(true);
 setError("");
 
-  const response = await fetch(
-    `${API_URL}/dresses?ownerId=${USER_ID}`,
-  );
+  const response = await fetch(`${API_URL}/dresses`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    removeToken();
+    router.push("/login");
+    return;
+  }
 
   if (!response.ok) {
     throw new Error("לא הצלחנו לטעון את השמלות");
@@ -77,9 +96,25 @@ setError("");
 
 }
 
+function handleLogout() {
+removeToken();
+router.push("/login");
+}
+
 useEffect(() => {
+if (!getToken()) {
+  router.push("/login");
+  return;
+}
+
+setCheckingAuth(false);
 loadDresses();
+// eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
+
+if (checkingAuth) {
+  return null;
+}
 
 function getImageUrl(dress: Dress) {
 const photo = [...dress.photos].sort(
@@ -147,9 +182,13 @@ DRESS RENTAL </div> </div>
           עזרה
         </button>
 
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white">
-          3
-        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50"
+        >
+          התנתקות
+        </button>
       </div>
     </div>
   </nav>
