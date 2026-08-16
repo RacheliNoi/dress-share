@@ -2,39 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getToken, removeToken } from "@/lib/auth";
+import { getToken, logout } from "@/lib/auth";
+import { API_URL, ApiError, Dress, DressStatus, getMyDresses } from "@/lib/api";
+import Header from "@/components/Header";
 
-type DressPhoto = {
-id: number;
-originalUrl: string;
-processedUrl: string | null;
-sortOrder: number;
-};
-
-type DressSize = {
-id: number;
-size: string;
-price: number;
-};
-
-type Dress = {
-id: number;
-name: string;
-description: string | null;
-category: string | null;
-color: string | null;
-status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
-ownerId: number;
-photos: DressPhoto[];
-sizes: DressSize[];
-};
-
-const API_URL = "http://localhost:3001";
-
-const statusConfig = {
+const statusConfig: Record<DressStatus, { label: string; className: string }> = {
 DRAFT: {
 label: "טיוטה",
 className: "bg-zinc-100 text-zinc-600",
+},
+AI_PROCESSING: {
+label: "בעיבוד",
+className: "bg-sky-50 text-sky-700",
+},
+AI_READY: {
+label: "מוכנה לבדיקה",
+className: "bg-sky-50 text-sky-700",
+},
+OWNER_REVIEW: {
+label: "ממתינה לבדיקתך",
+className: "bg-amber-50 text-amber-700",
 },
 PENDING_APPROVAL: {
 label: "ממתינה לאישור",
@@ -70,35 +57,20 @@ try {
 setLoading(true);
 setError("");
 
-  const response = await fetch(`${API_URL}/dresses`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    removeToken();
+  const data = await getMyDresses(token);
+  setDresses(data);
+} catch (err) {
+  if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+    logout();
     router.push("/login");
     return;
   }
 
-  if (!response.ok) {
-    throw new Error("לא הצלחנו לטעון את השמלות");
-  }
-
-  const data = await response.json();
-  setDresses(data);
-} catch {
   setError("לא הצלחנו לטעון את השמלות. נסי שוב.");
 } finally {
   setLoading(false);
 }
 
-}
-
-function handleLogout() {
-removeToken();
-router.push("/login");
 }
 
 useEffect(() => {
@@ -148,50 +120,7 @@ return (<main
     dir="rtl"
    className="min-h-screen bg-[#faf9f7] text-zinc-900"
  >
-{/* Top navigation */} <nav className="border-b border-zinc-200/70 bg-white/90 backdrop-blur"> <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8"> <div className="flex items-center gap-10"> <div> <div className="text-xl font-black tracking-tight text-zinc-900">
-Dress<span className="text-rose-500">Share</span> </div> <div className="text-[10px] font-medium tracking-[0.2em] text-zinc-400">
-DRESS RENTAL </div> </div>
-
-        <div className="hidden items-center gap-7 text-sm font-medium text-zinc-500 md:flex">
-          <a
-            href="#"
-            className="text-zinc-900 transition hover:text-rose-500"
-          >
-            השמלות שלי
-          </a>
-          <a
-            href="#"
-            className="transition hover:text-rose-500"
-          >
-            ההזמנות שלי
-          </a>
-          <a
-            href="#"
-            className="transition hover:text-rose-500"
-          >
-            הפרופיל שלי
-          </a>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="hidden rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50 sm:block"
-        >
-          עזרה
-        </button>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50"
-        >
-          התנתקות
-        </button>
-      </div>
-    </div>
-  </nav>
+{/* Top navigation */} <Header />
 
   <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
     {/* Hero */}

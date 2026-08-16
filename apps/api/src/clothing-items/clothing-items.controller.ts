@@ -5,14 +5,16 @@ import {
   Get,
   Param,
   Post,
-  Query,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ClothingItemsService } from './clothing-items.service';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('clothing-items')
 export class ClothingItemsController {
@@ -20,15 +22,13 @@ export class ClothingItemsController {
     private readonly clothingItemsService: ClothingItemsService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll(@Query('userId') userId?: string) {
-    if (userId) {
-      return this.clothingItemsService.findByUser(Number(userId));
-    }
-
-    return this.clothingItemsService.findAll();
+  findAll(@CurrentUser() user: { sub: number }) {
+    return this.clothingItemsService.findByUser(user.sub);
   }
 
+   @UseGuards(JwtAuthGuard)
    @Post()
    @UseInterceptors(
     FileInterceptor('image', {
@@ -50,18 +50,22 @@ export class ClothingItemsController {
       size?: string;
       color?: string;
       imageUrl?: string;
-      userId: number;
     },
+    @CurrentUser() user: { sub: number },
     ) {
     return this.clothingItemsService.create({
     ...body,
-    userId: Number(body.userId),
+    userId: user.sub,
     imageUrl: file ? `/uploads/${file.filename}` : undefined,
     });
     }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-    remove(@Param('id') id: string) {
-    return this.clothingItemsService.remove(Number(id));
+    remove(
+      @Param('id') id: string,
+      @CurrentUser() user: { sub: number },
+    ) {
+    return this.clothingItemsService.remove(Number(id), user.sub);
   }
 }

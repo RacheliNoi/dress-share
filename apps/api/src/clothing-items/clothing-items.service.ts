@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -44,7 +44,17 @@ export class ClothingItemsService {
     });
   }
 
-    async remove(id: number) {
+    async remove(id: number, userId: number) {
+    const item = await this.prisma.clothingItem.findUnique({
+        where: {
+        id,
+        },
+    });
+
+    if (!item || item.userId !== userId) {
+        throw new ForbiddenException('אין הרשאה למחוק את הפריט הזה');
+    }
+
     return this.prisma.clothingItem.delete({
         where: {
         id,

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -44,6 +45,12 @@ export class AdminService {
       throw new NotFoundException('השמלה לא נמצאה');
     }
 
+    if (dress.status !== DressStatus.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'ניתן לאשר רק שמלות שממתינות לאישור',
+      );
+    }
+
     return this.prisma.dress.update({
       where: { id },
       data: {
@@ -59,6 +66,12 @@ export class AdminService {
 
     if (!dress) {
       throw new NotFoundException('השמלה לא נמצאה');
+    }
+
+    if (dress.status !== DressStatus.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'ניתן לדחות רק שמלות שממתינות לאישור',
+      );
     }
 
     return this.prisma.dress.update({

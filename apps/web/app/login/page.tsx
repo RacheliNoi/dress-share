@@ -3,9 +3,9 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { setToken } from "@/lib/auth";
-
-const API_URL = "http://localhost:3001";
+import { setToken, setUser } from "@/lib/auth";
+import { login, ApiError } from "@/lib/api";
+import Header from "@/components/Header";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,36 +22,27 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "אימייל או סיסמה שגויים");
-      }
+      const data = await login(email, password);
 
       setToken(data.accessToken);
-      router.push("/dresses");
+      setUser(data.user);
+      router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה בהתחברות");
+      setError(
+        err instanceof ApiError ? err.message : "שגיאה בהתחברות",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main
-      dir="rtl"
-      className="flex min-h-screen items-center justify-center bg-zinc-100 p-6"
-    >
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
-        <p className="text-sm font-medium text-zinc-500">DressShare</p>
+    <main dir="rtl" className="min-h-screen bg-zinc-100">
+      <Header />
 
-        <h1 className="mt-1 text-3xl font-bold text-zinc-900">התחברות</h1>
+      <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
+        <h1 className="text-3xl font-bold text-zinc-900">התחברות</h1>
 
         <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
           <input
@@ -96,6 +87,7 @@ export default function LoginPage() {
             הרשמה
           </Link>
         </p>
+      </div>
       </div>
     </main>
   );

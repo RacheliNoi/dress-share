@@ -1,308 +1,155 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import Header from "@/components/Header";
+import DressCard from "@/components/DressCard";
+import { Dress, getApprovedDresses } from "@/lib/api";
 
-type ClothingItem = {
-  id: number;
-  name: string;
-  category: string;
-  size: string | null;
-  color: string | null;
-  imageUrl: string | null;
-};
-
-const USER_ID = 3;
-const API_URL = "http://localhost:3001";
-
-export default function Home() {
-  const [items, setItems] = useState<ClothingItem[]>([]);
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [size, setSize] = useState("");
-  const [color, setColor] = useState("");
-  const [image, setImage] = useState<File | null>(null);
-
+export default function CatalogPage() {
+  const [dresses, setDresses] = useState<Dress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadItems() {
+  async function loadDresses() {
     try {
+      setLoading(true);
       setError("");
 
-      const response = await fetch(
-        `${API_URL}/clothing-items?userId=${USER_ID}`,
-      );
-
-      if (!response.ok) {
-        throw new Error("לא הצלחנו לטעון את הארון");
-      }
-
-      const data = await response.json();
-      setItems(data);
+      const data = await getApprovedDresses();
+      setDresses(data);
     } catch {
-      setError("שגיאה בטעינת הארון");
+      setError("לא הצלחנו לטעון את הקטלוג. נסי שוב.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadItems();
+    loadDresses();
   }, []);
 
-  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    setImage(file);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setSaving(true);
-    setError("");
-
-    try {
-      const formData = new FormData();
-
-      formData.append("name", name);
-      formData.append("category", category);
-      formData.append("size", size);
-      formData.append("color", color);
-      formData.append("userId", String(USER_ID));
-
-      if (image) {
-        formData.append("image", image);
-      }
-
-      const response = await fetch(`${API_URL}/clothing-items`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "שגיאה בהוספת הפריט");
-      }
-
-      setItems((currentItems) => [data, ...currentItems]);
-
-      setName("");
-      setCategory("");
-      setSize("");
-      setColor("");
-      setImage(null);
-
-      const fileInput = document.getElementById(
-        "clothing-image",
-      ) as HTMLInputElement | null;
-
-      if (fileInput) {
-        fileInput.value = "";
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "שגיאה בהוספת הפריט",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(id: number) {
-    try {
-      setError("");
-
-      const response = await fetch(`${API_URL}/clothing-items/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("שגיאה במחיקת הפריט");
-      }
-
-      setItems((currentItems) =>
-        currentItems.filter((item) => item.id !== id),
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "שגיאה במחיקת הפריט",
-      );
-    }
-  }
-
   return (
-    <main className="min-h-screen bg-zinc-100 p-6">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8">
-          <p className="text-sm font-medium text-zinc-500">DressShare</p>
+    <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
+      <Header />
 
-          <h1 className="mt-1 text-4xl font-bold text-zinc-900">
-            הארון שלי
-          </h1>
-
-          <p className="mt-2 text-zinc-600">
-            כל הפריטים שלך במקום אחד
-          </p>
-        </header>
-
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-zinc-900">
-            הוספת פריט
-          </h2>
-
-          <form
-            onSubmit={handleSubmit}
-            className="mt-5 grid gap-4 md:grid-cols-2"
-          >
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="שם הפריט"
-              required
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
-            />
-
-            <input
-              type="text"
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              placeholder="קטגוריה"
-              required
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
-            />
-
-            <input
-              type="text"
-              value={size}
-              onChange={(event) => setSize(event.target.value)}
-              placeholder="מידה"
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
-            />
-
-            <input
-              type="text"
-              value={color}
-              onChange={(event) => setColor(event.target.value)}
-              placeholder="צבע"
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
-            />
-
-            <div className="md:col-span-2">
-              <label
-                htmlFor="clothing-image"
-                className="block text-sm font-medium text-zinc-700"
-              >
-                תמונה
-              </label>
-
-              <input
-                id="clothing-image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-700"
-              />
-
-              {image && (
-                <p className="mt-2 text-sm text-zinc-500">
-                  נבחר: {image.name}
-                </p>
-              )}
+      <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
+        {/* Hero */}
+        <section className="relative mb-10 overflow-hidden rounded-[2rem] bg-zinc-900 px-7 py-10 text-white shadow-xl sm:px-10 lg:px-14 lg:py-14">
+          <div className="relative z-10 max-w-2xl">
+            <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur">
+              ✦ קטלוג שמלות להשכרה
             </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-xl bg-zinc-900 px-4 py-3 font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2"
+            <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
+              שמלה לכל אירוע,
+              <br />
+              <span className="text-rose-300">בלי לקנות.</span>
+            </h1>
+
+            <p className="mt-5 max-w-xl text-base leading-7 text-zinc-300 sm:text-lg">
+              עיינו במבחר השמלות המאושרות שלנו להשכרה, ומצאו את
+              השמלה המושלמת לאירוע הבא שלכם.
+            </p>
+          </div>
+
+          <div className="pointer-events-none absolute -left-20 -top-32 h-80 w-80 rounded-full bg-rose-400/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-40 right-1/3 h-96 w-96 rounded-full bg-purple-400/10 blur-3xl" />
+
+          <div className="pointer-events-none absolute bottom-0 left-8 hidden opacity-10 lg:block">
+            <svg
+              width="260"
+              height="260"
+              viewBox="0 0 260 260"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              {saving ? "שומר..." : "+ הוספת פריט"}
-            </button>
-          </form>
+              <circle cx="130" cy="130" r="112" stroke="white" strokeWidth="1" />
+              <circle cx="130" cy="130" r="82" stroke="white" strokeWidth="1" />
+              <circle cx="130" cy="130" r="52" stroke="white" strokeWidth="1" />
+            </svg>
+          </div>
         </section>
 
+        {/* Header */}
+        <section className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-2 text-sm font-medium text-rose-500">
+              הקטלוג שלנו
+            </p>
+
+            <h2 className="text-3xl font-black tracking-tight text-zinc-900">
+              שמלות זמינות להשכרה
+            </h2>
+
+            <p className="mt-2 text-sm text-zinc-500">
+              כל השמלות שאושרו ומוכנות להשכרה.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm shadow-sm ring-1 ring-zinc-200/70">
+            <span className="font-bold text-zinc-900">
+              {dresses.length}
+            </span>
+            <span className="text-zinc-500">שמלות</span>
+          </div>
+        </section>
+
+        {/* Error */}
         {error && (
-          <div className="mt-6 rounded-2xl bg-red-50 p-4 text-red-700">
-            {error}
+          <div className="mb-6 flex items-center justify-between rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700">
+            <span>{error}</span>
+
+            <button
+              type="button"
+              onClick={loadDresses}
+              className="font-bold underline underline-offset-4"
+            >
+              נסי שוב
+            </button>
           </div>
         )}
 
-        <section className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-zinc-900">
-              הפריטים שלי
-            </h2>
+        {/* Loading */}
+        {loading ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div
+                key={item}
+                className="overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60"
+              >
+                <div className="h-80 animate-pulse bg-zinc-200" />
 
-            <span className="rounded-full bg-zinc-200 px-3 py-1 text-sm text-zinc-700">
-              {items.length} פריטים
-            </span>
+                <div className="space-y-3 p-5">
+                  <div className="h-5 w-2/3 animate-pulse rounded bg-zinc-200" />
+                  <div className="h-4 w-1/3 animate-pulse rounded bg-zinc-100" />
+                  <div className="h-8 w-1/2 animate-pulse rounded bg-zinc-100" />
+                </div>
+              </div>
+            ))}
           </div>
-
-          {loading ? (
-            <div className="rounded-3xl bg-white p-8 text-center text-zinc-500">
-              טוען את הארון...
+        ) : dresses.length === 0 ? (
+          /* Empty state */
+          <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50 text-4xl">
+              👗
             </div>
-          ) : items.length === 0 ? (
-            <div className="rounded-3xl bg-white p-8 text-center text-zinc-500">
-              עדיין אין פריטים בארון.
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item) => (
-                <article
-                  key={item.id}
-                  className="overflow-hidden rounded-3xl bg-white shadow-sm"
-                >
-                  {item.imageUrl ? (
-                    <img
-                      src={`${API_URL}${item.imageUrl}`}
-                      alt={item.name}
-                      className="h-64 w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-64 items-center justify-center bg-zinc-100 text-5xl">
-                      👕
-                    </div>
-                  )}
 
-                  <div className="p-6">
-                    <h3 className="text-lg font-bold text-zinc-900">
-                      {item.name}
-                    </h3>
+            <h3 className="mt-6 text-2xl font-black text-zinc-900">
+              עדיין אין שמלות בקטלוג
+            </h3>
 
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {item.category}
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2 text-sm">
-                      {item.size && (
-                        <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-700">
-                          מידה {item.size}
-                        </span>
-                      )}
-
-                      {item.color && (
-                        <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-700">
-                          {item.color}
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="mt-4 w-full rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
-                    >
-                      🗑️ מחיקת פריט
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-500">
+              ברגע ששמלות יאושרו הן יופיעו כאן.
+            </p>
+          </section>
+        ) : (
+          /* Dress grid */
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {dresses.map((dress) => (
+              <DressCard key={dress.id} dress={dress} />
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );

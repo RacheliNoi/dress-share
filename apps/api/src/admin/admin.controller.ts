@@ -1,9 +1,8 @@
 import {
   Controller,
-  Delete,
   Get,
   Param,
-  Post,
+  Patch,
   UseGuards,
 } from '@nestjs/common';
 
@@ -21,12 +20,12 @@ export class AdminController {
     return this.adminService.findPendingDresses();
   }
 
-  @Post('dresses/:id/approve')
+  @Patch('dresses/:id/approve')
   approveDress(@Param('id') id: string) {
     return this.adminService.approveDress(Number(id));
   }
 
-  @Post('dresses/:id/reject')
+  @Patch('dresses/:id/reject')
   rejectDress(@Param('id') id: string) {
     return this.adminService.rejectDress(Number(id));
   }

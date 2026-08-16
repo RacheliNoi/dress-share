@@ -3,9 +3,9 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { setToken } from "@/lib/auth";
-
-const API_URL = "http://localhost:3001";
+import { setToken, setUser } from "@/lib/auth";
+import { register, ApiError } from "@/lib/api";
+import Header from "@/components/Header";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -23,41 +23,27 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
+      const data = await register(name, email, password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "שגיאה בהרשמה");
-      }
-
-      if (data.accessToken) {
-        setToken(data.accessToken);
-        router.push("/dresses");
-        return;
-      }
-
-      router.push("/login");
+      setToken(data.accessToken);
+      setUser(data.user);
+      router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה בהרשמה");
+      setError(
+        err instanceof ApiError ? err.message : "שגיאה בהרשמה",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main
-      dir="rtl"
-      className="flex min-h-screen items-center justify-center bg-zinc-100 p-6"
-    >
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
-        <p className="text-sm font-medium text-zinc-500">DressShare</p>
+    <main dir="rtl" className="min-h-screen bg-zinc-100">
+      <Header />
 
-        <h1 className="mt-1 text-3xl font-bold text-zinc-900">הרשמה</h1>
+      <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
+        <h1 className="text-3xl font-bold text-zinc-900">הרשמה</h1>
 
         <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
           <input
@@ -111,6 +97,7 @@ export default function RegisterPage() {
             התחברות
           </Link>
         </p>
+      </div>
       </div>
     </main>
   );
