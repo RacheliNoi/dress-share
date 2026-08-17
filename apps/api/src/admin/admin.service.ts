@@ -4,11 +4,22 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import { DressStatus } from '../../generated/prisma/enums';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+  ) {}
+
+  // Delegates to the same secure, single-use, expiring reset-token mechanism
+  // used by the self-service "forgot password" flow, rather than a separate
+  // admin-only path that could set (or reveal) a password directly.
+  async initiatePasswordReset(userId: number) {
+    return this.authService.adminInitiatePasswordReset(userId);
+  }
 
   async findPendingDresses() {
     return this.prisma.dress.findMany({
@@ -55,11 +66,16 @@ export class AdminService {
       where: { id },
       data: {
         status: DressStatus.APPROVED,
+        rejectionReason: null,
       },
     });
   }
 
-  async rejectDress(id: number) {
+  async rejectDress(id: number, reason: string) {
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException('יש לציין סיבת דחייה');
+    }
+
     const dress = await this.prisma.dress.findUnique({
       where: { id },
     });
@@ -78,6 +94,7 @@ export class AdminService {
       where: { id },
       data: {
         status: DressStatus.REJECTED,
+        rejectionReason: reason.trim(),
       },
     });
   }

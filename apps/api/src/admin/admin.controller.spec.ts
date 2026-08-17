@@ -17,6 +17,13 @@ describe('AdminController', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    user: {
+      findUnique: jest.Mock;
+    };
+    passwordResetToken: {
+      create: jest.Mock;
+      deleteMany: jest.Mock;
+    };
   };
 
   function tokenFor(userId: number, role: 'USER' | 'ADMIN') {
@@ -34,6 +41,13 @@ describe('AdminController', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      user: {
+        findUnique: jest.fn(),
+      },
+      passwordResetToken: {
+        create: jest.fn(),
+        deleteMany: jest.fn(),
+      },
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -47,9 +61,12 @@ describe('AdminController', () => {
     await app.init();
 
     jwtService = moduleRef.get(JwtService);
+
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     await app.close();
   });
 
@@ -134,16 +151,17 @@ describe('AdminController', () => {
   });
 
   describe('PATCH /admin/dresses/:id/reject', () => {
-    it('rejects a USER (not an admin)', async () => {
+    it('rejects a USER (not an admin), even when a reason is supplied', async () => {
       await request(app.getHttpServer())
         .patch('/admin/dresses/1/reject')
         .set('Authorization', `Bearer ${tokenFor(1, 'USER')}`)
+        .send({ reason: 'לא מתאים' })
         .expect(403);
 
       expect(prisma.dress.update).not.toHaveBeenCalled();
     });
 
-    it('allows an ADMIN to reject a PENDING_APPROVAL dress', async () => {
+    it('allows an ADMIN to reject a PENDING_APPROVAL dress with a reason, returned to the owner', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         status: DressStatus.PENDING_APPROVAL,
@@ -151,14 +169,79 @@ describe('AdminController', () => {
       prisma.dress.update.mockResolvedValue({
         id: 1,
         status: DressStatus.REJECTED,
+        rejectionReason: 'התמונות לא ברורות מספיק',
       });
 
       const response = await request(app.getHttpServer())
         .patch('/admin/dresses/1/reject')
         .set('Authorization', `Bearer ${tokenFor(2, 'ADMIN')}`)
+        .send({ reason: 'התמונות לא ברורות מספיק' })
         .expect(200);
 
       expect(response.body.status).toBe(DressStatus.REJECTED);
+      expect(response.body.rejectionReason).toBe('התמונות לא ברורות מספיק');
+      expect(prisma.dress.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          status: DressStatus.REJECTED,
+          rejectionReason: 'התמונות לא ברורות מספיק',
+        },
+      });
+    });
+
+    it('rejects an ADMIN request with no reason', async () => {
+      await request(app.getHttpServer())
+        .patch('/admin/dresses/1/reject')
+        .set('Authorization', `Bearer ${tokenFor(2, 'ADMIN')}`)
+        .send({})
+        .expect(400);
+
+      expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /admin/users/:id/reset-password', () => {
+    it('rejects a USER (not an admin)', async () => {
+      await request(app.getHttpServer())
+        .post('/admin/users/5/reset-password')
+        .set('Authorization', `Bearer ${tokenFor(1, 'USER')}`)
+        .expect(403);
+
+      expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it('allows an ADMIN to initiate a reset without ever seeing passwordHash', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 5,
+        email: 'target@test.com',
+      });
+      prisma.passwordResetToken.create.mockResolvedValue({});
+
+      const response = await request(app.getHttpServer())
+        .post('/admin/users/5/reset-password')
+        .set('Authorization', `Bearer ${tokenFor(2, 'ADMIN')}`)
+        .expect(201);
+
+      expect(response.body).not.toHaveProperty('passwordHash');
+      expect(response.body).not.toHaveProperty('token');
+      expect(prisma.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 5 },
+          select: { id: true, email: true },
+        }),
+      );
+      expect(prisma.passwordResetToken.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 404 for a user that does not exist', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .post('/admin/users/999/reset-password')
+        .set('Authorization', `Bearer ${tokenFor(2, 'ADMIN')}`)
+        .expect(404);
+
+      expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
     });
   });
 });

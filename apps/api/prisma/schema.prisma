@@ -24,16 +24,34 @@ enum DressStatus {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  email         String         @unique
-  passwordHash  String?
-  name          String?
-  role          UserRole       @default(USER)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  clothingItems ClothingItem[]
-  dresses       Dress[]
-  bookings      Booking[]
+  id                  Int                  @id @default(autoincrement())
+  email               String               @unique
+  passwordHash        String?
+  name                String?
+  role                UserRole             @default(USER)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  clothingItems       ClothingItem[]
+  dresses             Dress[]
+  bookings            Booking[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+// A password-reset request creates exactly one of these rows. Only a hash of
+// the token is ever stored - the raw token is single-use and lives only in
+// the (future) reset email / dev log. The row is deleted as soon as it is
+// used, so "single-use" and "invalidated after reset" both fall out of the
+// row simply no longer existing.
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model ClothingItem {
@@ -53,15 +71,16 @@ model ClothingItem {
 }
 
 model Dress {
-  id          Int         @id @default(autoincrement())
-  name        String
-  description String?
-  category    String?
-  color       String?
-  status      DressStatus @default(DRAFT)
-  ownerId     Int
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id              Int         @id @default(autoincrement())
+  name            String
+  description     String?
+  category        String?
+  color           String?
+  status          DressStatus @default(DRAFT)
+  rejectionReason String?
+  ownerId         Int
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 

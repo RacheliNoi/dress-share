@@ -7,10 +7,14 @@ import { getToken } from "@/lib/auth";
 import {
   ApiError,
   Dress,
+  DressPhoto,
   DressSize,
   addDressPhotos,
   addDressSize,
   createDress,
+  deleteDressPhoto,
+  getDressImageUrl,
+  getMyDresses,
   submitDressForApproval,
 } from "@/lib/api";
 import Header from "@/components/Header";
@@ -44,9 +48,11 @@ export default function NewDressPage() {
   const [sizeError, setSizeError] = useState("");
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [selectedPreviews, setSelectedPreviews] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<DressPhoto[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -124,7 +130,14 @@ export default function NewDressPage() {
   }
 
   function handleFilesSelected(event: ChangeEvent<HTMLInputElement>) {
-    setSelectedFiles(Array.from(event.target.files ?? []));
+    const files = Array.from(event.target.files ?? []);
+
+    setSelectedFiles(files);
+
+    setSelectedPreviews((current) => {
+      current.forEach((url) => URL.revokeObjectURL(url));
+      return files.map((file) => URL.createObjectURL(file));
+    });
   }
 
   async function handleUploadPhotos() {
@@ -140,11 +153,19 @@ export default function NewDressPage() {
     try {
       await addDressPhotos(token, dress.id, selectedFiles);
 
-      setPhotoPreviews((current) => [
-        ...current,
-        ...selectedFiles.map((file) => URL.createObjectURL(file)),
-      ]);
+      const myDresses = await getMyDresses(token);
+      const updated = myDresses.find((current) => current.id === dress.id);
+
+      if (updated) {
+        setPhotos(updated.photos);
+      }
+
       setSelectedFiles([]);
+
+      setSelectedPreviews((current) => {
+        current.forEach((url) => URL.revokeObjectURL(url));
+        return [];
+      });
 
       const fileInput = document.getElementById(
         "dress-photos",
@@ -159,6 +180,34 @@ export default function NewDressPage() {
       );
     } finally {
       setUploadingPhotos(false);
+    }
+  }
+
+  async function handleDeletePhoto(photoId: number) {
+    const token = getToken();
+
+    if (!token || !dress) {
+      return;
+    }
+
+    const confirmed = window.confirm("למחוק את התמונה?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingPhotoId(photoId);
+    setPhotoError("");
+
+    try {
+      await deleteDressPhoto(token, dress.id, photoId);
+      setPhotos((current) => current.filter((photo) => photo.id !== photoId));
+    } catch (err) {
+      setPhotoError(
+        err instanceof ApiError ? err.message : "שגיאה במחיקת התמונה",
+      );
+    } finally {
+      setDeletingPhotoId(null);
     }
   }
 
@@ -362,40 +411,147 @@ export default function NewDressPage() {
               )}
             </section>
 
-            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
-              <h2 className="text-lg font-bold text-zinc-900">
-                3. תמונות
-              </h2>
+            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60 sm:p-7">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-lg font-bold text-zinc-900">
+                  3. תמונות
+                </h2>
 
-              {photoPreviews.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {photoPreviews.map((src, index) => (
-                    <img
-                      key={index}
-                      src={src}
-                      alt={`תמונה ${index + 1}`}
-                      className="h-20 w-20 rounded-2xl object-cover"
-                    />
-                  ))}
+                {(photos.length > 0 || selectedFiles.length > 0) && (
+                  <span className="text-xs font-medium text-zinc-400">
+                    {photos.length > 0 && `${photos.length} הועלו`}
+                    {photos.length > 0 && selectedFiles.length > 0 && " · "}
+                    {selectedFiles.length > 0 &&
+                      `${selectedFiles.length} ממתינות`}
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-1 text-sm text-zinc-500">
+                תמונות איכותיות עוזרות לשמלה שלך לבלוט בקטלוג.
+              </p>
+
+              {/* Uploaded gallery */}
+              {photos.length > 0 && (
+                <div className="mt-6">
+                  <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    תמונות שהועלו
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                    {photos.map((photo, index) => (
+                      <div
+                        key={photo.id}
+                        className="group relative aspect-square animate-fade-scale-in overflow-hidden rounded-2xl bg-zinc-100 ring-1 ring-zinc-200/70 transition duration-300 hover:shadow-lg"
+                        style={{ animationDelay: `${index * 40}ms` }}
+                      >
+                        <img
+                          src={getDressImageUrl(photo)}
+                          alt={`תמונה ${index + 1}`}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+
+                        {index === 0 && (
+                          <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur">
+                            ראשית
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePhoto(photo.id)}
+                          disabled={deletingPhotoId === photo.id}
+                          aria-label="מחיקת תמונה"
+                          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/60 text-xs font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:scale-110 hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deletingPhotoId === photo.id ? (
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          ) : (
+                            "✕"
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <input
-                  id="dress-photos"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFilesSelected}
-                  className="flex-1 rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-700"
-                />
+              {/* Selected, waiting to upload */}
+              {selectedPreviews.length > 0 && (
+                <div className="mt-6">
+                  <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-600">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                    ממתינות להעלאה
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                    {selectedPreviews.map((preview, index) => (
+                      <div
+                        key={preview}
+                        className="relative aspect-square animate-fade-scale-in overflow-hidden rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/40"
+                        style={{ animationDelay: `${index * 40}ms` }}
+                      >
+                        <img
+                          src={preview}
+                          alt={`תצוגה מקדימה ${index + 1}`}
+                          className="h-full w-full object-cover opacity-90"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {photos.length === 0 && selectedPreviews.length === 0 && (
+                <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 px-6 py-10 text-center">
+                  <span className="text-4xl">👗</span>
+                  <p className="mt-3 text-sm font-medium text-zinc-600">
+                    עדיין לא הועלו תמונות
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    הוסיפי תמונות איכותיות כדי להציג את השמלה בצורה הטובה
+                    ביותר
+                  </p>
+                </div>
+              )}
+
+              {/* Dropzone + upload action */}
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label
+                  htmlFor="dress-photos"
+                  className="group flex flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 px-4 py-3.5 text-sm text-zinc-600 transition duration-200 hover:border-rose-300 hover:bg-rose-50/40"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1 ring-zinc-200 transition duration-200 group-hover:ring-rose-200">
+                    📷
+                  </span>
+
+                  <span className="flex-1">
+                    {selectedFiles.length > 0
+                      ? `${selectedFiles.length} תמונות נבחרו`
+                      : "לחצי לבחירת תמונות"}
+                  </span>
+
+                  <input
+                    id="dress-photos"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFilesSelected}
+                    className="sr-only"
+                  />
+                </label>
 
                 <button
                   type="button"
                   onClick={handleUploadPhotos}
                   disabled={uploadingPhotos || selectedFiles.length === 0}
-                  className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
+                  {uploadingPhotos && (
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  )}
                   {uploadingPhotos
                     ? "מעלה..."
                     : `העלאת ${selectedFiles.length} תמונות`}

@@ -78,6 +78,13 @@ export default function Header() {
                 שלום, {user.name || user.email}
               </span>
 
+              <Link
+                href="/account"
+                className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50"
+              >
+                שינוי סיסמה
+              </Link>
+
               <button
                 type="button"
                 onClick={handleLogout}

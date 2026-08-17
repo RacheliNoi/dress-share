@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { CSSProperties, useState } from "react";
 import { Dress, getDressImageUrl } from "@/lib/api";
 
-function getPriceRange(dress: Dress) {
+function getPriceLabel(dress: Dress) {
   if (dress.sizes.length === 0) {
-    return "טרם הוגדר מחיר";
+    return null;
   }
 
   const prices = dress.sizes.map((size) => size.price);
@@ -11,82 +14,94 @@ function getPriceRange(dress: Dress) {
   const max = Math.max(...prices);
 
   if (min === max) {
-    return `${min} ₪`;
+    return { eyebrow: "מחיר", value: `${min} ₪` };
   }
 
-  return `${min}–${max} ₪`;
+  return { eyebrow: "החל מ־", value: `${min} ₪` };
 }
 
-export default function DressCard({ dress }: { dress: Dress }) {
+export default function DressCard({
+  dress,
+  style,
+}: {
+  dress: Dress;
+  style?: CSSProperties;
+}) {
   const photo = [...dress.photos].sort(
     (a, b) => a.sortOrder - b.sortOrder,
   )[0];
   const imageUrl = photo ? getDressImageUrl(photo) : null;
+  const price = getPriceLabel(dress);
+
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !imageFailed;
 
   return (
     <Link
       href={`/dress/${dress.id}`}
-      className="group block overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+      style={style}
+      className="animate-fade-scale-in group block overflow-hidden rounded-[1.5rem] bg-white ring-1 ring-zinc-200/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_-15px_rgba(24,24,27,0.18)] sm:rounded-[1.75rem]"
     >
-      <div className="relative h-[380px] overflow-hidden bg-zinc-100">
-        {imageUrl ? (
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-zinc-100">
+        {showImage ? (
           <img
-            src={imageUrl}
+            src={imageUrl ?? undefined}
             alt={dress.name}
-            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+            onError={() => setImageFailed(true)}
+            className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.06]"
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-7xl">
+          <div className="flex h-full items-center justify-center bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-6xl sm:text-7xl">
             👗
           </div>
         )}
 
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
         {dress.photos.length > 1 && (
-          <div className="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
-            📷 {dress.photos.length} תמונות
+          <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur sm:bottom-4 sm:left-4 sm:px-3 sm:py-1.5 sm:text-xs">
+            📷 {dress.photos.length}
           </div>
         )}
       </div>
 
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-xl font-black text-zinc-900">
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-black text-zinc-900 sm:text-lg">
               {dress.name}
             </h3>
 
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 truncate text-xs text-zinc-500 sm:text-sm">
               {dress.category || "ללא קטגוריה"}
               {dress.color && ` · ${dress.color}`}
             </p>
           </div>
 
-          <div className="text-left">
-            <p className="text-xs text-zinc-400">מחיר</p>
-            <p className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900">
-              {getPriceRange(dress)}
-            </p>
-          </div>
+          {price && (
+            <div className="shrink-0 text-left">
+              <p className="text-[10px] uppercase tracking-wide text-zinc-400">
+                {price.eyebrow}
+              </p>
+              <p className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900">
+                {price.value}
+              </p>
+            </div>
+          )}
         </div>
 
-        {dress.description && (
-          <p className="mt-4 line-clamp-2 text-sm leading-6 text-zinc-500">
-            {dress.description}
-          </p>
-        )}
-
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
           {dress.sizes.length > 0 ? (
             dress.sizes.map((size) => (
               <span
                 key={size.id}
-                className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600"
+                className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 sm:px-3 sm:py-1.5 sm:text-xs"
               >
                 {size.size}
               </span>
             ))
           ) : (
-            <span className="text-xs text-zinc-400">
+            <span className="text-[11px] text-zinc-400 sm:text-xs">
               טרם הוגדרו מידות
             </span>
           )}

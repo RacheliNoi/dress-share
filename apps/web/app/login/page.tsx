@@ -63,6 +63,13 @@ export default function LoginPage() {
             className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
           />
 
+          <Link
+            href="/forgot-password"
+            className="-mt-2 text-sm font-medium text-zinc-500 underline underline-offset-4 hover:text-zinc-900"
+          >
+            שכחת סיסמה?
+          </Link>
+
           {error && (
             <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
               {error}

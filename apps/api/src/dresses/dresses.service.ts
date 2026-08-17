@@ -4,8 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { unlink } from 'fs/promises';
+import { basename, join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { DressStatus } from '../../generated/prisma/enums';
+
+const UPLOADS_DIR = join(process.cwd(), 'uploads');
+
 @Injectable()
 export class DressesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -152,6 +157,55 @@ async addPhotos(
   });
 }
 
+async removePhoto(dressId: number, photoId: number, ownerId: number) {
+  const photo = await this.prisma.dressPhoto.findUnique({
+    where: {
+      id: photoId,
+    },
+    include: {
+      dress: true,
+    },
+  });
+
+  if (!photo || photo.dressId !== dressId) {
+    throw new NotFoundException('התמונה לא נמצאה');
+  }
+
+  if (photo.dress.ownerId !== ownerId) {
+    throw new ForbiddenException('אין הרשאה למחוק את התמונה הזו');
+  }
+
+  if (photo.dress.status === DressStatus.APPROVED) {
+    throw new BadRequestException(
+      'שמלה שאושרה לא ניתנת לעריכה ישירה',
+    );
+  }
+
+  const deleted = await this.prisma.dressPhoto.delete({
+    where: {
+      id: photoId,
+    },
+  });
+
+  await this.deleteUploadedFile(deleted.originalUrl);
+
+  if (deleted.processedUrl) {
+    await this.deleteUploadedFile(deleted.processedUrl);
+  }
+
+  return deleted;
+}
+
+private async deleteUploadedFile(url: string) {
+  const filePath = join(UPLOADS_DIR, basename(url));
+
+  try {
+    await unlink(filePath);
+  } catch {
+    // File already missing or inaccessible; the DB record is already gone.
+  }
+}
+
     async submitForApproval(id: number, ownerId: number) {
     const dress = await this.prisma.dress.findUnique({
         where: {
@@ -167,9 +221,12 @@ async addPhotos(
         throw new ForbiddenException('אין הרשאה לשלוח את השמלה הזו לאישור');
     }
 
-    if (dress.status !== DressStatus.DRAFT) {
+    if (
+        dress.status !== DressStatus.DRAFT &&
+        dress.status !== DressStatus.REJECTED
+    ) {
         throw new BadRequestException(
-        'רק שמלה שנמצאת בטיוטה יכולה להישלח לאישור',
+        'רק שמלה שנמצאת בטיוטה או שנדחתה יכולה להישלח לאישור',
         );
     }
 
@@ -179,6 +236,7 @@ async addPhotos(
         },
         data: {
         status: DressStatus.PENDING_APPROVAL,
+        rejectionReason: null,
         },
     });
     }

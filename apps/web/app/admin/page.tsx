@@ -7,11 +7,11 @@ import {
   ApiError,
   PendingDress,
   approveDress,
-  getDressImageUrl,
   getPendingDresses,
   rejectDress,
 } from "@/lib/api";
 import Header from "@/components/Header";
+import PhotoGallery from "@/components/PhotoGallery";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -21,6 +21,8 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actioningId, setActioningId] = useState<number | null>(null);
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   async function loadPending() {
     const token = getToken();
@@ -87,15 +89,31 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function handleReject(id: number) {
+  function openRejectForm(id: number) {
+    setRejectingId(id);
+    setRejectReason("");
+  }
+
+  function cancelRejectForm() {
+    setRejectingId(null);
+    setRejectReason("");
+  }
+
+  async function handleConfirmReject(id: number) {
     const token = getToken();
-    if (!token) return;
+    const reason = rejectReason.trim();
+
+    if (!token || !reason) {
+      return;
+    }
 
     setActioningId(id);
 
     try {
-      await rejectDress(token, id);
+      await rejectDress(token, id, reason);
       setDresses((current) => current.filter((dress) => dress.id !== id));
+      setRejectingId(null);
+      setRejectReason("");
     } catch {
       setError("שגיאה בדחיית השמלה. נסי שוב.");
     } finally {
@@ -169,35 +187,14 @@ export default function AdminDashboardPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
             {dresses.map((dress) => {
-              const photo = [...dress.photos].sort(
-                (a, b) => a.sortOrder - b.sortOrder,
-              )[0];
-              const imageUrl = photo ? getDressImageUrl(photo) : null;
-
               return (
                 <article
                   key={dress.id}
                   className="overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60"
                 >
                   <div className="flex flex-col sm:flex-row">
-                    <div className="relative h-56 w-full shrink-0 overflow-hidden bg-zinc-100 sm:h-auto sm:w-48">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={dress.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-5xl">
-                          👗
-                        </div>
-                      )}
-
-                      {dress.photos.length > 1 && (
-                        <div className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
-                          📷 {dress.photos.length}
-                        </div>
-                      )}
+                    <div className="shrink-0 p-3 sm:w-56">
+                      <PhotoGallery photos={dress.photos} alt={dress.name} />
                     </div>
 
                     <div className="flex-1 p-5">
@@ -237,25 +234,69 @@ export default function AdminDashboardPage() {
                         )}
                       </div>
 
-                      <div className="mt-5 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleApprove(dress.id)}
-                          disabled={actioningId === dress.id}
-                          className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {actioningId === dress.id ? "מעדכנת..." : "אישור"}
-                        </button>
+                      {rejectingId === dress.id ? (
+                        <div className="mt-5 rounded-xl border border-red-200 bg-red-50/50 p-3">
+                          <label className="block text-xs font-bold text-red-700">
+                            סיבת הדחייה (חובה)
+                          </label>
 
-                        <button
-                          type="button"
-                          onClick={() => handleReject(dress.id)}
-                          disabled={actioningId === dress.id}
-                          className="flex-1 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {actioningId === dress.id ? "מעדכנת..." : "דחייה"}
-                        </button>
-                      </div>
+                          <textarea
+                            value={rejectReason}
+                            onChange={(event) =>
+                              setRejectReason(event.target.value)
+                            }
+                            placeholder="למשל: התמונות לא ברורות, חסרים פרטים..."
+                            rows={3}
+                            autoFocus
+                            className="mt-2 w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-red-400"
+                          />
+
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmReject(dress.id)}
+                              disabled={
+                                actioningId === dress.id ||
+                                !rejectReason.trim()
+                              }
+                              className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {actioningId === dress.id
+                                ? "דוחה..."
+                                : "אישור הדחייה"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={cancelRejectForm}
+                              disabled={actioningId === dress.id}
+                              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              ביטול
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-5 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleApprove(dress.id)}
+                            disabled={actioningId === dress.id}
+                            className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {actioningId === dress.id ? "מעדכנת..." : "אישור"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => openRejectForm(dress.id)}
+                            disabled={actioningId === dress.id}
+                            className="flex-1 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            דחייה
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </article>

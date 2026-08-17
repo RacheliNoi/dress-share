@@ -70,14 +70,14 @@ export default function CatalogPage() {
           </div>
         </section>
 
-        {/* Header */}
-        <section className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        {/* Catalog controls */}
+        <section className="mb-6 flex flex-col gap-4 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-2 text-sm font-medium text-rose-500">
               הקטלוג שלנו
             </p>
 
-            <h2 className="text-3xl font-black tracking-tight text-zinc-900">
+            <h2 className="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">
               שמלות זמינות להשכרה
             </h2>
 
@@ -86,23 +86,30 @@ export default function CatalogPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm shadow-sm ring-1 ring-zinc-200/70">
-            <span className="font-bold text-zinc-900">
-              {dresses.length}
-            </span>
-            <span className="text-zinc-500">שמלות</span>
-          </div>
+          {!loading && dresses.length > 0 && (
+            <div className="flex items-center gap-2 self-start rounded-full bg-white px-4 py-2.5 text-sm shadow-sm ring-1 ring-zinc-200/70 sm:self-auto">
+              <span className="font-bold text-zinc-900">
+                {dresses.length}
+              </span>
+              <span className="text-zinc-500">
+                {dresses.length === 1 ? "שמלה" : "שמלות"}
+              </span>
+            </div>
+          )}
         </section>
 
         {/* Error */}
         {error && (
-          <div className="mb-6 flex items-center justify-between rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700">
-            <span>{error}</span>
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex items-center gap-2">
+              <span aria-hidden>⚠</span>
+              {error}
+            </span>
 
             <button
               type="button"
               onClick={loadDresses}
-              className="font-bold underline underline-offset-4"
+              className="self-start rounded-full border border-red-200 px-4 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100 sm:self-auto"
             >
               נסי שוב
             </button>
@@ -111,30 +118,30 @@ export default function CatalogPage() {
 
         {/* Loading */}
         {loading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((item) => (
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
+            {Array.from({ length: 8 }).map((_, item) => (
               <div
                 key={item}
-                className="overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60"
+                className="overflow-hidden rounded-[1.5rem] bg-white ring-1 ring-zinc-200/60 sm:rounded-[1.75rem]"
               >
-                <div className="h-80 animate-pulse bg-zinc-200" />
+                <div className="aspect-[3/4] w-full animate-pulse bg-zinc-200" />
 
-                <div className="space-y-3 p-5">
-                  <div className="h-5 w-2/3 animate-pulse rounded bg-zinc-200" />
-                  <div className="h-4 w-1/3 animate-pulse rounded bg-zinc-100" />
-                  <div className="h-8 w-1/2 animate-pulse rounded bg-zinc-100" />
+                <div className="space-y-3 p-4 sm:p-5">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-200" />
+                  <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
+                  <div className="h-6 w-1/2 animate-pulse rounded bg-zinc-100" />
                 </div>
               </div>
             ))}
           </div>
         ) : dresses.length === 0 ? (
           /* Empty state */
-          <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50 text-4xl">
+          <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-4xl">
               👗
             </div>
 
-            <h3 className="mt-6 text-2xl font-black text-zinc-900">
+            <h3 className="mt-6 text-xl font-black text-zinc-900 sm:text-2xl">
               עדיין אין שמלות בקטלוג
             </h3>
 
@@ -144,9 +151,13 @@ export default function CatalogPage() {
           </section>
         ) : (
           /* Dress grid */
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {dresses.map((dress) => (
-              <DressCard key={dress.id} dress={dress} />
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
+            {dresses.map((dress, index) => (
+              <DressCard
+                key={dress.id}
+                dress={dress}
+                style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+              />
             ))}
           </div>
         )}

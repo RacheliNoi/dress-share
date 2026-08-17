@@ -30,6 +30,7 @@ export type Dress = {
   category: string | null;
   color: string | null;
   status: DressStatus;
+  rejectionReason: string | null;
   ownerId: number;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +104,39 @@ export function register(name: string, email: string, password: string) {
   });
 }
 
+export function changePassword(
+  token: string,
+  data: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  },
+) {
+  return request<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
+  });
+}
+
+export function requestPasswordReset(email: string) {
+  return request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(data: {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}) {
+  return request<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export function getApprovedDresses() {
   return request<Dress[]>("/dresses/approved");
 }
@@ -168,6 +202,17 @@ export function submitDressForApproval(token: string, dressId: number) {
   });
 }
 
+export function deleteDressPhoto(
+  token: string,
+  dressId: number,
+  photoId: number,
+) {
+  return request<DressPhoto>(`/dresses/${dressId}/photos/${photoId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export type PendingDress = Dress & {
   owner: { id: number; name: string | null; email: string };
 };
@@ -183,9 +228,10 @@ export function approveDress(token: string, dressId: number) {
   });
 }
 
-export function rejectDress(token: string, dressId: number) {
+export function rejectDress(token: string, dressId: number, reason: string) {
   return request<Dress>(`/admin/dresses/${dressId}/reject`, {
     method: "PATCH",
     token,
+    body: JSON.stringify({ reason }),
   });
 }

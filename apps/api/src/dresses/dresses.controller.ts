@@ -99,6 +99,20 @@ addPhotos(
 }
 
 @UseGuards(JwtAuthGuard)
+@Delete(':id/photos/:photoId')
+removePhoto(
+  @Param('id') id: string,
+  @Param('photoId') photoId: string,
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.removePhoto(
+    Number(id),
+    Number(photoId),
+    user.sub,
+  );
+}
+
+@UseGuards(JwtAuthGuard)
 @Post(':id/submit')
 submitForApproval(
   @Param('id') id: string,

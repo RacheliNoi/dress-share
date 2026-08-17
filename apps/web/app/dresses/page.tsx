@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken, logout } from "@/lib/auth";
-import { API_URL, ApiError, Dress, DressStatus, getMyDresses } from "@/lib/api";
+import {
+  ApiError,
+  Dress,
+  DressStatus,
+  getDressImageUrl,
+  getMyDresses,
+  submitDressForApproval,
+} from "@/lib/api";
 import Header from "@/components/Header";
 
 const statusConfig: Record<DressStatus, { label: string; className: string }> = {
@@ -44,6 +51,8 @@ const [dresses, setDresses] = useState<Dress[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
 const [checkingAuth, setCheckingAuth] = useState(true);
+const [resubmittingId, setResubmittingId] = useState<number | null>(null);
+const [failedImageIds, setFailedImageIds] = useState<Set<number>>(new Set());
 
 async function loadDresses() {
 const token = getToken();
@@ -73,6 +82,32 @@ setError("");
 
 }
 
+async function handleResubmit(dressId: number) {
+const token = getToken();
+
+if (!token) {
+  router.push("/login");
+  return;
+}
+
+setResubmittingId(dressId);
+
+try {
+  await submitDressForApproval(token, dressId);
+  await loadDresses();
+} catch (err) {
+  if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+    logout();
+    router.push("/login");
+    return;
+  }
+
+  setError("שגיאה בשליחה מחדש לאישור. נסי שוב.");
+} finally {
+  setResubmittingId(null);
+}
+}
+
 useEffect(() => {
 if (!getToken()) {
   router.push("/login");
@@ -95,7 +130,7 @@ const photo = [...dress.photos].sort(
 
 if (!photo) return null;
 
-return `${API_URL}${photo.processedUrl ?? photo.originalUrl}`;
+return getDressImageUrl(photo);
 
 }
 
@@ -271,6 +306,7 @@ return (<main
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {dresses.map((dress) => {
           const imageUrl = getImageUrl(dress);
+          const showImage = Boolean(imageUrl) && !failedImageIds.has(dress.id);
           const status = statusConfig[dress.status];
 
           return (
@@ -280,10 +316,13 @@ return (<main
             >
               {/* Image */}
               <div className="relative h-[380px] overflow-hidden bg-zinc-100">
-                {imageUrl ? (
+                {showImage ? (
                   <img
-                    src={imageUrl}
+                    src={imageUrl ?? undefined}
                     alt={dress.name}
+                    onError={() =>
+                      setFailedImageIds((current) => new Set(current).add(dress.id))
+                    }
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                   />
                 ) : (
@@ -353,6 +392,29 @@ return (<main
                     </span>
                   )}
                 </div>
+
+                {dress.status === "REJECTED" && (
+                  <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4">
+                    <p className="text-xs font-bold text-red-700">
+                      סיבת הדחייה
+                    </p>
+
+                    <p className="mt-1 text-sm leading-6 text-red-700">
+                      {dress.rejectionReason || "לא צוינה סיבה."}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => handleResubmit(dress.id)}
+                      disabled={resubmittingId === dress.id}
+                      className="mt-3 w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {resubmittingId === dress.id
+                        ? "שולחת מחדש..."
+                        : "שליחה מחדש לאישור"}
+                    </button>
+                  </div>
+                )}
 
                 <div className="mt-5 flex gap-2">
                   <button

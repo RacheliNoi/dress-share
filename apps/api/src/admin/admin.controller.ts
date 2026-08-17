@@ -1,8 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 
@@ -26,7 +28,15 @@ export class AdminController {
   }
 
   @Patch('dresses/:id/reject')
-  rejectDress(@Param('id') id: string) {
-    return this.adminService.rejectDress(Number(id));
+  rejectDress(
+    @Param('id') id: string,
+    @Body() body: { reason: string },
+  ) {
+    return this.adminService.rejectDress(Number(id), body?.reason);
+  }
+
+  @Post('users/:id/reset-password')
+  initiatePasswordReset(@Param('id') id: string) {
+    return this.adminService.initiatePasswordReset(Number(id));
   }
 }
