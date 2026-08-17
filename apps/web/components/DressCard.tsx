@@ -58,6 +58,11 @@ export default function DressCard({
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
+        <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm backdrop-blur sm:right-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+          זמינה להשכרה
+        </div>
+
         {dress.photos.length > 1 && (
           <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur sm:bottom-4 sm:left-4 sm:px-3 sm:py-1.5 sm:text-xs">
             📷 {dress.photos.length}
