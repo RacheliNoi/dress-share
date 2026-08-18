@@ -61,15 +61,51 @@ function StatusPanel({ dress }: { dress: Dress }) {
       );
 
     case "APPROVED":
+      if (dress.pendingReviewSubmittedAt) {
+        return (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <p className="text-sm font-bold text-amber-700">
+              העריכה שלך ממתינה לאישור מנהל
+            </p>
+            <p className="mt-1 text-sm leading-6 text-amber-700">
+              הציבור עדיין רואה את הגרסה המאושרת הנוכחית. השינויים שהצעת
+              יופיעו בקטלוג רק לאחר אישור מנהל. לא ניתן לערוך שוב עד להחלטה.
+            </p>
+          </div>
+        );
+      }
+
       return (
-        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-          <p className="text-sm font-bold text-emerald-700">
-            מאושרת וזמינה להשכרה
-          </p>
-          <p className="mt-1 text-sm leading-6 text-emerald-700">
-            השמלה מאושרת ומוצגת בקטלוג הציבורי. לא ניתן לערוך שמלה שכבר
-            אושרה.
-          </p>
+        <div className="mt-6 space-y-3">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+            <p className="text-sm font-bold text-emerald-700">
+              מאושרת וזמינה להשכרה
+            </p>
+            <p className="mt-1 text-sm leading-6 text-emerald-700">
+              השמלה מאושרת ומוצגת בקטלוג הציבורי.
+            </p>
+
+            <a
+              href={`/dresses/${dress.id}/edit`}
+              className="mt-4 inline-flex rounded-xl bg-zinc-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-zinc-700"
+            >
+              ערוך שמלה
+            </a>
+          </div>
+
+          {dress.rejectionReason && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+              <p className="text-sm font-bold text-red-700">
+                העריכה האחרונה שלך נדחתה
+              </p>
+              <p className="mt-1 text-sm leading-6 text-red-700">
+                {dress.rejectionReason}
+              </p>
+              <p className="mt-2 text-xs text-red-600">
+                הגרסה המאושרת הנוכחית (זו שהציבור רואה) לא נפגעה.
+              </p>
+            </div>
+          )}
         </div>
       );
 
@@ -155,8 +191,19 @@ export default function MyDressDetailsPage() {
     return null;
   }
 
+  // "מידות ומחירים" below reflects exactly what's currently live/public -
+  // pending (ADD/REMOVE-flagged) rows from an in-progress or submitted edit
+  // are reviewed on the edit page instead, not mixed into this factual list.
+  const liveSizes = dress
+    ? dress.sizes.filter((size) => size.pendingAction === null)
+    : [];
+  const liveOrPendingRemovalSizes = dress
+    ? dress.sizes.filter((size) => size.pendingAction !== "ADD")
+    : [];
   const photos = dress
-    ? [...dress.photos].sort((a, b) => a.sortOrder - b.sortOrder)
+    ? [...dress.photos]
+        .filter((photo) => photo.pendingAction === null)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
     : [];
   const activePhoto = photos[activePhotoIndex];
 
@@ -264,9 +311,9 @@ export default function MyDressDetailsPage() {
                   מידות ומחירים
                 </h2>
 
-                {dress.sizes.length > 0 ? (
+                {liveSizes.length > 0 ? (
                   <ul className="mt-4 divide-y divide-zinc-100">
-                    {dress.sizes.map((size) => (
+                    {liveSizes.map((size) => (
                       <li
                         key={size.id}
                         className="flex items-center justify-between py-3"
@@ -288,7 +335,10 @@ export default function MyDressDetailsPage() {
               </div>
 
               {dress.status === "APPROVED" && (
-                <DressAvailabilityManager dressId={dress.id} sizes={dress.sizes} />
+                <DressAvailabilityManager
+                  dressId={dress.id}
+                  sizes={liveOrPendingRemovalSizes}
+                />
               )}
             </div>
           </div>

@@ -1,17 +1,25 @@
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+// null = live/unaffected. "ADD" = proposed by an in-review edit to an
+// already-approved dress, hidden from the public until approved. "REMOVE" =
+// an existing live row flagged for removal by an in-review edit - stays
+// fully visible to the public until the edit is actually approved.
+export type DressPendingAction = "ADD" | "REMOVE" | null;
+
 export type DressPhoto = {
   id: number;
   originalUrl: string;
   processedUrl: string | null;
   sortOrder: number;
+  pendingAction: DressPendingAction;
 };
 
 export type DressSize = {
   id: number;
   size: string;
   price: number;
+  pendingAction: DressPendingAction;
 };
 
 export type DressStatus =
@@ -22,6 +30,16 @@ export type DressStatus =
   | "PENDING_APPROVAL"
   | "APPROVED"
   | "REJECTED";
+
+// Proposed new values for an in-progress/submitted edit to an approved
+// dress - only present (non-null) on owner-facing reads (getMyDresses /
+// getPendingDresses), never on the public getApprovedDresses.
+export type DressPendingDetails = {
+  name?: string;
+  description?: string | null;
+  category?: string | null;
+  color?: string | null;
+};
 
 export type Dress = {
   id: number;
@@ -36,6 +54,10 @@ export type Dress = {
   updatedAt: string;
   photos: DressPhoto[];
   sizes: DressSize[];
+  // Both undefined on the public getApprovedDresses response (the backend
+  // never selects them there) - only present on owner/admin reads.
+  pendingDetails?: DressPendingDetails | null;
+  pendingReviewSubmittedAt?: string | null;
 };
 
 export type AuthUser = {
@@ -271,12 +293,19 @@ export function createDress(
   });
 }
 
+// The size/price-change endpoints return the affected DressSize plus,
+// when relevant, whether that size currently has active bookings - a
+// non-blocking warning surfaced to the owner (existing bookings are never
+// affected either way; this size just won't be bookable again once the
+// edit that removed/replaced it is approved).
+export type DressSizeChangeResult = DressSize & { hasActiveBookings?: boolean };
+
 export function addDressSize(
   token: string,
   dressId: number,
   data: { size: string; price: number },
 ) {
-  return request<DressSize>(`/dresses/${dressId}/sizes`, {
+  return request<DressSizeChangeResult>(`/dresses/${dressId}/sizes`, {
     method: "POST",
     token,
     body: JSON.stringify(data),
@@ -289,7 +318,7 @@ export function updateDressSize(
   sizeId: number,
   data: { size?: string; price?: number },
 ) {
-  return request<DressSize>(`/dresses/${dressId}/sizes/${sizeId}`, {
+  return request<DressSizeChangeResult>(`/dresses/${dressId}/sizes/${sizeId}`, {
     method: "PATCH",
     token,
     body: JSON.stringify(data),
@@ -297,8 +326,22 @@ export function updateDressSize(
 }
 
 export function deleteDressSize(token: string, dressId: number, sizeId: number) {
-  return request<DressSize>(`/dresses/${dressId}/sizes/${sizeId}`, {
+  return request<DressSizeChangeResult>(`/dresses/${dressId}/sizes/${sizeId}`, {
     method: "DELETE",
+    token,
+  });
+}
+
+// "Undo" for one pending size change (before the whole edit is submitted):
+// discards a not-yet-approved addition, or restores a live size that was
+// flagged for removal.
+export function cancelPendingSizeChange(
+  token: string,
+  dressId: number,
+  sizeId: number,
+) {
+  return request<DressSize>(`/dresses/${dressId}/sizes/${sizeId}/cancel-pending`, {
+    method: "POST",
     token,
   });
 }
@@ -345,6 +388,41 @@ export function deleteDressPhoto(
 ) {
   return request<DressPhoto>(`/dresses/${dressId}/photos/${photoId}`, {
     method: "DELETE",
+    token,
+  });
+}
+
+// "Undo" for one pending photo change (before the whole edit is submitted):
+// discards a not-yet-approved upload, or restores a live photo that was
+// flagged for removal.
+export function cancelPendingPhotoChange(
+  token: string,
+  dressId: number,
+  photoId: number,
+) {
+  return request<DressPhoto>(`/dresses/${dressId}/photos/${photoId}/cancel-pending`, {
+    method: "POST",
+    token,
+  });
+}
+
+// Submits an in-progress edit to an already-APPROVED dress for admin
+// review. Unlike submitDressForApproval (brand-new dresses), the dress's
+// own `status` never changes - it stays APPROVED throughout, which is why
+// the public catalog keeps showing the live data untouched until an admin
+// actually approves the edit.
+export function submitDressEditForApproval(token: string, dressId: number) {
+  return request<Dress>(`/dresses/${dressId}/submit-edit`, {
+    method: "POST",
+    token,
+  });
+}
+
+// Discards an in-progress (not-yet-submitted) edit entirely, reverting the
+// dress to exactly its current approved state.
+export function cancelPendingDressEdit(token: string, dressId: number) {
+  return request<Dress>(`/dresses/${dressId}/cancel-edit`, {
+    method: "POST",
     token,
   });
 }

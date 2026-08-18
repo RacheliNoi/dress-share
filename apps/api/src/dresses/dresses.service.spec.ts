@@ -24,15 +24,25 @@ describe('DressesService', () => {
     };
     dressPhoto: {
       findUnique: jest.Mock;
+      findMany: jest.Mock;
       delete: jest.Mock;
+      deleteMany: jest.Mock;
       createMany: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
     };
     dressSize: {
       findUnique: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       delete: jest.Mock;
+      deleteMany: jest.Mock;
       create: jest.Mock;
     };
+    booking: {
+      count: jest.Mock;
+    };
+    $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -47,15 +57,25 @@ describe('DressesService', () => {
       },
       dressPhoto: {
         findUnique: jest.fn(),
+        findMany: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
         createMany: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
       },
       dressSize: {
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
         create: jest.fn(),
       },
+      booking: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -86,6 +106,24 @@ describe('DressesService', () => {
         }),
       );
       expect(result).toEqual([{ id: 1, status: DressStatus.APPROVED }]);
+    });
+
+    it('never selects pendingDetails/pendingReviewSubmittedAt, and filters sizes/photos to live-or-pending-removal only', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved();
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+
+      expect(call.select.pendingDetails).toBeUndefined();
+      expect(call.select.pendingReviewSubmittedAt).toBeUndefined();
+      expect(call.select.sizes).toEqual({
+        where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] },
+      });
+      expect(call.select.photos).toEqual({
+        where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] },
+        orderBy: { sortOrder: 'asc' },
+      });
     });
   });
 
@@ -204,11 +242,74 @@ describe('DressesService', () => {
       expect(prisma.dress.update).not.toHaveBeenCalled();
     });
 
-    it('rejects editing an already-APPROVED dress', async () => {
+    it('allows editing an APPROVED dress with no submitted pending edit - writes to pendingDetails, not the live fields', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         ownerId: 7,
         status: DressStatus.APPROVED,
+        name: 'שם חי',
+        description: 'תיאור חי',
+        category: 'ערב',
+        color: 'אדום',
+        pendingDetails: null,
+        pendingReviewSubmittedAt: null,
+      });
+      prisma.dress.update.mockResolvedValue({ id: 1, status: DressStatus.APPROVED });
+
+      await service.update(1, 7, { name: 'שם מוצע' });
+
+      expect(prisma.dress.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1 },
+          data: {
+            pendingDetails: {
+              name: 'שם מוצע',
+              description: 'תיאור חי',
+              category: 'ערב',
+              color: 'אדום',
+            },
+          },
+        }),
+      );
+    });
+
+    it('merges into an already-in-progress pendingDetails draft rather than overwriting it', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        name: 'שם חי',
+        description: 'תיאור חי',
+        category: 'ערב',
+        color: 'אדום',
+        pendingDetails: { name: 'שם מוצע קודם', description: 'תיאור חי', category: 'ערב', color: 'אדום' },
+        pendingReviewSubmittedAt: null,
+      });
+      prisma.dress.update.mockResolvedValue({ id: 1, status: DressStatus.APPROVED });
+
+      await service.update(1, 7, { color: 'כחול' });
+
+      expect(prisma.dress.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            pendingDetails: {
+              name: 'שם מוצע קודם',
+              description: 'תיאור חי',
+              category: 'ערב',
+              color: 'כחול',
+            },
+          },
+        }),
+      );
+    });
+
+    it('rejects editing an APPROVED dress whose edit was already submitted for review', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        pendingDetails: null,
+        pendingReviewSubmittedAt: new Date('2026-08-18'),
       });
 
       await expect(
@@ -297,13 +398,106 @@ describe('DressesService', () => {
       expect(prisma.dressSize.update).not.toHaveBeenCalled();
     });
 
-    it('rejects updating a size on an already-APPROVED dress', async () => {
+    it('editing a live size on an APPROVED dress flags it REMOVE and creates a new ADD row - never mutates the live row', async () => {
       prisma.dressSize.findUnique.mockResolvedValue({
         id: 3,
         dressId: 1,
         size: 'M',
         price: 100,
-        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED },
+        pendingAction: null,
+        dress: {
+          id: 1,
+          ownerId: 7,
+          status: DressStatus.APPROVED,
+          pendingReviewSubmittedAt: null,
+        },
+      });
+      prisma.dressSize.update.mockResolvedValue({ id: 3, size: 'M', price: 100, pendingAction: 'REMOVE' });
+      prisma.dressSize.create.mockResolvedValue({ id: 9, dressId: 1, size: 'M', price: 150, pendingAction: 'ADD' });
+
+      const result = await service.updateSize(1, 3, 7, { price: 150 });
+
+      expect(prisma.dressSize.update).toHaveBeenCalledWith({
+        where: { id: 3 },
+        data: { pendingAction: 'REMOVE' },
+      });
+      expect(prisma.dressSize.create).toHaveBeenCalledWith({
+        data: { dressId: 1, size: 'M', price: 150, pendingAction: 'ADD' },
+      });
+      expect(result.pendingAction).toBe('ADD');
+      expect(result.price).toBe(150);
+    });
+
+    it('reports whether the size being replaced has active bookings (non-blocking warning)', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.booking.count.mockResolvedValue(2);
+      prisma.dressSize.update.mockResolvedValue({ id: 3 });
+      prisma.dressSize.create.mockResolvedValue({ id: 9, dressId: 1, size: 'M', price: 150 });
+
+      const result = await service.updateSize(1, 3, 7, { price: 150 });
+
+      expect(prisma.booking.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ dressId: 1, size: 'M' }) }),
+      );
+      expect((result as { hasActiveBookings?: boolean }).hasActiveBookings).toBe(true);
+    });
+
+    it('editing a not-yet-approved ADD-flagged row updates it directly (no remove+add pair)', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 9,
+        dressId: 1,
+        size: 'M',
+        price: 150,
+        pendingAction: 'ADD',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressSize.update.mockResolvedValue({ id: 9, size: 'M', price: 175, pendingAction: 'ADD' });
+
+      await service.updateSize(1, 9, 7, { price: 175 });
+
+      expect(prisma.dressSize.update).toHaveBeenCalledWith({
+        where: { id: 9 },
+        data: { size: undefined, price: 175 },
+      });
+      expect(prisma.dressSize.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects editing a size already flagged for removal', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        pendingAction: 'REMOVE',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+
+      await expect(service.updateSize(1, 3, 7, { price: 150 })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects updating a size on an APPROVED dress whose edit was already submitted for review', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        pendingAction: null,
+        dress: {
+          id: 1,
+          ownerId: 7,
+          status: DressStatus.APPROVED,
+          pendingReviewSubmittedAt: new Date('2026-08-18'),
+        },
       });
 
       await expect(
@@ -391,19 +585,94 @@ describe('DressesService', () => {
       expect(prisma.dressSize.delete).not.toHaveBeenCalled();
     });
 
-    it('rejects deleting a size from an already-APPROVED dress', async () => {
+    it('removing a live size from an APPROVED dress soft-flags REMOVE instead of deleting it', async () => {
       prisma.dressSize.findUnique.mockResolvedValue({
         id: 3,
         dressId: 1,
         size: 'M',
         price: 100,
-        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED },
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressSize.update.mockResolvedValue({ id: 3, size: 'M', price: 100, pendingAction: 'REMOVE' });
+
+      const result = await service.removeSize(1, 3, 7);
+
+      expect(prisma.dressSize.update).toHaveBeenCalledWith({
+        where: { id: 3 },
+        data: { pendingAction: 'REMOVE' },
+      });
+      expect(prisma.dressSize.delete).not.toHaveBeenCalled();
+      expect(result.pendingAction).toBe('REMOVE');
+    });
+
+    it('flags hasActiveBookings when removing a size that has active bookings (non-blocking)', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.booking.count.mockResolvedValue(1);
+      prisma.dressSize.update.mockResolvedValue({ id: 3, pendingAction: 'REMOVE' });
+
+      const result = await service.removeSize(1, 3, 7);
+
+      expect((result as { hasActiveBookings?: boolean }).hasActiveBookings).toBe(true);
+    });
+
+    it('removing a not-yet-approved ADD-flagged size hard-deletes it (never went live)', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 9,
+        dressId: 1,
+        size: 'XL',
+        price: 999,
+        pendingAction: 'ADD',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressSize.delete.mockResolvedValue({ id: 9 });
+
+      await service.removeSize(1, 9, 7);
+
+      expect(prisma.dressSize.delete).toHaveBeenCalledWith({ where: { id: 9 } });
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects removing a size that is already flagged for removal', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        pendingAction: 'REMOVE',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+
+      await expect(service.removeSize(1, 3, 7)).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects deleting a size from an APPROVED dress whose edit was already submitted for review', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        pendingAction: null,
+        dress: {
+          id: 1,
+          ownerId: 7,
+          status: DressStatus.APPROVED,
+          pendingReviewSubmittedAt: new Date('2026-08-18'),
+        },
       });
 
       await expect(service.removeSize(1, 3, 7)).rejects.toThrow(
         BadRequestException,
       );
       expect(prisma.dressSize.delete).not.toHaveBeenCalled();
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
     });
 
     it('rejects deleting a size from a dress that is PENDING_APPROVAL', async () => {
@@ -546,19 +815,82 @@ describe('DressesService', () => {
       expect(prisma.dressPhoto.delete).not.toHaveBeenCalled();
     });
 
-    it('rejects deleting a photo from an already-APPROVED dress', async () => {
+    it('removing a live photo from an APPROVED dress soft-flags REMOVE and keeps the file on disk', async () => {
       prisma.dressPhoto.findUnique.mockResolvedValue({
         id: 5,
         dressId: 1,
         originalUrl: '/uploads/photo-5.jpg',
         processedUrl: null,
-        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED },
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressPhoto.update.mockResolvedValue({ id: 5, pendingAction: 'REMOVE' });
+
+      const result = await service.removePhoto(1, 5, 7);
+
+      expect(prisma.dressPhoto.update).toHaveBeenCalledWith({
+        where: { id: 5 },
+        data: { pendingAction: 'REMOVE' },
+      });
+      expect(prisma.dressPhoto.delete).not.toHaveBeenCalled();
+      expect(unlink).not.toHaveBeenCalled();
+      expect(result.pendingAction).toBe('REMOVE');
+    });
+
+    it('removing a not-yet-approved ADD-flagged photo hard-deletes it and its file (never went live)', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue({
+        id: 9,
+        dressId: 1,
+        originalUrl: '/uploads/photo-9.jpg',
+        processedUrl: null,
+        pendingAction: 'ADD',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressPhoto.delete.mockResolvedValue({
+        id: 9,
+        originalUrl: '/uploads/photo-9.jpg',
+        processedUrl: null,
+      });
+
+      await service.removePhoto(1, 9, 7);
+
+      expect(prisma.dressPhoto.delete).toHaveBeenCalledWith({ where: { id: 9 } });
+      expect(unlink).toHaveBeenCalledWith(expect.stringContaining('photo-9.jpg'));
+    });
+
+    it('rejects removing a photo that is already flagged for removal', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue({
+        id: 5,
+        dressId: 1,
+        originalUrl: '/uploads/photo-5.jpg',
+        processedUrl: null,
+        pendingAction: 'REMOVE',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+
+      await expect(service.removePhoto(1, 5, 7)).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects deleting a photo from an APPROVED dress whose edit was already submitted for review', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue({
+        id: 5,
+        dressId: 1,
+        originalUrl: '/uploads/photo-5.jpg',
+        processedUrl: null,
+        pendingAction: null,
+        dress: {
+          id: 1,
+          ownerId: 7,
+          status: DressStatus.APPROVED,
+          pendingReviewSubmittedAt: new Date('2026-08-18'),
+        },
       });
 
       await expect(service.removePhoto(1, 5, 7)).rejects.toThrow(
         BadRequestException,
       );
       expect(prisma.dressPhoto.delete).not.toHaveBeenCalled();
+      expect(prisma.dressPhoto.update).not.toHaveBeenCalled();
     });
 
     it('rejects deleting a photo from a dress that is PENDING_APPROVAL', async () => {
@@ -591,11 +923,29 @@ describe('DressesService', () => {
       expect(prisma.dressSize.create).not.toHaveBeenCalled();
     });
 
-    it('rejects adding a size to an already-APPROVED dress', async () => {
+    it('adding a size to an APPROVED dress with no submitted edit creates an ADD-flagged row (hidden from public until approved)', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         ownerId: 7,
         status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: null,
+      });
+      prisma.dressSize.create.mockResolvedValue({ id: 9, dressId: 1, size: 'M', price: 100, pendingAction: 'ADD' });
+
+      const result = await service.addSize({ dressId: 1, size: 'M', price: 100, ownerId: 7 });
+
+      expect(prisma.dressSize.create).toHaveBeenCalledWith({
+        data: { dressId: 1, size: 'M', price: 100, pendingAction: 'ADD' },
+      });
+      expect(result.pendingAction).toBe('ADD');
+    });
+
+    it('rejects adding a size to an APPROVED dress whose edit was already submitted for review', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: new Date('2026-08-18'),
       });
 
       await expect(
@@ -619,17 +969,215 @@ describe('DressesService', () => {
       expect(prisma.dressPhoto.createMany).not.toHaveBeenCalled();
     });
 
-    it('rejects adding photos to an already-APPROVED dress', async () => {
+    it('adding photos to an APPROVED dress with no submitted edit flags them ADD (hidden from public until approved)', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         ownerId: 7,
         status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: null,
+      });
+      prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
+
+      await service.addPhotos(1, 7, [
+        { filename: 'a.jpg' } as Express.Multer.File,
+      ]);
+
+      expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({ dressId: 1, pendingAction: 'ADD' }),
+        ],
+      });
+    });
+
+    it('rejects adding photos to an APPROVED dress whose edit was already submitted for review', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: new Date('2026-08-18'),
       });
 
       await expect(
         service.addPhotos(1, 7, []),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.dressPhoto.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('submitEditForApproval', () => {
+    it('locks in the pending edit by setting pendingReviewSubmittedAt (status stays APPROVED)', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: null,
+        pendingDetails: { name: 'שם מוצע' },
+        sizes: [],
+        photos: [],
+      });
+      prisma.dress.update.mockResolvedValue({ id: 1, status: DressStatus.APPROVED });
+
+      await service.submitEditForApproval(1, 7);
+
+      expect(prisma.dress.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { pendingReviewSubmittedAt: expect.any(Date) },
+      });
+    });
+
+    it('rejects when there is nothing pending to submit', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: null,
+        pendingDetails: null,
+        sizes: [{ pendingAction: null }],
+        photos: [{ pendingAction: null }],
+      });
+
+      await expect(service.submitEditForApproval(1, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects submitting an edit for a dress that is not APPROVED', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+        pendingReviewSubmittedAt: null,
+        sizes: [],
+        photos: [],
+      });
+
+      await expect(service.submitEditForApproval(1, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects submitting an edit that was already submitted', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: new Date('2026-08-18'),
+        sizes: [],
+        photos: [],
+      });
+
+      await expect(service.submitEditForApproval(1, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("rejects submitting another user's edit", async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 999,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: null,
+        sizes: [],
+        photos: [],
+      });
+
+      await expect(service.submitEditForApproval(1, 7)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe('cancelPendingEdit', () => {
+    it('discards ADD rows (and their files) and restores REMOVE-flagged rows to live', async () => {
+      prisma.dress.findUnique
+        .mockResolvedValueOnce({
+          id: 1,
+          ownerId: 7,
+          status: DressStatus.APPROVED,
+          pendingReviewSubmittedAt: null,
+        })
+        .mockResolvedValueOnce({ id: 1, sizes: [], photos: [] });
+      prisma.dressPhoto.findMany.mockResolvedValue([
+        { id: 9, originalUrl: '/uploads/pending.jpg', processedUrl: null },
+      ]);
+
+      await service.cancelPendingEdit(1, 7);
+
+      expect(prisma.dressPhoto.deleteMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'ADD' },
+      });
+      expect(prisma.dressSize.deleteMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'ADD' },
+      });
+      expect(prisma.dressPhoto.updateMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'REMOVE' },
+        data: { pendingAction: null },
+      });
+      expect(prisma.dressSize.updateMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'REMOVE' },
+        data: { pendingAction: null },
+      });
+      expect(unlink).toHaveBeenCalledWith(expect.stringContaining('pending.jpg'));
+    });
+
+    it('rejects cancelling an edit that was already submitted for review', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: new Date('2026-08-18'),
+      });
+
+      await expect(service.cancelPendingEdit(1, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('cancelPendingSizeChange', () => {
+    it('discards a pending ADD size', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 9,
+        dressId: 1,
+        pendingAction: 'ADD',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressSize.delete.mockResolvedValue({ id: 9 });
+
+      await service.cancelPendingSizeChange(1, 9, 7);
+
+      expect(prisma.dressSize.delete).toHaveBeenCalledWith({ where: { id: 9 } });
+    });
+
+    it('restores a REMOVE-flagged size back to live', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        pendingAction: 'REMOVE',
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressSize.update.mockResolvedValue({ id: 3, pendingAction: null });
+
+      await service.cancelPendingSizeChange(1, 3, 7);
+
+      expect(prisma.dressSize.update).toHaveBeenCalledWith({
+        where: { id: 3 },
+        data: { pendingAction: null },
+      });
+    });
+
+    it('rejects when there is nothing pending to cancel', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+
+      await expect(service.cancelPendingSizeChange(1, 3, 7)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

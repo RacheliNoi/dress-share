@@ -23,6 +23,11 @@ enum DressStatus {
   REJECTED
 }
 
+enum DressPendingAction {
+  ADD
+  REMOVE
+}
+
 model User {
   id                  Int                  @id @default(autoincrement())
   email               String               @unique
@@ -82,6 +87,22 @@ model Dress {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
+  // Editing-an-approved-dress support (Stage: approved-edit + re-approval).
+  // `status` is intentionally left at APPROVED for the entire edit/review
+  // cycle - the public catalog query (findApproved) filters on `status`
+  // alone and is never touched by this feature, so it keeps showing the
+  // live name/description/category/color and the live (pendingAction: null)
+  // sizes/photos throughout, with zero changes to that read path.
+  // pendingDetails holds the proposed new scalar values while an edit is
+  // being drafted/reviewed; null otherwise. pendingReviewSubmittedAt is null
+  // while the owner is still drafting (freely editable, not visible to
+  // admin), and set the moment the edit is submitted for admin review
+  // (locks further edits, surfaces it in the admin queue - mirrors
+  // PENDING_APPROVAL's role for brand-new dresses, without reusing `status`
+  // itself so the public read path never has to branch on it).
+  pendingDetails           Json?
+  pendingReviewSubmittedAt DateTime?
+
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   photos   DressPhoto[]
@@ -100,6 +121,13 @@ model DressPhoto {
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 
+  // null = live/unaffected. ADD = proposed new photo, hidden from the public
+  // until the edit is approved. REMOVE = an existing live photo flagged for
+  // removal - stays fully visible to the public (row and file both untouched)
+  // until approval actually deletes it, so an in-review edit never affects
+  // what's currently shown.
+  pendingAction DressPendingAction?
+
   dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
 
   @@index([dressId])
@@ -113,9 +141,22 @@ model DressSize {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Same ADD/REMOVE meaning as DressPhoto.pendingAction. Editing an existing
+  // live size's label/price is modeled as REMOVE-flagging the live row plus
+  // creating a new ADD-flagged row with the proposed values, rather than
+  // mutating the live row in place - so the public price/label never changes
+  // before an admin approves it.
+  pendingAction DressPendingAction?
+
   dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
 
-  @@unique([dressId, size])
+  // pendingAction is part of the unique key (not just [dressId, size]) so a
+  // live "M" (pendingAction: null) and a proposed replacement "M"
+  // (pendingAction: ADD) can coexist as distinct rows while an edit is being
+  // drafted/reviewed - Postgres treats each NULL as distinct, so this still
+  // prevents two simultaneous live rows or two simultaneous pending-ADD rows
+  // for the same size.
+  @@unique([dressId, size, pendingAction])
   @@index([dressId])
 }
 

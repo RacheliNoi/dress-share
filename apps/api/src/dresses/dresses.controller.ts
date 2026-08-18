@@ -109,6 +109,20 @@ removeSize(
 }
 
 @UseGuards(JwtAuthGuard)
+@Post(':id/sizes/:sizeId/cancel-pending')
+cancelPendingSizeChange(
+  @Param('id') id: string,
+  @Param('sizeId') sizeId: string,
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.cancelPendingSizeChange(
+    Number(id),
+    Number(sizeId),
+    user.sub,
+  );
+}
+
+@UseGuards(JwtAuthGuard)
 @Post(':id/photos')
 @UseInterceptors(
   FilesInterceptor('images', 10, {
@@ -151,6 +165,20 @@ removePhoto(
 }
 
 @UseGuards(JwtAuthGuard)
+@Post(':id/photos/:photoId/cancel-pending')
+cancelPendingPhotoChange(
+  @Param('id') id: string,
+  @Param('photoId') photoId: string,
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.cancelPendingPhotoChange(
+    Number(id),
+    Number(photoId),
+    user.sub,
+  );
+}
+
+@UseGuards(JwtAuthGuard)
 @Post(':id/submit')
 submitForApproval(
   @Param('id') id: string,
@@ -179,6 +207,30 @@ update(
     Number(id),
     user.sub,
     body,
+  );
+}
+
+@UseGuards(JwtAuthGuard)
+@Post(':id/submit-edit')
+submitEditForApproval(
+  @Param('id') id: string,
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.submitEditForApproval(
+    Number(id),
+    user.sub,
+  );
+}
+
+@UseGuards(JwtAuthGuard)
+@Post(':id/cancel-edit')
+cancelPendingEdit(
+  @Param('id') id: string,
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.cancelPendingEdit(
+    Number(id),
+    user.sub,
   );
 }
 

@@ -466,6 +466,82 @@ describe('BookingsService', () => {
       expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
+    describe('price snapshotting at INTERESTED-creation time', () => {
+      it('snapshots the size price onto the booking when creating INTERESTED', async () => {
+        prisma.dress.findUnique.mockResolvedValue({
+          ...dressWithSizes,
+          sizes: [
+            { id: 1, size: 'S', price: 100 },
+            { id: 2, size: 'M', price: 150 },
+            { id: 3, size: 'L', price: 200 },
+          ],
+        });
+        prisma.booking.findFirst.mockResolvedValue(null);
+        prisma.booking.create.mockResolvedValue({ id: 1, size: 'M', price: 150 });
+
+        await service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          size: 'M',
+          ownerId: 7,
+        });
+
+        expect(prisma.booking.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ size: 'M', price: 150 }),
+        });
+      });
+
+      it('markAsRented uses the snapshotted price, not the current (possibly changed) DressSize price', async () => {
+        prisma.booking.findUnique.mockResolvedValue({
+          id: 1,
+          dressId: 1,
+          status: BookingStatus.INTERESTED,
+          size: 'M',
+          price: 150, // snapshotted at INTERESTED-creation time
+          startDate: new Date('2026-09-01'),
+          endDate: new Date('2026-09-05'),
+          dress: {
+            ...dressWithSizes,
+            // The dress's M size was since edited to 999 (e.g. an approved
+            // price edit) - the booking must NOT pick up the new price.
+            sizes: [{ id: 2, size: 'M', price: 999 }],
+          },
+        });
+        prisma.booking.update.mockResolvedValue({ id: 1, status: BookingStatus.RENTED, price: 150 });
+
+        const result = await service.markAsRented(1, 7, {});
+
+        expect(prisma.booking.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ price: 150 }) }),
+        );
+        expect(result.price).toBe(150);
+      });
+
+      it('falls back to the current DressSize price for a legacy booking with no snapshotted price', async () => {
+        prisma.booking.findUnique.mockResolvedValue({
+          id: 1,
+          dressId: 1,
+          status: BookingStatus.INTERESTED,
+          size: 'M',
+          price: null, // created before price-snapshotting existed
+          startDate: new Date('2026-09-01'),
+          endDate: new Date('2026-09-05'),
+          dress: {
+            ...dressWithSizes,
+            sizes: [{ id: 2, size: 'M', price: 175 }],
+          },
+        });
+        prisma.booking.update.mockResolvedValue({ id: 1, status: BookingStatus.RENTED, price: 175 });
+
+        await service.markAsRented(1, 7, {});
+
+        expect(prisma.booking.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ price: 175 }) }),
+        );
+      });
+    });
+
     describe('markAsRented size-locking', () => {
       it('locks the size from the INTERESTED booking and derives price from the matching DressSize', async () => {
         prisma.booking.findUnique.mockResolvedValue({

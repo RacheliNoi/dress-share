@@ -46,7 +46,13 @@ export class BookingsService {
   private async loadOwnedDress(dressId: number, ownerId: number) {
     const dress = await this.prisma.dress.findUnique({
       where: { id: dressId },
-      include: { sizes: true },
+      // Bookable sizes are the currently-live ones (pendingAction: null)
+      // plus any flagged for removal by an in-review edit (REMOVE) - nothing
+      // changes publicly/bookably until that edit is actually approved.
+      // Sizes proposed by an in-review edit (ADD) aren't real/bookable yet.
+      include: {
+        sizes: { where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] } },
+      },
     });
 
     if (!dress) {
@@ -179,6 +185,16 @@ export class BookingsService {
       hasSizes ? data.size : undefined,
     );
 
+    // Snapshots the size's price at the moment of interest, exactly like
+    // createRented already does for a direct RENTED booking - so a later
+    // price edit to the dress (or even removal of the size) can never
+    // retroactively change what this renter was quoted when they expressed
+    // interest. markAsRented uses this snapshot as-is rather than
+    // re-deriving it from the (possibly since-changed) DressSize row.
+    const matchingSize = hasSizes
+      ? dress.sizes.find((candidate) => candidate.size === data.size)
+      : undefined;
+
     return this.prisma.booking.create({
       data: {
         dressId: data.dressId,
@@ -186,6 +202,7 @@ export class BookingsService {
         endDate,
         status: BookingStatus.INTERESTED,
         size: hasSizes ? data.size : undefined,
+        price: hasSizes ? matchingSize?.price : undefined,
       },
     });
   }
@@ -291,7 +308,13 @@ export class BookingsService {
   private async loadOwnedBooking(bookingId: number, ownerId: number) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { dress: { include: { sizes: true } } },
+      include: {
+        dress: {
+          include: {
+            sizes: { where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] } },
+          },
+        },
+      },
     });
 
     if (!booking) {
@@ -335,26 +358,36 @@ export class BookingsService {
     if (hasSizes) {
       // The size was already fixed when this booking was created as
       // INTERESTED (see createInterested) - it can't change at
-      // confirm-rental time, and the price is always re-derived from that
-      // size's current DressSize row so it can never drift from what the
-      // size actually costs (rather than trusting a client-sent price).
+      // confirm-rental time.
       if (data.size !== undefined && data.size !== booking.size) {
         throw new BadRequestException(
           'לא ניתן לשנות את המידה בשלב אישור ההשכרה - המידה נקבעה כשההתעניינות נוצרה',
         );
       }
 
-      const matchingSize = dressSizes.find(
-        (candidate) => candidate.size === booking.size,
-      );
-
-      if (!matchingSize) {
-        throw new BadRequestException(
-          'לא נמצאה עוד הגדרת מחיר עבור המידה שנקבעה להתעניינות זו',
+      if (booking.price !== null) {
+        // The price was already snapshotted onto the booking when it was
+        // created as INTERESTED (see createInterested) - it's used as-is,
+        // deliberately NOT re-derived from the size's current DressSize row,
+        // so a later price edit to the dress (or even removal of the size
+        // entirely) can never retroactively change what an existing renter
+        // was quoted.
+        price = booking.price;
+      } else {
+        // Legacy INTERESTED booking created before price-snapshotting
+        // existed - best-effort fallback to the size's current price.
+        const matchingSize = dressSizes.find(
+          (candidate) => candidate.size === booking.size,
         );
-      }
 
-      price = matchingSize.price;
+        if (!matchingSize) {
+          throw new BadRequestException(
+            'לא נמצאה עוד הגדרת מחיר עבור המידה שנקבעה להתעניינות זו',
+          );
+        }
+
+        price = matchingSize.price;
+      }
     } else {
       // No DressSize rows for this dress - original free-text behavior,
       // untouched.

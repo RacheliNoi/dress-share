@@ -5,6 +5,10 @@ import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DressStatus } from '../../generated/prisma/enums';
 
+jest.mock('fs/promises', () => ({
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
+
 describe('AdminService', () => {
   let service: AdminService;
   let prisma: {
@@ -13,6 +17,9 @@ describe('AdminService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    dressPhoto: { deleteMany: jest.Mock; updateMany: jest.Mock };
+    dressSize: { deleteMany: jest.Mock; updateMany: jest.Mock };
+    $transaction: jest.Mock;
   };
   let authService: { adminInitiatePasswordReset: jest.Mock };
 
@@ -23,6 +30,9 @@ describe('AdminService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      dressPhoto: { deleteMany: jest.fn(), updateMany: jest.fn() },
+      dressSize: { deleteMany: jest.fn(), updateMany: jest.fn() },
+      $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     };
     authService = {
       adminInitiatePasswordReset: jest.fn(),
@@ -44,14 +54,19 @@ describe('AdminService', () => {
   });
 
   describe('findPendingDresses', () => {
-    it('queries only PENDING_APPROVAL dresses', async () => {
+    it('queries both PENDING_APPROVAL dresses and APPROVED dresses with a submitted edit', async () => {
       prisma.dress.findMany.mockResolvedValue([]);
 
       await service.findPendingDresses();
 
       expect(prisma.dress.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { status: DressStatus.PENDING_APPROVAL },
+          where: {
+            OR: [
+              { status: DressStatus.PENDING_APPROVAL },
+              { pendingReviewSubmittedAt: { not: null } },
+            ],
+          },
         }),
       );
     });
@@ -107,6 +122,45 @@ describe('AdminService', () => {
         NotFoundException,
       );
       expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+
+    it('applies a submitted edit: promotes ADD rows, deletes REMOVE rows, applies pendingDetails, keeps status APPROVED', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: new Date('2026-08-18'),
+        pendingDetails: { name: 'שם חדש', color: 'כחול' },
+        sizes: [{ id: 1, pendingAction: 'REMOVE' }, { id: 2, pendingAction: 'ADD' }],
+        photos: [{ id: 5, pendingAction: 'REMOVE', originalUrl: '/uploads/old.jpg', processedUrl: null }],
+      });
+      prisma.dress.update.mockResolvedValue({ id: 1, status: DressStatus.APPROVED, name: 'שם חדש' });
+
+      const result = await service.approveDress(1);
+
+      expect(prisma.dressPhoto.deleteMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'REMOVE' },
+      });
+      expect(prisma.dressSize.deleteMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'REMOVE' },
+      });
+      expect(prisma.dressPhoto.updateMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'ADD' },
+        data: { pendingAction: null },
+      });
+      expect(prisma.dressSize.updateMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'ADD' },
+        data: { pendingAction: null },
+      });
+      expect(prisma.dress.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: expect.objectContaining({
+          name: 'שם חדש',
+          color: 'כחול',
+          pendingReviewSubmittedAt: null,
+          rejectionReason: null,
+        }),
+      });
+      expect(result.status).toBe(DressStatus.APPROVED);
     });
   });
 
@@ -176,6 +230,55 @@ describe('AdminService', () => {
         BadRequestException,
       );
       expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+
+    it('discards a submitted edit: deletes ADD rows, restores REMOVE rows, keeps status APPROVED (not REJECTED)', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        status: DressStatus.APPROVED,
+        pendingReviewSubmittedAt: new Date('2026-08-18'),
+        pendingDetails: { name: 'שם מוצע' },
+        sizes: [{ id: 1, pendingAction: 'REMOVE' }, { id: 2, pendingAction: 'ADD' }],
+        photos: [{ id: 9, pendingAction: 'ADD', originalUrl: '/uploads/new.jpg', processedUrl: null }],
+      });
+      prisma.dress.update.mockResolvedValue({
+        id: 1,
+        status: DressStatus.APPROVED,
+        rejectionReason: 'לא מתאים',
+      });
+
+      const result = await service.rejectDress(1, 'לא מתאים');
+
+      expect(prisma.dressPhoto.deleteMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'ADD' },
+      });
+      expect(prisma.dressSize.deleteMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'ADD' },
+      });
+      expect(prisma.dressPhoto.updateMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'REMOVE' },
+        data: { pendingAction: null },
+      });
+      expect(prisma.dressSize.updateMany).toHaveBeenCalledWith({
+        where: { dressId: 1, pendingAction: 'REMOVE' },
+        data: { pendingAction: null },
+      });
+      expect(prisma.dress.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: expect.objectContaining({
+          pendingReviewSubmittedAt: null,
+          rejectionReason: 'לא מתאים',
+        }),
+      });
+      // Crucially: `status` is NOT part of the update payload here - the
+      // dress itself stays APPROVED and public, only the proposed edit is
+      // discarded.
+      expect(prisma.dress.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({ status: expect.anything() }),
+        }),
+      );
+      expect(result.status).toBe(DressStatus.APPROVED);
     });
   });
 

@@ -101,7 +101,12 @@ describe('AdminController', () => {
       expect(response.body).toHaveLength(1);
       expect(prisma.dress.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { status: DressStatus.PENDING_APPROVAL },
+          where: {
+            OR: [
+              { status: DressStatus.PENDING_APPROVAL },
+              { pendingReviewSubmittedAt: { not: null } },
+            ],
+          },
         }),
       );
     });

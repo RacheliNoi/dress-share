@@ -187,6 +187,58 @@ export default function AdminDashboardPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
             {dresses.map((dress) => {
+              // A card is either a brand-new dress submission (status
+              // PENDING_APPROVAL) or an edit to an already-approved dress
+              // (status stays APPROVED, pendingReviewSubmittedAt is set) -
+              // both share the same approve/reject actions below, but an
+              // edit also gets a before/after comparison so the admin isn't
+              // just told "here's a name", they can see what's changing.
+              const isEdit = dress.status === "APPROVED";
+              const liveSizes = dress.sizes.filter(
+                (size) => size.pendingAction === null,
+              );
+              const addedSizes = dress.sizes.filter(
+                (size) => size.pendingAction === "ADD",
+              );
+              const removedSizes = dress.sizes.filter(
+                (size) => size.pendingAction === "REMOVE",
+              );
+              const addedPhotos = dress.photos.filter(
+                (photo) => photo.pendingAction === "ADD",
+              );
+              const removedPhotos = dress.photos.filter(
+                (photo) => photo.pendingAction === "REMOVE",
+              );
+              const pending = dress.pendingDetails;
+              const changedFields = isEdit && pending
+                ? (
+                    [
+                      pending.name !== undefined && pending.name !== dress.name
+                        ? { label: "שם", from: dress.name, to: pending.name }
+                        : null,
+                      pending.description !== undefined &&
+                      pending.description !== dress.description
+                        ? {
+                            label: "תיאור",
+                            from: dress.description || "—",
+                            to: pending.description || "—",
+                          }
+                        : null,
+                      pending.category !== undefined &&
+                      pending.category !== dress.category
+                        ? {
+                            label: "קטגוריה",
+                            from: dress.category || "—",
+                            to: pending.category || "—",
+                          }
+                        : null,
+                      pending.color !== undefined && pending.color !== dress.color
+                        ? { label: "צבע", from: dress.color || "—", to: pending.color || "—" }
+                        : null,
+                    ] as const
+                  ).filter((field): field is NonNullable<typeof field> => field !== null)
+                : [];
+
               return (
                 <article
                   key={dress.id}
@@ -194,10 +246,19 @@ export default function AdminDashboardPage() {
                 >
                   <div className="flex flex-col sm:flex-row">
                     <div className="shrink-0 p-3 sm:w-56">
-                      <PhotoGallery photos={dress.photos} alt={dress.name} />
+                      <PhotoGallery
+                        photos={dress.photos.filter((photo) => photo.pendingAction !== "REMOVE")}
+                        alt={dress.name}
+                      />
                     </div>
 
                     <div className="flex-1 p-5">
+                      {isEdit && (
+                        <span className="mb-2 inline-flex rounded-full bg-sky-100 px-3 py-1 text-[11px] font-bold text-sky-700">
+                          עריכה לשמלה קיימת ומאושרת
+                        </span>
+                      )}
+
                       <h3 className="text-lg font-black text-zinc-900">
                         {dress.name}
                       </h3>
@@ -208,7 +269,8 @@ export default function AdminDashboardPage() {
                       </p>
 
                       <p className="mt-1 text-xs text-zinc-400">
-                        נשלחה על ידי {dress.owner.name || dress.owner.email}
+                        {isEdit ? "עריכה נשלחה על ידי" : "נשלחה על ידי"}{" "}
+                        {dress.owner.name || dress.owner.email}
                       </p>
 
                       {dress.description && (
@@ -217,22 +279,63 @@ export default function AdminDashboardPage() {
                         </p>
                       )}
 
+                      {changedFields.length > 0 && (
+                        <div className="mt-3 space-y-1.5 rounded-xl bg-sky-50/60 p-3">
+                          {changedFields.map((field) => (
+                            <p key={field.label} className="text-xs text-sky-800">
+                              <span className="font-bold">{field.label}:</span>{" "}
+                              <span className="text-zinc-500 line-through">{field.from}</span>
+                              {" ← "}
+                              <span className="font-bold">{field.to}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {dress.sizes.length > 0 ? (
-                          dress.sizes.map((size) => (
-                            <span
-                              key={size.id}
-                              className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600"
-                            >
-                              מידה {size.size} · {size.price} ₪
-                            </span>
-                          ))
+                        {liveSizes.length > 0 || addedSizes.length > 0 || removedSizes.length > 0 ? (
+                          <>
+                            {liveSizes.map((size) => (
+                              <span
+                                key={size.id}
+                                className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600"
+                              >
+                                מידה {size.size} · {size.price} ₪
+                              </span>
+                            ))}
+                            {addedSizes.map((size) => (
+                              <span
+                                key={size.id}
+                                className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700"
+                              >
+                                + מידה {size.size} · {size.price} ₪
+                              </span>
+                            ))}
+                            {removedSizes.map((size) => (
+                              <span
+                                key={size.id}
+                                className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 line-through"
+                              >
+                                מידה {size.size} · {size.price} ₪
+                              </span>
+                            ))}
+                          </>
                         ) : (
                           <span className="text-xs text-zinc-400">
                             טרם הוגדרו מידות
                           </span>
                         )}
                       </div>
+
+                      {(addedPhotos.length > 0 || removedPhotos.length > 0) && (
+                        <p className="mt-2 text-xs text-zinc-500">
+                          {addedPhotos.length > 0 &&
+                            `${addedPhotos.length} תמונות חדשות מוצעות`}
+                          {addedPhotos.length > 0 && removedPhotos.length > 0 && " · "}
+                          {removedPhotos.length > 0 &&
+                            `${removedPhotos.length} תמונות מסומנות להסרה`}
+                        </p>
+                      )}
 
                       {rejectingId === dress.id ? (
                         <div className="mt-5 rounded-xl border border-red-200 bg-red-50/50 p-3">

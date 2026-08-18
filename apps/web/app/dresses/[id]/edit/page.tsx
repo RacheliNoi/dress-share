@@ -9,10 +9,14 @@ import {
   Dress,
   addDressPhotos,
   addDressSize,
+  cancelPendingDressEdit,
+  cancelPendingPhotoChange,
+  cancelPendingSizeChange,
   deleteDressPhoto,
   deleteDressSize,
   getDressImageUrl,
   getMyDresses,
+  submitDressEditForApproval,
   submitDressForApproval,
   updateDress,
   updateDressSize,
@@ -42,6 +46,7 @@ export default function EditDressPage() {
   const [savingSizeId, setSavingSizeId] = useState<number | null>(null);
   const [removingSizeId, setRemovingSizeId] = useState<number | null>(null);
   const [sizeActionError, setSizeActionError] = useState("");
+  const [sizeActionWarning, setSizeActionWarning] = useState("");
 
   const [newSizeValue, setNewSizeValue] = useState("");
   const [newPriceValue, setNewPriceValue] = useState("");
@@ -56,6 +61,13 @@ export default function EditDressPage() {
 
   const [resubmitting, setResubmitting] = useState(false);
   const [resubmitError, setResubmitError] = useState("");
+
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [submitEditError, setSubmitEditError] = useState("");
+  const [cancellingEdit, setCancellingEdit] = useState(false);
+  const [cancelEditError, setCancelEditError] = useState("");
+
+  const isApprovedEdit = dress?.status === "APPROVED";
 
   async function loadDress() {
     const token = getToken();
@@ -88,16 +100,24 @@ export default function EditDressPage() {
         return;
       }
 
-      if (found.status === "APPROVED") {
-        setLoadError("שמלה שאושרה כבר לא ניתנת לעריכה.");
+      if (found.status === "APPROVED" && found.pendingReviewSubmittedAt) {
+        setLoadError(
+          "העריכה שלך כבר נשלחה לאישור מנהל - יש להמתין להחלטה לפני עריכה נוספת.",
+        );
         return;
       }
 
       setDress(found);
-      setName(found.name);
-      setDescription(found.description ?? "");
-      setCategory(found.category ?? "");
-      setColor(found.color ?? "");
+
+      // While an approved dress is being edited, the public catalog keeps
+      // showing the live values - the form here is prefilled from any
+      // already-in-progress pending draft instead, so returning to this
+      // page never loses what was already proposed.
+      const pending = found.pendingDetails;
+      setName(pending?.name ?? found.name);
+      setDescription((pending?.description ?? found.description) ?? "");
+      setCategory((pending?.category ?? found.category) ?? "");
+      setColor((pending?.color ?? found.color) ?? "");
       setSizeDrafts(
         Object.fromEntries(
           found.sizes.map((size) => [
@@ -155,7 +175,11 @@ export default function EditDressPage() {
       });
 
       setDress(updated);
-      setSaveSuccess("הפרטים נשמרו בהצלחה.");
+      setSaveSuccess(
+        isApprovedEdit
+          ? "השינויים נשמרו כטיוטה. הם יופיעו בקטלוג רק לאחר אישור מנהל."
+          : "הפרטים נשמרו בהצלחה.",
+      );
     } catch (err) {
       setSaveError(
         err instanceof ApiError ? err.message : "שגיאה בשמירת הפרטים",
@@ -229,12 +253,19 @@ export default function EditDressPage() {
 
     setSavingSizeId(sizeId);
     setSizeActionError("");
+    setSizeActionWarning("");
 
     try {
-      await updateDressSize(token, dress.id, sizeId, {
+      const result = await updateDressSize(token, dress.id, sizeId, {
         size: draft.size.trim(),
         price,
       });
+
+      if (result.hasActiveBookings) {
+        setSizeActionWarning(
+          `יש הזמנות פעילות במידה ${draft.size.trim()} - הן ימשיכו להתקיים כפי שהן; המידה הקודמת פשוט לא תהיה זמינה להזמנות חדשות לאחר אישור העריכה.`,
+        );
+      }
 
       await refreshDressAndSizeDrafts(token, dress.id);
     } catch (err) {
@@ -261,13 +292,43 @@ export default function EditDressPage() {
 
     setRemovingSizeId(sizeId);
     setSizeActionError("");
+    setSizeActionWarning("");
 
     try {
-      await deleteDressSize(token, dress.id, sizeId);
+      const result = await deleteDressSize(token, dress.id, sizeId);
+
+      if (result.hasActiveBookings) {
+        setSizeActionWarning(
+          "יש הזמנות פעילות במידה זו - הן ימשיכו להתקיים כפי שהן, אך לא ניתן יהיה ליצור הזמנות חדשות במידה זו לאחר אישור העריכה.",
+        );
+      }
+
       await refreshDressAndSizeDrafts(token, dress.id);
     } catch (err) {
       setSizeActionError(
         err instanceof ApiError ? err.message : "שגיאה בהסרת המידה",
+      );
+    } finally {
+      setRemovingSizeId(null);
+    }
+  }
+
+  async function handleCancelSizeChange(sizeId: number) {
+    const token = getToken();
+
+    if (!token || !dress) {
+      return;
+    }
+
+    setRemovingSizeId(sizeId);
+    setSizeActionError("");
+
+    try {
+      await cancelPendingSizeChange(token, dress.id, sizeId);
+      await refreshDressAndSizeDrafts(token, dress.id);
+    } catch (err) {
+      setSizeActionError(
+        err instanceof ApiError ? err.message : "שגיאה בביטול השינוי",
       );
     } finally {
       setRemovingSizeId(null);
@@ -346,18 +407,32 @@ export default function EditDressPage() {
 
     try {
       await deleteDressPhoto(token, dress.id, photoId);
-
-      setDress((current) =>
-        current
-          ? {
-              ...current,
-              photos: current.photos.filter((photo) => photo.id !== photoId),
-            }
-          : current,
-      );
+      await refreshDressAndSizeDrafts(token, dress.id);
     } catch (err) {
       setPhotoError(
         err instanceof ApiError ? err.message : "שגיאה במחיקת התמונה",
+      );
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  }
+
+  async function handleCancelPhotoChange(photoId: number) {
+    const token = getToken();
+
+    if (!token || !dress) {
+      return;
+    }
+
+    setDeletingPhotoId(photoId);
+    setPhotoError("");
+
+    try {
+      await cancelPendingPhotoChange(token, dress.id, photoId);
+      await refreshDressAndSizeDrafts(token, dress.id);
+    } catch (err) {
+      setPhotoError(
+        err instanceof ApiError ? err.message : "שגיאה בביטול השינוי",
       );
     } finally {
       setDeletingPhotoId(null);
@@ -401,7 +476,70 @@ export default function EditDressPage() {
     }
   }
 
+  async function handleSubmitEdit() {
+    const token = getToken();
+
+    if (!token || !dress) {
+      return;
+    }
+
+    setSubmittingEdit(true);
+    setSubmitEditError("");
+
+    try {
+      // Detail fields (name/description/category/color) are saved live into
+      // the pending draft on every "שמירת שינויים" click above, so nothing
+      // extra needs flushing here - this just locks in what's already
+      // staged and sends it to the admin queue.
+      await submitDressEditForApproval(token, dress.id);
+      router.push(`/dresses/${dress.id}`);
+    } catch (err) {
+      setSubmitEditError(
+        err instanceof ApiError ? err.message : "שגיאה בשליחת העריכה לאישור",
+      );
+    } finally {
+      setSubmittingEdit(false);
+    }
+  }
+
+  async function handleCancelEdit() {
+    const token = getToken();
+
+    if (!token || !dress) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "לבטל את כל השינויים שביצעת ולחזור לגרסה המאושרת הנוכחית?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCancellingEdit(true);
+    setCancelEditError("");
+
+    try {
+      await cancelPendingDressEdit(token, dress.id);
+      router.push(`/dresses/${dress.id}`);
+    } catch (err) {
+      setCancelEditError(
+        err instanceof ApiError ? err.message : "שגיאה בביטול העריכה",
+      );
+    } finally {
+      setCancellingEdit(false);
+    }
+  }
+
   const canResubmit = dress?.status === "DRAFT" || dress?.status === "REJECTED";
+  const hasPendingChanges = Boolean(
+    dress &&
+      isApprovedEdit &&
+      (dress.pendingDetails != null ||
+        dress.sizes.some((size) => size.pendingAction !== null) ||
+        dress.photos.some((photo) => photo.pendingAction !== null)),
+  );
 
   return (
     <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
@@ -416,7 +554,7 @@ export default function EditDressPage() {
         </Link>
 
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">
-          עריכת שמלה
+          {isApprovedEdit ? "עריכת שמלה מאושרת" : "עריכת שמלה"}
         </h1>
 
         {loading ? (
@@ -443,6 +581,19 @@ export default function EditDressPage() {
           </section>
         ) : dress ? (
           <div className="mt-8 space-y-6">
+            {isApprovedEdit && (
+              <section className="rounded-3xl border border-sky-100 bg-sky-50 p-6">
+                <p className="text-sm font-bold text-sky-800">
+                  את עורכת שמלה שכבר מאושרת ומוצגת בקטלוג
+                </p>
+                <p className="mt-1 text-sm leading-6 text-sky-800">
+                  השינויים שתבצעי כאן נשמרים כטיוטה ולא משפיעים על מה שהציבור
+                  רואה. הציבור ימשיך לראות את הגרסה הנוכחית עד שתשלחי את
+                  העריכה לאישור מנהל, וזו תאושר בפועל.
+                </p>
+              </section>
+            )}
+
             {dress.status === "REJECTED" && (
               <section className="rounded-3xl border border-red-100 bg-red-50 p-6">
                 <p className="text-sm font-bold text-red-700">
@@ -537,11 +688,45 @@ export default function EditDressPage() {
                       price: String(size.price),
                     };
 
+                    if (size.pendingAction === "REMOVE") {
+                      return (
+                        <div
+                          key={size.id}
+                          className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 p-3"
+                        >
+                          <span className="text-sm text-red-700 line-through">
+                            מידה {size.size} · {size.price} ₪
+                          </span>
+                          <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                            מסומן להסרה
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelSizeChange(size.id)}
+                            disabled={removingSizeId === size.id}
+                            className="mr-auto rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {removingSizeId === size.id ? "מבטלת..." : "בטל הסרה"}
+                          </button>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div
                         key={size.id}
-                        className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 p-3"
+                        className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${
+                          size.pendingAction === "ADD"
+                            ? "border-emerald-200 bg-emerald-50/40"
+                            : "border-zinc-200"
+                        }`}
                       >
+                        {size.pendingAction === "ADD" && (
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                            חדש - ממתין לאישור
+                          </span>
+                        )}
+
                         <input
                           type="text"
                           value={draft.size}
@@ -598,6 +783,12 @@ export default function EditDressPage() {
                 </div>
               )}
 
+              {sizeActionWarning && (
+                <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                  {sizeActionWarning}
+                </p>
+              )}
+
               {sizeActionError && (
                 <p className="mt-3 text-sm text-red-600">{sizeActionError}</p>
               )}
@@ -649,7 +840,13 @@ export default function EditDressPage() {
                   {dress.photos.map((photo, index) => (
                     <div
                       key={photo.id}
-                      className="group relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 ring-1 ring-zinc-200/70 transition duration-300 hover:shadow-lg"
+                      className={`group relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 ring-1 transition duration-300 hover:shadow-lg ${
+                        photo.pendingAction === "REMOVE"
+                          ? "opacity-50 ring-red-200"
+                          : photo.pendingAction === "ADD"
+                            ? "ring-emerald-300"
+                            : "ring-zinc-200/70"
+                      }`}
                     >
                       <img
                         src={getDressImageUrl(photo)}
@@ -663,19 +860,43 @@ export default function EditDressPage() {
                         </span>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePhoto(photo.id)}
-                        disabled={deletingPhotoId === photo.id}
-                        aria-label="מחיקת תמונה"
-                        className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/60 text-xs font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:scale-110 hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {deletingPhotoId === photo.id ? (
-                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                        ) : (
-                          "✕"
-                        )}
-                      </button>
+                      {photo.pendingAction === "ADD" && (
+                        <span className="absolute bottom-2 right-2 rounded-full bg-emerald-100/95 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-sm backdrop-blur">
+                          ממתין לאישור
+                        </span>
+                      )}
+
+                      {photo.pendingAction === "REMOVE" && (
+                        <span className="absolute bottom-2 right-2 rounded-full bg-red-100/95 px-2 py-0.5 text-[10px] font-bold text-red-700 shadow-sm backdrop-blur">
+                          מסומן להסרה
+                        </span>
+                      )}
+
+                      {photo.pendingAction === "REMOVE" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleCancelPhotoChange(photo.id)}
+                          disabled={deletingPhotoId === photo.id}
+                          aria-label="ביטול הסרה"
+                          className="absolute left-2 top-2 flex h-7 items-center justify-center rounded-full bg-zinc-900/70 px-2 text-[10px] font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deletingPhotoId === photo.id ? "..." : "בטל הסרה"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePhoto(photo.id)}
+                          disabled={deletingPhotoId === photo.id}
+                          aria-label="מחיקת תמונה"
+                          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/60 text-xs font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:scale-110 hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deletingPhotoId === photo.id ? (
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          ) : (
+                            "✕"
+                          )}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -782,6 +1003,50 @@ export default function EditDressPage() {
                 >
                   {resubmitting ? "שולחת..." : "שמור ושלח מחדש לאישור"}
                 </button>
+              </section>
+            )}
+
+            {isApprovedEdit && (
+              <section className="rounded-3xl bg-zinc-900 p-6 text-white shadow-sm">
+                <h2 className="text-lg font-bold">שליחת העריכה לאישור</h2>
+
+                <p className="mt-2 text-sm leading-6 text-zinc-300">
+                  {hasPendingChanges
+                    ? "לאחר שליחת העריכה לאישור, השינויים ייכנסו לתור הבדיקה של המנהל. הציבור ימשיך לראות את הגרסה הנוכחית עד שהעריכה תאושר, ולא ניתן יהיה לערוך שוב עד להחלטה."
+                    : "עדיין לא ביצעת שינויים לשמלה זו."}
+                </p>
+
+                {submitEditError && (
+                  <div className="mt-4 rounded-2xl bg-red-500/10 p-4 text-sm text-red-200">
+                    {submitEditError}
+                  </div>
+                )}
+
+                {cancelEditError && (
+                  <div className="mt-4 rounded-2xl bg-red-500/10 p-4 text-sm text-red-200">
+                    {cancelEditError}
+                  </div>
+                )}
+
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={handleSubmitEdit}
+                    disabled={submittingEdit || cancellingEdit || !hasPendingChanges}
+                    className="flex-1 rounded-xl bg-white px-4 py-3 font-bold text-zinc-900 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submittingEdit ? "שולחת..." : "שלח עריכה לאישור"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={submittingEdit || cancellingEdit || !hasPendingChanges}
+                    className="rounded-xl border border-white/20 px-4 py-3 font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {cancellingEdit ? "מבטלת..." : "ביטול כל השינויים"}
+                  </button>
+                </div>
               </section>
             )}
           </div>
