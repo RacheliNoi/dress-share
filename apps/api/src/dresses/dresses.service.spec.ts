@@ -25,6 +25,13 @@ describe('DressesService', () => {
     dressPhoto: {
       findUnique: jest.Mock;
       delete: jest.Mock;
+      createMany: jest.Mock;
+    };
+    dressSize: {
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      delete: jest.Mock;
+      create: jest.Mock;
     };
   };
 
@@ -41,6 +48,13 @@ describe('DressesService', () => {
       dressPhoto: {
         findUnique: jest.fn(),
         delete: jest.fn(),
+        createMany: jest.fn(),
+      },
+      dressSize: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+        create: jest.fn(),
       },
     };
 
@@ -143,6 +157,277 @@ describe('DressesService', () => {
         BadRequestException,
       );
       expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it("updates the owner's own dress and returns it with sizes and photos included", async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.REJECTED,
+      });
+      prisma.dress.update.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        name: 'שם מעודכן',
+        status: DressStatus.REJECTED,
+        sizes: [{ id: 1, size: 'M', price: 100 }],
+        photos: [{ id: 1, originalUrl: '/uploads/a.jpg' }],
+      });
+
+      const result = await service.update(1, 7, { name: 'שם מעודכן' });
+
+      expect(prisma.dress.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1 },
+          include: {
+            sizes: true,
+            photos: { orderBy: { sortOrder: 'asc' } },
+          },
+        }),
+      );
+      expect(result.sizes).toEqual([{ id: 1, size: 'M', price: 100 }]);
+      expect(result.photos).toEqual([{ id: 1, originalUrl: '/uploads/a.jpg' }]);
+    });
+
+    it("rejects editing another user's dress", async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 999,
+        status: DressStatus.REJECTED,
+      });
+
+      await expect(
+        service.update(1, 7, { name: 'x' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects editing an already-APPROVED dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+      });
+
+      await expect(
+        service.update(1, 7, { name: 'x' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects editing a dress that is PENDING_APPROVAL', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.PENDING_APPROVAL,
+      });
+
+      await expect(
+        service.update(1, 7, { name: 'x' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a missing dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update(999, 7, { name: 'x' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.dress.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateSize', () => {
+    it("updates the price of the owner's own size", async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 7, status: DressStatus.REJECTED },
+      });
+      prisma.dressSize.update.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 150,
+      });
+
+      const result = await service.updateSize(1, 3, 7, { price: 150 });
+
+      expect(prisma.dressSize.update).toHaveBeenCalledWith({
+        where: { id: 3 },
+        data: { size: undefined, price: 150 },
+      });
+      expect(result.price).toBe(150);
+    });
+
+    it('translates a duplicate size-label conflict into a BadRequestException', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 7, status: DressStatus.REJECTED },
+      });
+      prisma.dressSize.update.mockRejectedValue(
+        Object.assign(new Error('unique constraint'), { code: 'P2002' }),
+      );
+
+      await expect(
+        service.updateSize(1, 3, 7, { size: 'L' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rejects updating another user's size", async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 999, status: DressStatus.REJECTED },
+      });
+
+      await expect(
+        service.updateSize(1, 3, 7, { price: 150 }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects updating a size on an already-APPROVED dress', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED },
+      });
+
+      await expect(
+        service.updateSize(1, 3, 7, { price: 150 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects updating a size on a dress that is PENDING_APPROVAL', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 7, status: DressStatus.PENDING_APPROVAL },
+      });
+
+      await expect(
+        service.updateSize(1, 3, 7, { price: 150 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
+    });
+
+    it('returns NotFoundException for a missing size', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateSize(1, 999, 7, { price: 150 }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
+    });
+
+    it("returns NotFoundException when the size belongs to a different dress", async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 42,
+        size: 'M',
+        price: 100,
+        dress: { id: 42, ownerId: 7, status: DressStatus.REJECTED },
+      });
+
+      await expect(
+        service.updateSize(1, 3, 7, { price: 150 }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removeSize', () => {
+    it("allows the owner to delete their own dress's size", async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 7, status: DressStatus.REJECTED },
+      });
+      prisma.dressSize.delete.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+      });
+
+      const result = await service.removeSize(1, 3, 7);
+
+      expect(prisma.dressSize.delete).toHaveBeenCalledWith({
+        where: { id: 3 },
+      });
+      expect(result.id).toBe(3);
+    });
+
+    it("rejects deleting another user's size", async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 999, status: DressStatus.REJECTED },
+      });
+
+      await expect(service.removeSize(1, 3, 7)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.dressSize.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting a size from an already-APPROVED dress', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED },
+      });
+
+      await expect(service.removeSize(1, 3, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.dressSize.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting a size from a dress that is PENDING_APPROVAL', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        dress: { id: 1, ownerId: 7, status: DressStatus.PENDING_APPROVAL },
+      });
+
+      await expect(service.removeSize(1, 3, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.dressSize.delete).not.toHaveBeenCalled();
+    });
+
+    it('returns NotFoundException for a missing size', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue(null);
+
+      await expect(service.removeSize(1, 999, 7)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.dressSize.delete).not.toHaveBeenCalled();
     });
   });
 
@@ -274,6 +559,77 @@ describe('DressesService', () => {
         BadRequestException,
       );
       expect(prisma.dressPhoto.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting a photo from a dress that is PENDING_APPROVAL', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue({
+        id: 5,
+        dressId: 1,
+        originalUrl: '/uploads/photo-5.jpg',
+        processedUrl: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.PENDING_APPROVAL },
+      });
+
+      await expect(service.removePhoto(1, 5, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.dressPhoto.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addSize', () => {
+    it('rejects adding a size to a dress that is PENDING_APPROVAL', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.PENDING_APPROVAL,
+      });
+
+      await expect(
+        service.addSize({ dressId: 1, size: 'M', price: 100, ownerId: 7 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressSize.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects adding a size to an already-APPROVED dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+      });
+
+      await expect(
+        service.addSize({ dressId: 1, size: 'M', price: 100, ownerId: 7 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressSize.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addPhotos', () => {
+    it('rejects adding photos to a dress that is PENDING_APPROVAL', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.PENDING_APPROVAL,
+      });
+
+      await expect(
+        service.addPhotos(1, 7, []),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressPhoto.createMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects adding photos to an already-APPROVED dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+      });
+
+      await expect(
+        service.addPhotos(1, 7, []),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressPhoto.createMany).not.toHaveBeenCalled();
     });
   });
 });

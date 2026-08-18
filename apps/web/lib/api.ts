@@ -184,6 +184,26 @@ export function addDressSize(
   });
 }
 
+export function updateDressSize(
+  token: string,
+  dressId: number,
+  sizeId: number,
+  data: { size?: string; price?: number },
+) {
+  return request<DressSize>(`/dresses/${dressId}/sizes/${sizeId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteDressSize(token: string, dressId: number, sizeId: number) {
+  return request<DressSize>(`/dresses/${dressId}/sizes/${sizeId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function addDressPhotos(token: string, dressId: number, files: File[]) {
   const formData = new FormData();
   files.forEach((file) => formData.append("images", file));
@@ -192,6 +212,23 @@ export function addDressPhotos(token: string, dressId: number, files: File[]) {
     method: "POST",
     token,
     body: formData,
+  });
+}
+
+export function updateDress(
+  token: string,
+  dressId: number,
+  data: {
+    name?: string;
+    description?: string;
+    category?: string;
+    color?: string;
+  },
+) {
+  return request<Dress>(`/dresses/${dressId}/update`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
   });
 }
 

@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UploadedFiles,
@@ -68,6 +69,43 @@ addSize(
     price: Number(body.price),
     ownerId: user.sub,
   });
+}
+
+@UseGuards(JwtAuthGuard)
+@Patch(':id/sizes/:sizeId')
+updateSize(
+  @Param('id') id: string,
+  @Param('sizeId') sizeId: string,
+  @Body()
+  body: {
+    size?: string;
+    price?: number;
+  },
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.updateSize(
+    Number(id),
+    Number(sizeId),
+    user.sub,
+    {
+      size: body.size,
+      price: body.price !== undefined ? Number(body.price) : undefined,
+    },
+  );
+}
+
+@UseGuards(JwtAuthGuard)
+@Delete(':id/sizes/:sizeId')
+removeSize(
+  @Param('id') id: string,
+  @Param('sizeId') sizeId: string,
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.removeSize(
+    Number(id),
+    Number(sizeId),
+    user.sub,
+  );
 }
 
 @UseGuards(JwtAuthGuard)

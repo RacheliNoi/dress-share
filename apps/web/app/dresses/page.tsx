@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { getToken, logout } from "@/lib/auth";
 import {
   ApiError,
@@ -9,7 +10,6 @@ import {
   DressStatus,
   getDressImageUrl,
   getMyDresses,
-  submitDressForApproval,
 } from "@/lib/api";
 import Header from "@/components/Header";
 
@@ -51,7 +51,6 @@ const [dresses, setDresses] = useState<Dress[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
 const [checkingAuth, setCheckingAuth] = useState(true);
-const [resubmittingId, setResubmittingId] = useState<number | null>(null);
 const [failedImageIds, setFailedImageIds] = useState<Set<number>>(new Set());
 
 async function loadDresses() {
@@ -80,32 +79,6 @@ setError("");
   setLoading(false);
 }
 
-}
-
-async function handleResubmit(dressId: number) {
-const token = getToken();
-
-if (!token) {
-  router.push("/login");
-  return;
-}
-
-setResubmittingId(dressId);
-
-try {
-  await submitDressForApproval(token, dressId);
-  await loadDresses();
-} catch (err) {
-  if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-    logout();
-    router.push("/login");
-    return;
-  }
-
-  setError("שגיאה בשליחה מחדש לאישור. נסי שוב.");
-} finally {
-  setResubmittingId(null);
-}
 }
 
 useEffect(() => {
@@ -310,9 +283,10 @@ return (<main
           const status = statusConfig[dress.status];
 
           return (
-            <article
+            <Link
               key={dress.id}
-              className="group overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+              href={`/dresses/${dress.id}`}
+              className="group block overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
             >
               {/* Image */}
               <div className="relative h-[380px] overflow-hidden bg-zinc-100">
@@ -393,46 +367,12 @@ return (<main
                   )}
                 </div>
 
-                {dress.status === "REJECTED" && (
-                  <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4">
-                    <p className="text-xs font-bold text-red-700">
-                      סיבת הדחייה
-                    </p>
-
-                    <p className="mt-1 text-sm leading-6 text-red-700">
-                      {dress.rejectionReason || "לא צוינה סיבה."}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => handleResubmit(dress.id)}
-                      disabled={resubmittingId === dress.id}
-                      className="mt-3 w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {resubmittingId === dress.id
-                        ? "שולחת מחדש..."
-                        : "שליחה מחדש לאישור"}
-                    </button>
-                  </div>
-                )}
-
-                <div className="mt-5 flex gap-2">
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:bg-zinc-50"
-                  >
-                    צפייה
-                  </button>
-
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-700"
-                  >
-                    עריכה
-                  </button>
+                <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4 text-sm font-bold text-zinc-700 transition group-hover:text-rose-500">
+                  <span>צפייה בשמלה</span>
+                  <span aria-hidden>←</span>
                 </div>
               </div>
-            </article>
+            </Link>
           );
         })}
       </div>

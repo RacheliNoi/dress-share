@@ -108,9 +108,12 @@ async addSize(data: {
     throw new ForbiddenException('אין הרשאה לערוך את השמלה הזו');
   }
 
-  if (dress.status === DressStatus.APPROVED) {
+  if (
+    dress.status === DressStatus.APPROVED ||
+    dress.status === DressStatus.PENDING_APPROVAL
+  ) {
     throw new BadRequestException(
-      'שמלה שאושרה לא ניתנת לעריכה ישירה',
+      'שמלה שאושרה או ממתינה לאישור לא ניתנת לעריכה ישירה',
     );
   }
 
@@ -119,6 +122,96 @@ async addSize(data: {
       dressId: data.dressId,
       size: data.size,
       price: data.price,
+    },
+  });
+}
+
+async updateSize(
+  dressId: number,
+  sizeId: number,
+  ownerId: number,
+  data: { size?: string; price?: number },
+) {
+  const existingSize = await this.prisma.dressSize.findUnique({
+    where: {
+      id: sizeId,
+    },
+    include: {
+      dress: true,
+    },
+  });
+
+  if (!existingSize || existingSize.dressId !== dressId) {
+    throw new NotFoundException('המידה לא נמצאה');
+  }
+
+  if (existingSize.dress.ownerId !== ownerId) {
+    throw new ForbiddenException('אין הרשאה לערוך את המידה הזו');
+  }
+
+  if (
+    existingSize.dress.status === DressStatus.APPROVED ||
+    existingSize.dress.status === DressStatus.PENDING_APPROVAL
+  ) {
+    throw new BadRequestException(
+      'שמלה שאושרה או ממתינה לאישור לא ניתנת לעריכה ישירה',
+    );
+  }
+
+  try {
+    return await this.prisma.dressSize.update({
+      where: {
+        id: sizeId,
+      },
+      data: {
+        size: data.size,
+        price: data.price,
+      },
+    });
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'P2002'
+    ) {
+      throw new BadRequestException('קיימת כבר מידה כזו לשמלה הזו');
+    }
+
+    throw error;
+  }
+}
+
+async removeSize(dressId: number, sizeId: number, ownerId: number) {
+  const existingSize = await this.prisma.dressSize.findUnique({
+    where: {
+      id: sizeId,
+    },
+    include: {
+      dress: true,
+    },
+  });
+
+  if (!existingSize || existingSize.dressId !== dressId) {
+    throw new NotFoundException('המידה לא נמצאה');
+  }
+
+  if (existingSize.dress.ownerId !== ownerId) {
+    throw new ForbiddenException('אין הרשאה למחוק את המידה הזו');
+  }
+
+  if (
+    existingSize.dress.status === DressStatus.APPROVED ||
+    existingSize.dress.status === DressStatus.PENDING_APPROVAL
+  ) {
+    throw new BadRequestException(
+      'שמלה שאושרה או ממתינה לאישור לא ניתנת לעריכה ישירה',
+    );
+  }
+
+  return this.prisma.dressSize.delete({
+    where: {
+      id: sizeId,
     },
   });
 }
@@ -142,9 +235,12 @@ async addPhotos(
     throw new ForbiddenException('אין הרשאה לערוך את השמלה הזו');
   }
 
-  if (dress.status === DressStatus.APPROVED) {
+  if (
+    dress.status === DressStatus.APPROVED ||
+    dress.status === DressStatus.PENDING_APPROVAL
+  ) {
     throw new BadRequestException(
-      'שמלה שאושרה לא ניתנת לעריכה ישירה',
+      'שמלה שאושרה או ממתינה לאישור לא ניתנת לעריכה ישירה',
     );
   }
 
@@ -175,9 +271,12 @@ async removePhoto(dressId: number, photoId: number, ownerId: number) {
     throw new ForbiddenException('אין הרשאה למחוק את התמונה הזו');
   }
 
-  if (photo.dress.status === DressStatus.APPROVED) {
+  if (
+    photo.dress.status === DressStatus.APPROVED ||
+    photo.dress.status === DressStatus.PENDING_APPROVAL
+  ) {
     throw new BadRequestException(
-      'שמלה שאושרה לא ניתנת לעריכה ישירה',
+      'שמלה שאושרה או ממתינה לאישור לא ניתנת לעריכה ישירה',
     );
   }
 
@@ -265,9 +364,12 @@ private async deleteUploadedFile(url: string) {
         throw new ForbiddenException('אין הרשאה לערוך את השמלה הזו');
     }
 
-    if (dress.status === DressStatus.APPROVED) {
+    if (
+        dress.status === DressStatus.APPROVED ||
+        dress.status === DressStatus.PENDING_APPROVAL
+    ) {
         throw new BadRequestException(
-        'שמלה שאושרה לא ניתנת לעריכה ישירה',
+        'שמלה שאושרה או ממתינה לאישור לא ניתנת לעריכה ישירה',
         );
     }
 
@@ -280,6 +382,14 @@ private async deleteUploadedFile(url: string) {
         description: data.description,
         category: data.category,
         color: data.color,
+        },
+        include: {
+        sizes: true,
+        photos: {
+            orderBy: {
+            sortOrder: 'asc',
+            },
+        },
         },
     });
     }
