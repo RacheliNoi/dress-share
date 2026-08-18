@@ -193,6 +193,35 @@ export class BookingsService {
     });
   }
 
+  // Public availability read: no ownership check by design (a future
+  // renter browsing the catalog needs to see which dates are taken, not
+  // just the dress owner) - only confirms the dress exists, then returns
+  // just the date range + status for the statuses that actually occupy the
+  // calendar. renterId/size/price are never selected here - this is the one
+  // booking-read path a non-owner (or anonymous visitor) can reach.
+  async findAvailabilityForDress(dressId: number) {
+    const dress = await this.prisma.dress.findUnique({
+      where: { id: dressId },
+    });
+
+    if (!dress) {
+      throw new NotFoundException('השמלה לא נמצאה');
+    }
+
+    return this.prisma.booking.findMany({
+      where: {
+        dressId,
+        status: { in: ACTIVE_BOOKING_STATUSES },
+      },
+      select: {
+        startDate: true,
+        endDate: true,
+        status: true,
+      },
+      orderBy: { startDate: 'asc' },
+    });
+  }
+
   async findForOwner(ownerId: number) {
     return this.prisma.booking.findMany({
       where: { dress: { ownerId } },

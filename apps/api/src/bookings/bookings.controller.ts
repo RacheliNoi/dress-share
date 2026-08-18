@@ -32,6 +32,14 @@ export class BookingsController {
     return this.bookingsService.findForDress(Number(dressId), user.sub);
   }
 
+  // Intentionally public (no JwtAuthGuard): the future public dress-details
+  // screen and catalog need to show taken dates to visitors who aren't
+  // signed in at all.
+  @Get('dress/:dressId/availability')
+  findAvailabilityForDress(@Param('dressId') dressId: string) {
+    return this.bookingsService.findAvailabilityForDress(Number(dressId));
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('interested')
   createInterested(

@@ -453,6 +453,100 @@ describe('BookingsService', () => {
     });
   });
 
+  describe('findAvailabilityForDress', () => {
+    it('returns an empty array for a dress with no bookings', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      const result = await service.findAvailabilityForDress(1);
+
+      expect(result).toEqual([]);
+    });
+
+    it('includes INTERESTED bookings', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([
+        {
+          startDate: new Date('2026-09-01'),
+          endDate: new Date('2026-09-05'),
+          status: BookingStatus.INTERESTED,
+        },
+      ]);
+
+      const result = await service.findAvailabilityForDress(1);
+
+      expect(result).toEqual([
+        expect.objectContaining({ status: BookingStatus.INTERESTED }),
+      ]);
+    });
+
+    it('includes RENTED bookings', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([
+        {
+          startDate: new Date('2026-10-01'),
+          endDate: new Date('2026-10-05'),
+          status: BookingStatus.RENTED,
+        },
+      ]);
+
+      const result = await service.findAvailabilityForDress(1);
+
+      expect(result).toEqual([
+        expect.objectContaining({ status: BookingStatus.RENTED }),
+      ]);
+    });
+
+    it('queries only INTERESTED/RENTED - excludes CANCELLED and any other status at the DB level', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.findAvailabilityForDress(1);
+
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            dressId: 1,
+            status: { in: [BookingStatus.INTERESTED, BookingStatus.RENTED] },
+          },
+        }),
+      );
+    });
+
+    it('selects only startDate, endDate, status - never renterId/size/price or other private fields', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.findAvailabilityForDress(1);
+
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: { startDate: true, endDate: true, status: true },
+        }),
+      );
+    });
+
+    it('orders results by startDate ascending', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.findAvailabilityForDress(1);
+
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { startDate: 'asc' } }),
+      );
+    });
+
+    it('throws NotFoundException for a dress that does not exist (no ownership check)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(null);
+
+      await expect(service.findAvailabilityForDress(999)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.booking.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findForDress / findForOwner', () => {
     it("returns a dress's bookings for its owner", async () => {
       prisma.dress.findUnique.mockResolvedValue(approvedDress);

@@ -203,6 +203,73 @@ describe('BookingsController', () => {
     });
   });
 
+  describe('GET /bookings/dress/:dressId/availability', () => {
+    it('works without a JWT (public endpoint)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/bookings/dress/1/availability')
+        .expect(200);
+    });
+
+    it('returns [] for a dress with no active bookings', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .get('/bookings/dress/1/availability')
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+
+    it('does not require the caller to own the dress', async () => {
+      // Dress owned by 999, request made with a token for user 7 (or no
+      // token at all) - must still succeed since this is public.
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 999,
+        status: DressStatus.APPROVED,
+      });
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/bookings/dress/1/availability')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(200);
+    });
+
+    it('returns only startDate/endDate/status - no renterId or other private fields', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([
+        {
+          startDate: new Date('2026-09-01').toISOString(),
+          endDate: new Date('2026-09-05').toISOString(),
+          status: BookingStatus.INTERESTED,
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/bookings/dress/1/availability')
+        .expect(200);
+
+      expect(Object.keys(response.body[0]).sort()).toEqual([
+        'endDate',
+        'startDate',
+        'status',
+      ]);
+    });
+
+    it('returns 404 for a dress that does not exist', async () => {
+      prisma.dress.findUnique.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get('/bookings/dress/999/availability')
+        .expect(404);
+    });
+  });
+
   describe('PATCH /bookings/:id/rent', () => {
     it('rejects unauthenticated requests (401)', async () => {
       await request(app.getHttpServer())
