@@ -161,12 +161,94 @@ export type DressAvailabilityEntry = {
   startDate: string;
   endDate: string;
   status: DressAvailabilityStatus;
+  // Which DressSize this booking holds - null means either a dress with no
+  // sizes defined (whole-dress booking, unchanged legacy behavior) or a
+  // booking made before per-size tracking existed. Never private (no
+  // renterId/price here) - size is a physical dress attribute, not who
+  // booked it.
+  size: string | null;
 };
 
 export function getDressAvailability(dressId: number) {
   return request<DressAvailabilityEntry[]>(
     `/bookings/dress/${dressId}/availability`,
   );
+}
+
+// The full Booking record, as returned by the owner-only
+// GET /bookings/dress/:dressId (unlike the public availability endpoint,
+// this includes renterId/size/price - only ever fetched with an owner's
+// token, and the backend re-checks ownership on every call regardless).
+export type BookingStatus =
+  | "INTERESTED"
+  | "RENTED"
+  | "CANCELLED"
+  | "PENDING"
+  | "CONFIRMED"
+  | "COMPLETED";
+
+export type Booking = {
+  id: number;
+  dressId: number;
+  renterId: number | null;
+  size: string | null;
+  startDate: string;
+  endDate: string;
+  price: number | null;
+  status: BookingStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function getDressBookings(token: string, dressId: number) {
+  return request<Booking[]>(`/bookings/dress/${dressId}`, { token });
+}
+
+export function createInterestedBooking(
+  token: string,
+  data: { dressId: number; startDate: string; endDate: string; size?: string },
+) {
+  return request<Booking>("/bookings/interested", {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
+  });
+}
+
+export function createRentedBooking(
+  token: string,
+  data: {
+    dressId: number;
+    startDate: string;
+    endDate: string;
+    size?: string;
+    price?: number;
+  },
+) {
+  return request<Booking>("/bookings/rented", {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
+  });
+}
+
+export function markBookingAsRented(
+  token: string,
+  bookingId: number,
+  data: { size?: string; price?: number } = {},
+) {
+  return request<Booking>(`/bookings/${bookingId}/rent`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(data),
+  });
+}
+
+export function cancelBooking(token: string, bookingId: number) {
+  return request<Booking>(`/bookings/${bookingId}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 export function getMyDresses(token: string) {

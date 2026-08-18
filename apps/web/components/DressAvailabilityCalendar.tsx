@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ApiError,
   DressAvailabilityEntry,
+  DressSize,
   getDressAvailability,
 } from "@/lib/api";
+import { getHebrewDateLabel } from "@/lib/hebrewDate";
 
 const WEEKDAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 
@@ -86,6 +88,70 @@ const monthFormatter = new Intl.DateTimeFormat("he-IL", {
   timeZone: "UTC",
 });
 
+// Per-size breakdown for one calendar day - computed on demand (only when a
+// day is clicked open), never baked into the grid's own background color,
+// which intentionally keeps showing the dress's overall worst-case status
+// exactly as before. `size: null` on an entry means either a no-size dress
+// (whole-dress booking, unchanged legacy behavior) or a booking made before
+// per-size tracking existed - both are treated as blocking every size, the
+// conservative reading.
+function sizeBreakdownForDate(
+  date: Date,
+  availability: DressAvailabilityEntry[],
+  sizes: DressSize[],
+): { available: string[]; blocked: string[]; wholeDressBlocked: boolean } {
+  const time = date.getTime();
+  const blockedSizes = new Set<string>();
+  let wholeDressBlocked = false;
+
+  for (const entry of availability) {
+    const start = new Date(entry.startDate).getTime();
+    const end = new Date(entry.endDate).getTime();
+
+    if (time < start || time > end) {
+      continue;
+    }
+
+    if (entry.size === null || entry.size === undefined) {
+      wholeDressBlocked = true;
+    } else {
+      blockedSizes.add(entry.size);
+    }
+  }
+
+  if (wholeDressBlocked) {
+    return { available: [], blocked: sizes.map((size) => size.size), wholeDressBlocked: true };
+  }
+
+  return {
+    available: sizes.filter((size) => !blockedSizes.has(size.size)).map((size) => size.size),
+    blocked: sizes.filter((size) => blockedSizes.has(size.size)).map((size) => size.size),
+    wholeDressBlocked: false,
+  };
+}
+
+function isSameUtcDay(a: Date, b: Date) {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+  );
+}
+
+// Parses an <input type="date"> value ("YYYY-MM-DD") as a UTC-midnight Date,
+// matching how the rest of this component treats calendar days.
+function parseDateInputValue(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day] = match;
+
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+}
+
 const STATUS_CELL_CLASSES: Record<DayStatus, string> = {
   FREE: "bg-white text-zinc-700 ring-1 ring-zinc-200/70",
   INTERESTED: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
@@ -94,8 +160,10 @@ const STATUS_CELL_CLASSES: Record<DayStatus, string> = {
 
 export default function DressAvailabilityCalendar({
   dressId,
+  sizes = [],
 }: {
   dressId: number;
+  sizes?: DressSize[];
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -106,6 +174,10 @@ export default function DressAvailabilityCalendar({
     const today = new Date();
     return startOfUtcMonth(today.getFullYear(), today.getMonth());
   });
+  const [jumpValue, setJumpValue] = useState("");
+  const [highlightedDate, setHighlightedDate] = useState<Date | null>(null);
+  const [detailDate, setDetailDate] = useState<Date | null>(null);
+  const hasSizes = sizes.length > 0;
 
   async function loadAvailability() {
     try {
@@ -147,6 +219,19 @@ export default function DressAvailabilityCalendar({
       (current) =>
         new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 1)),
     );
+  }
+
+  function handleJumpToDate(value: string) {
+    setJumpValue(value);
+
+    const parsed = parseDateInputValue(value);
+
+    if (!parsed) {
+      return;
+    }
+
+    setCurrentMonth(startOfUtcMonth(parsed.getUTCFullYear(), parsed.getUTCMonth()));
+    setHighlightedDate(parsed);
   }
 
   return (
@@ -204,6 +289,19 @@ export default function DressAvailabilityCalendar({
             </button>
           </div>
 
+          <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+            <label htmlFor={`jump-to-date-${dressId}`} className="text-xs font-bold text-zinc-500">
+              קפיצה לתאריך:
+            </label>
+            <input
+              id={`jump-to-date-${dressId}`}
+              type="date"
+              value={jumpValue}
+              onChange={(event) => handleJumpToDate(event.target.value)}
+              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 sm:w-auto"
+            />
+          </div>
+
           <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold text-zinc-400 sm:gap-2 sm:text-xs">
             {WEEKDAY_LABELS.map((label) => (
               <div key={label}>{label}</div>
@@ -211,17 +309,64 @@ export default function DressAvailabilityCalendar({
           </div>
 
           <div className="mt-1.5 grid grid-cols-7 gap-1.5 sm:gap-2">
-            {cells.map((cell) => (
-              <div
-                key={cell.date.toISOString()}
-                className={`flex aspect-square items-center justify-center rounded-lg text-xs font-semibold sm:text-sm ${
-                  STATUS_CELL_CLASSES[cell.status]
-                } ${cell.inCurrentMonth ? "" : "opacity-35"}`}
-              >
-                {cell.date.getUTCDate()}
-              </div>
-            ))}
+            {cells.map((cell) => {
+              const isHighlighted =
+                highlightedDate !== null && isSameUtcDay(cell.date, highlightedDate);
+              const isSelectedForDetail =
+                detailDate !== null && isSameUtcDay(cell.date, detailDate);
+
+              return (
+                <button
+                  key={cell.date.toISOString()}
+                  type="button"
+                  onClick={() =>
+                    hasSizes &&
+                    setDetailDate((current) =>
+                      current && isSameUtcDay(current, cell.date) ? null : cell.date,
+                    )
+                  }
+                  className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:text-sm ${
+                    STATUS_CELL_CLASSES[cell.status]
+                  } ${cell.inCurrentMonth ? "" : "opacity-35"} ${
+                    isHighlighted ? "ring-2 ring-sky-500 ring-offset-2" : ""
+                  } ${isSelectedForDetail ? "ring-2 ring-zinc-900 ring-offset-2" : ""} ${
+                    hasSizes ? "cursor-pointer" : "cursor-default"
+                  }`}
+                >
+                  <span>{cell.date.getUTCDate()}</span>
+                  <span className="text-[8px] font-normal leading-none opacity-80 sm:text-[10px]">
+                    {getHebrewDateLabel(cell.date)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+
+          {hasSizes && detailDate && (
+            <div className="mt-3 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-700 sm:text-sm">
+              {(() => {
+                const breakdown = sizeBreakdownForDate(detailDate, availability, sizes);
+                const dateLabel = `${detailDate.getUTCDate()}/${
+                  detailDate.getUTCMonth() + 1
+                } (${getHebrewDateLabel(detailDate)})`;
+
+                if (breakdown.available.length === 0) {
+                  return <p>בתאריך {dateLabel}: כל המידות תפוסות.</p>;
+                }
+
+                if (breakdown.blocked.length === 0) {
+                  return <p>בתאריך {dateLabel}: כל המידות פנויות.</p>;
+                }
+
+                return (
+                  <p>
+                    בתאריך {dateLabel}: מידות פנויות – {breakdown.available.join(", ")} · מידות
+                    תפוסות – {breakdown.blocked.join(", ")}
+                  </p>
+                );
+              })()}
+            </div>
+          )}
 
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-zinc-100 pt-4 text-xs text-zinc-500">
             <div className="flex items-center gap-1.5">

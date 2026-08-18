@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getToken } from "@/lib/auth";
 import { ApiError, Dress, getDressImageUrl, getMyDresses } from "@/lib/api";
 import Header from "@/components/Header";
+import DressAvailabilityManager from "@/components/DressAvailabilityManager";
 
 function StatusPanel({ dress }: { dress: Dress }) {
   switch (dress.status) {
@@ -285,6 +286,10 @@ export default function MyDressDetailsPage() {
                   </p>
                 )}
               </div>
+
+              {dress.status === "APPROVED" && (
+                <DressAvailabilityManager dressId={dress.id} sizes={dress.sizes} />
+              )}
             </div>
           </div>
         ) : null}

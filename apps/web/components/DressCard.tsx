@@ -23,9 +23,14 @@ function getPriceLabel(dress: Dress) {
 export default function DressCard({
   dress,
   style,
+  sizeAvailability,
 }: {
   dress: Dress;
   style?: CSSProperties;
+  // Set only when a catalog date filter is active - drives per-size
+  // available/blocked chip styling below without affecting whether the
+  // dress is shown at all (that's already decided by the caller).
+  sizeAvailability?: { available: string[]; blocked: string[] } | null;
 }) {
   const photo = [...dress.photos].sort(
     (a, b) => a.sortOrder - b.sortOrder,
@@ -97,14 +102,22 @@ export default function DressCard({
 
         <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
           {dress.sizes.length > 0 ? (
-            dress.sizes.map((size) => (
-              <span
-                key={size.id}
-                className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 sm:px-3 sm:py-1.5 sm:text-xs"
-              >
-                {size.size}
-              </span>
-            ))
+            dress.sizes.map((size) => {
+              const isBlockedOnDate = sizeAvailability?.blocked.includes(size.size);
+
+              return (
+                <span
+                  key={size.id}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold sm:px-3 sm:py-1.5 sm:text-xs ${
+                    isBlockedOnDate
+                      ? "bg-zinc-50 text-zinc-300 line-through"
+                      : "bg-zinc-100 text-zinc-600"
+                  }`}
+                >
+                  {size.size}
+                </span>
+              );
+            })
           ) : (
             <span className="text-[11px] text-zinc-400 sm:text-xs">
               טרם הוגדרו מידות

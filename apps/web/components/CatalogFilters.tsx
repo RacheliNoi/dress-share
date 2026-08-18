@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  buildHebrewYearTable,
+  getHebrewDateParts,
+  hebrewToGregorian,
+  toHebrewNumeral,
+} from "@/lib/hebrewDate";
 
 export type SortOption = "recommended" | "price-asc" | "price-desc" | "newest";
 
@@ -29,6 +35,9 @@ export default function CatalogFilters({
   priceBounds,
   sort,
   onSortChange,
+  availabilityDate,
+  onAvailabilityDateChange,
+  availabilityLoading,
   resultCount,
   totalCount,
   hasActiveFilters,
@@ -53,6 +62,9 @@ export default function CatalogFilters({
   priceBounds: { min: number; max: number } | null;
   sort: SortOption;
   onSortChange: (value: SortOption) => void;
+  availabilityDate: string;
+  onAvailabilityDateChange: (value: string) => void;
+  availabilityLoading: boolean;
   resultCount: number;
   totalCount: number;
   hasActiveFilters: boolean;
@@ -60,6 +72,68 @@ export default function CatalogFilters({
   chips: FilterChip[];
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // Hebrew-date picker for the availability filter: three selects (year /
+  // month / day) that resolve to the same Gregorian `availabilityDate` the
+  // Gregorian <input type="date"> above already drives - Hebrew is UI-only
+  // here, the actual filtering always runs on the Gregorian value.
+  const currentHebrewYear = useMemo(() => getHebrewDateParts(new Date()).year, []);
+  const hebrewYearOptions = useMemo(
+    () => Array.from({ length: 5 }, (_, index) => currentHebrewYear - 1 + index),
+    [currentHebrewYear],
+  );
+
+  const [hebrewYear, setHebrewYear] = useState(currentHebrewYear);
+  const [hebrewMonthName, setHebrewMonthName] = useState("");
+  const [hebrewDay, setHebrewDay] = useState("");
+
+  const hebrewTable = useMemo(() => buildHebrewYearTable(hebrewYear), [hebrewYear]);
+  const hebrewDayOptions =
+    hebrewTable.find((month) => month.name === hebrewMonthName)?.days.map((entry) => entry.day) ??
+    [];
+
+  // Keeps the Hebrew selects in sync whenever availabilityDate changes from
+  // elsewhere (the Gregorian input, the clear button, a chip removal) - so
+  // the Hebrew date shown is always a correct reflection of whatever date is
+  // actually selected, however it was picked.
+  useEffect(() => {
+    if (!availabilityDate) {
+      setHebrewMonthName("");
+      setHebrewDay("");
+      return;
+    }
+
+    const parts = getHebrewDateParts(new Date(`${availabilityDate}T00:00:00.000Z`));
+    setHebrewYear(parts.year);
+    setHebrewMonthName(parts.month);
+    setHebrewDay(String(parts.day));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availabilityDate]);
+
+  function handleHebrewYearChange(nextYear: number) {
+    setHebrewYear(nextYear);
+    setHebrewMonthName("");
+    setHebrewDay("");
+  }
+
+  function handleHebrewMonthChange(nextMonth: string) {
+    setHebrewMonthName(nextMonth);
+    setHebrewDay("");
+  }
+
+  function handleHebrewDayChange(nextDay: string) {
+    setHebrewDay(nextDay);
+
+    if (!hebrewMonthName || !nextDay) {
+      return;
+    }
+
+    const gregorian = hebrewToGregorian(hebrewTable, hebrewMonthName, Number(nextDay));
+
+    if (gregorian) {
+      onAvailabilityDateChange(gregorian.toISOString().slice(0, 10));
+    }
+  }
 
   const selectClassName =
     "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-zinc-400 sm:w-auto";
@@ -124,6 +198,109 @@ export default function CatalogFilters({
             <option value="price-asc">מחיר: מהנמוך לגבוה</option>
             <option value="price-desc">מחיר: מהגבוה לנמוך</option>
           </select>
+        </div>
+      </div>
+
+      {/* Date-of-rental availability filter - always visible (not tucked
+          inside the collapsible mobile panel) since it's a distinct kind of
+          filter from the rest. */}
+      <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-rose-100 bg-rose-50/60 p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <label
+            htmlFor="availability-date-filter"
+            className="text-sm font-bold text-zinc-800"
+          >
+            מחפשת שמלה לתאריך?
+          </label>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              id="availability-date-filter"
+              type="date"
+              value={availabilityDate}
+              onChange={(event) => onAvailabilityDateChange(event.target.value)}
+              className="rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-zinc-400"
+            />
+
+            {availabilityDate && (
+              <button
+                type="button"
+                onClick={() => onAvailabilityDateChange("")}
+                className="rounded-xl px-3 py-2.5 text-sm font-bold text-rose-500 transition hover:bg-rose-100"
+              >
+                ניקוי תאריך
+              </button>
+            )}
+
+            {availabilityLoading && (
+              <span className="text-xs font-medium text-zinc-500">
+                בודקת זמינות...
+              </span>
+            )}
+          </div>
+
+          {availabilityDate && !availabilityLoading && (
+            <span className="text-xs font-medium text-rose-600 sm:ms-auto">
+              מוצגות רק שמלות שפנויות בתאריך שנבחר
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-rose-100/70 pt-3 sm:flex-row sm:items-center sm:gap-2">
+          <span className="text-xs font-bold text-zinc-500">
+            או לפי תאריך עברי:
+          </span>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={hebrewYear}
+              onChange={(event) => handleHebrewYearChange(Number(event.target.value))}
+              aria-label="שנה עברית"
+              className="rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-zinc-400"
+            >
+              {hebrewYearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={hebrewMonthName}
+              onChange={(event) => handleHebrewMonthChange(event.target.value)}
+              aria-label="חודש עברי"
+              className="rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-zinc-400"
+            >
+              <option value="">חודש</option>
+              {hebrewTable.map((month) => (
+                <option key={month.name} value={month.name}>
+                  {month.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={hebrewDay}
+              onChange={(event) => handleHebrewDayChange(event.target.value)}
+              aria-label="יום עברי"
+              disabled={!hebrewMonthName}
+              className="rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">יום</option>
+              {hebrewDayOptions.map((day) => (
+                <option key={day} value={day}>
+                  {toHebrewNumeral(day)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {availabilityDate && (
+            <span className="text-xs font-medium text-zinc-500 sm:ms-auto">
+              נבחר: {new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${availabilityDate}T00:00:00.000Z`))}
+              {hebrewMonthName && hebrewDay && ` · ${toHebrewNumeral(Number(hebrewDay))} ב${hebrewMonthName} ${hebrewYear}`}
+            </span>
+          )}
         </div>
       </div>
 

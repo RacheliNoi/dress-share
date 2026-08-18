@@ -46,6 +46,7 @@ export class BookingsService {
   private async loadOwnedDress(dressId: number, ownerId: number) {
     const dress = await this.prisma.dress.findUnique({
       where: { id: dressId },
+      include: { sizes: true },
     });
 
     if (!dress) {
@@ -59,6 +60,30 @@ export class BookingsService {
     }
 
     return dress;
+  }
+
+  // A dress with zero DressSize rows keeps the original, size-blind
+  // behavior entirely untouched (no size required, no validation against a
+  // size list that doesn't exist, whole-dress overlap blocking) - see the
+  // stage report for why this is a deliberate "don't invent behavior for
+  // dresses with no sizes" decision rather than an oversight.
+  private assertSizeSelection(
+    dress: { sizes: { size: string }[] },
+    size: string | undefined,
+  ) {
+    const sizes = dress.sizes ?? [];
+
+    if (sizes.length === 0) {
+      return;
+    }
+
+    if (!size) {
+      throw new BadRequestException('יש לבחור מידה עבור שמלה זו');
+    }
+
+    if (!sizes.some((candidate) => candidate.size === size)) {
+      throw new BadRequestException('המידה שנבחרה אינה קיימת עבור שמלה זו');
+    }
   }
 
   private assertDressBookable(dress: { status: DressStatus }) {
@@ -77,10 +102,17 @@ export class BookingsService {
   // occupancy. One consequence worth knowing: a booking ending on day X and
   // another starting on day X are treated as overlapping (no same-day
   // turnover) - the conservative, safe default for this stage.
+  //
+  // `size` scopes the conflict check to just that size (plus any size-less
+  // "blocks the whole dress" booking) - passed only for a dress that
+  // actually has DressSize rows. When `size` is omitted, the query is
+  // byte-for-byte the original whole-dress check, so a dress with no sizes
+  // keeps its exact original overlap behavior.
   private async assertNoOverlap(
     dressId: number,
     startDate: Date,
     endDate: Date,
+    size?: string,
     excludeBookingId?: number,
   ) {
     const conflict = await this.prisma.booking.findFirst({
@@ -89,13 +121,14 @@ export class BookingsService {
         status: { in: ACTIVE_BOOKING_STATUSES },
         startDate: { lte: endDate },
         endDate: { gte: startDate },
+        ...(size !== undefined ? { OR: [{ size: null }, { size }] } : {}),
         ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
     });
 
     if (conflict) {
       throw new BadRequestException(
-        'קיימת כבר תפיסה של השמלה בטווח התאריכים המבוקש',
+        'קיימת כבר תפיסה של השמלה (או של המידה שנבחרה) בטווח התאריכים המבוקש',
       );
     }
   }
@@ -127,6 +160,7 @@ export class BookingsService {
     dressId: number;
     startDate: string | Date;
     endDate: string | Date;
+    size?: string;
     ownerId: number;
   }) {
     const dress = await this.loadOwnedDress(data.dressId, data.ownerId);
@@ -135,8 +169,15 @@ export class BookingsService {
     const startDate = this.parseDate(data.startDate, 'תאריך התחלה');
     const endDate = this.parseDate(data.endDate, 'תאריך סיום');
     this.assertValidRange(startDate, endDate);
+    this.assertSizeSelection(dress, data.size);
 
-    await this.assertNoOverlap(data.dressId, startDate, endDate);
+    const hasSizes = (dress.sizes ?? []).length > 0;
+    await this.assertNoOverlap(
+      data.dressId,
+      startDate,
+      endDate,
+      hasSizes ? data.size : undefined,
+    );
 
     return this.prisma.booking.create({
       data: {
@@ -144,6 +185,7 @@ export class BookingsService {
         startDate,
         endDate,
         status: BookingStatus.INTERESTED,
+        size: hasSizes ? data.size : undefined,
       },
     });
   }
@@ -164,8 +206,15 @@ export class BookingsService {
     const endDate = this.parseDate(data.endDate, 'תאריך סיום');
     this.assertValidRange(startDate, endDate);
     this.assertValidSizeAndPrice(data);
+    this.assertSizeSelection(dress, data.size);
 
-    await this.assertNoOverlap(data.dressId, startDate, endDate);
+    const hasSizes = (dress.sizes ?? []).length > 0;
+    await this.assertNoOverlap(
+      data.dressId,
+      startDate,
+      endDate,
+      hasSizes ? data.size : undefined,
+    );
 
     try {
       return await this.prisma.booking.create({
@@ -196,9 +245,13 @@ export class BookingsService {
   // Public availability read: no ownership check by design (a future
   // renter browsing the catalog needs to see which dates are taken, not
   // just the dress owner) - only confirms the dress exists, then returns
-  // just the date range + status for the statuses that actually occupy the
-  // calendar. renterId/size/price are never selected here - this is the one
-  // booking-read path a non-owner (or anonymous visitor) can reach.
+  // the date range + status + size for the statuses that actually occupy
+  // the calendar. `size` is included because per-size availability (a dress
+  // with S/M/L only has the rented size actually blocked) needs it to be
+  // computable client-side without a new endpoint - it is a physical dress
+  // attribute, not who booked it. renterId/price are never selected here -
+  // this is the one booking-read path a non-owner (or anonymous visitor)
+  // can reach.
   async findAvailabilityForDress(dressId: number) {
     const dress = await this.prisma.dress.findUnique({
       where: { id: dressId },
@@ -217,6 +270,7 @@ export class BookingsService {
         startDate: true,
         endDate: true,
         status: true,
+        size: true,
       },
       orderBy: { startDate: 'asc' },
     });
@@ -237,7 +291,7 @@ export class BookingsService {
   private async loadOwnedBooking(bookingId: number, ownerId: number) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { dress: true },
+      include: { dress: { include: { sizes: true } } },
     });
 
     if (!booking) {
@@ -271,7 +325,49 @@ export class BookingsService {
     }
 
     this.assertDressBookable(booking.dress);
-    this.assertValidSizeAndPrice(data);
+
+    const dressSizes = booking.dress.sizes ?? [];
+    const hasSizes = dressSizes.length > 0;
+
+    let size = booking.size;
+    let price = booking.price;
+
+    if (hasSizes) {
+      // The size was already fixed when this booking was created as
+      // INTERESTED (see createInterested) - it can't change at
+      // confirm-rental time, and the price is always re-derived from that
+      // size's current DressSize row so it can never drift from what the
+      // size actually costs (rather than trusting a client-sent price).
+      if (data.size !== undefined && data.size !== booking.size) {
+        throw new BadRequestException(
+          'לא ניתן לשנות את המידה בשלב אישור ההשכרה - המידה נקבעה כשההתעניינות נוצרה',
+        );
+      }
+
+      const matchingSize = dressSizes.find(
+        (candidate) => candidate.size === booking.size,
+      );
+
+      if (!matchingSize) {
+        throw new BadRequestException(
+          'לא נמצאה עוד הגדרת מחיר עבור המידה שנקבעה להתעניינות זו',
+        );
+      }
+
+      price = matchingSize.price;
+    } else {
+      // No DressSize rows for this dress - original free-text behavior,
+      // untouched.
+      this.assertValidSizeAndPrice(data);
+
+      if (data.size !== undefined) {
+        size = data.size;
+      }
+
+      if (data.price !== undefined) {
+        price = data.price;
+      }
+    }
 
     let startDate = booking.startDate;
     let endDate = booking.endDate;
@@ -296,6 +392,7 @@ export class BookingsService {
         booking.dressId,
         startDate,
         endDate,
+        hasSizes ? size ?? undefined : undefined,
         booking.id,
       );
     }
@@ -308,8 +405,8 @@ export class BookingsService {
           startDate,
           endDate,
           renterId: data.renterId,
-          size: data.size,
-          price: data.price,
+          size,
+          price,
         },
       });
     } catch (error) {

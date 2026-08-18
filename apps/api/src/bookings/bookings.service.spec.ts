@@ -338,6 +338,215 @@ describe('BookingsService', () => {
     });
   });
 
+  describe('per-size availability (Fix 3)', () => {
+    const dressWithSizes = {
+      id: 1,
+      ownerId: 7,
+      status: DressStatus.APPROVED,
+      sizes: [
+        { id: 1, size: 'S' },
+        { id: 2, size: 'M' },
+        { id: 3, size: 'L' },
+      ],
+    };
+
+    it('requires a size for createInterested when the dress has sizes', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.booking.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invented size that is not a real DressSize for this dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          size: 'XL',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.booking.create).not.toHaveBeenCalled();
+    });
+
+    it('does not require a size when the dress has no DressSize rows (legacy behavior preserved)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({ id: 1, status: BookingStatus.INTERESTED });
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          ownerId: 7,
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('scopes the overlap check to the requested size (OR size=null) when the dress has sizes', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({ id: 1 });
+
+      await service.createInterested({
+        dressId: 1,
+        startDate: '2026-09-01',
+        endDate: '2026-09-05',
+        size: 'M',
+        ownerId: 7,
+      });
+
+      expect(prisma.booking.findFirst).toHaveBeenCalledWith({
+        where: {
+          dressId: 1,
+          status: { in: [BookingStatus.INTERESTED, BookingStatus.RENTED] },
+          startDate: { lte: new Date('2026-09-05') },
+          endDate: { gte: new Date('2026-09-01') },
+          OR: [{ size: null }, { size: 'M' }],
+        },
+      });
+    });
+
+    it('allows booking a different size for the same overlapping date range (a conflicting-size findFirst result means no conflict)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
+      // Simulates the DB query correctly excluding a same-range, different-size
+      // booking - findFirst returns null because the real query is scoped by
+      // size, so no conflict is found even though dates overlap another size.
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({ id: 2, size: 'L' });
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          size: 'L',
+          ownerId: 7,
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('rejects a real conflict on the same size', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
+      prisma.booking.findFirst.mockResolvedValue({ id: 9, size: 'M' });
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          size: 'M',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('createRented also requires and validates size when the dress has sizes', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
+
+      await expect(
+        service.createRented({
+          dressId: 1,
+          startDate: '2026-10-01',
+          endDate: '2026-10-05',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.booking.create).not.toHaveBeenCalled();
+    });
+
+    describe('markAsRented size-locking', () => {
+      it('locks the size from the INTERESTED booking and derives price from the matching DressSize', async () => {
+        prisma.booking.findUnique.mockResolvedValue({
+          id: 1,
+          dressId: 1,
+          status: BookingStatus.INTERESTED,
+          size: 'M',
+          price: null,
+          startDate: new Date('2026-09-01'),
+          endDate: new Date('2026-09-05'),
+          dress: {
+            ...dressWithSizes,
+            sizes: [
+              { id: 1, size: 'S', price: 100 },
+              { id: 2, size: 'M', price: 150 },
+              { id: 3, size: 'L', price: 200 },
+            ],
+          },
+        });
+        prisma.booking.update.mockResolvedValue({ id: 1, status: BookingStatus.RENTED, size: 'M', price: 150 });
+
+        const result = await service.markAsRented(1, 7, {});
+
+        expect(prisma.booking.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ size: 'M', price: 150 }),
+          }),
+        );
+        expect(result.price).toBe(150);
+      });
+
+      it('rejects an attempt to change the size at confirm-rental time', async () => {
+        prisma.booking.findUnique.mockResolvedValue({
+          id: 1,
+          dressId: 1,
+          status: BookingStatus.INTERESTED,
+          size: 'M',
+          price: null,
+          startDate: new Date('2026-09-01'),
+          endDate: new Date('2026-09-05'),
+          dress: {
+            ...dressWithSizes,
+            sizes: [
+              { id: 1, size: 'S', price: 100 },
+              { id: 2, size: 'M', price: 150 },
+              { id: 3, size: 'L', price: 200 },
+            ],
+          },
+        });
+
+        await expect(
+          service.markAsRented(1, 7, { size: 'L' }),
+        ).rejects.toThrow(BadRequestException);
+        expect(prisma.booking.update).not.toHaveBeenCalled();
+      });
+
+      it('ignores a client-sent price and always uses the DressSize price when the dress has sizes', async () => {
+        prisma.booking.findUnique.mockResolvedValue({
+          id: 1,
+          dressId: 1,
+          status: BookingStatus.INTERESTED,
+          size: 'M',
+          price: null,
+          startDate: new Date('2026-09-01'),
+          endDate: new Date('2026-09-05'),
+          dress: {
+            ...dressWithSizes,
+            sizes: [{ id: 2, size: 'M', price: 150 }],
+          },
+        });
+        prisma.booking.update.mockResolvedValue({ id: 1, status: BookingStatus.RENTED, price: 150 });
+
+        await service.markAsRented(1, 7, { price: 999 });
+
+        expect(prisma.booking.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ price: 150 }) }),
+        );
+      });
+    });
+  });
+
   describe('overlap detection (assertNoOverlap via createInterested)', () => {
     // These tests assert on the WHERE clause passed to findFirst, which is
     // the actual overlap predicate: existing.startDate <= new.endDate AND
@@ -513,7 +722,7 @@ describe('BookingsService', () => {
       );
     });
 
-    it('selects only startDate, endDate, status - never renterId/size/price or other private fields', async () => {
+    it('selects startDate, endDate, status, size - never renterId/price or other private fields', async () => {
       prisma.dress.findUnique.mockResolvedValue(approvedDress);
       prisma.booking.findMany.mockResolvedValue([]);
 
@@ -521,7 +730,7 @@ describe('BookingsService', () => {
 
       expect(prisma.booking.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          select: { startDate: true, endDate: true, status: true },
+          select: { startDate: true, endDate: true, status: true, size: true },
         }),
       );
     });

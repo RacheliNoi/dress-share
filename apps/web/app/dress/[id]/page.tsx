@@ -176,7 +176,7 @@ export default function DressDetailsPage() {
                 )}
               </div>
 
-              <DressAvailabilityCalendar dressId={dress.id} />
+              <DressAvailabilityCalendar dressId={dress.id} sizes={dress.sizes} />
             </div>
           </div>
         ) : null}

@@ -48,6 +48,7 @@ export class BookingsController {
       dressId: number;
       startDate: string;
       endDate: string;
+      size?: string;
     },
     @CurrentUser() user: { sub: number },
   ) {
@@ -55,6 +56,7 @@ export class BookingsController {
       dressId: Number(body.dressId),
       startDate: body.startDate,
       endDate: body.endDate,
+      size: body.size,
       ownerId: user.sub,
     });
   }

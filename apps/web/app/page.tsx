@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import DressCard from "@/components/DressCard";
 import CatalogFilters, { SortOption } from "@/components/CatalogFilters";
-import { Dress, getApprovedDresses } from "@/lib/api";
+import {
+  Dress,
+  DressAvailabilityEntry,
+  getApprovedDresses,
+  getDressAvailability,
+} from "@/lib/api";
 
 function getMinPrice(dress: Dress): number | null {
   if (dress.sizes.length === 0) {
@@ -20,6 +25,65 @@ function uniqueSorted(values: (string | null)[]): string[] {
   );
 }
 
+// Same inclusive-both-ends semantics as the backend and
+// DressAvailabilityCalendar - a booking blocks the exact start/end days too.
+function isDateBlocked(dateValue: string, entries: DressAvailabilityEntry[]): boolean {
+  const target = new Date(`${dateValue}T00:00:00.000Z`).getTime();
+
+  return entries.some((entry) => {
+    const start = new Date(entry.startDate).getTime();
+    const end = new Date(entry.endDate).getTime();
+    return target >= start && target <= end;
+  });
+}
+
+// Per-size breakdown for one date - `size: null` on an entry means either a
+// no-size dress (whole-dress booking) or a booking made before per-size
+// tracking existed, both treated as blocking every size (the conservative
+// reading, matching the backend and DressAvailabilityCalendar).
+function getBlockedSizesForDate(
+  dateValue: string,
+  entries: DressAvailabilityEntry[],
+): { blockedSizes: Set<string>; wholeDressBlocked: boolean } {
+  const target = new Date(`${dateValue}T00:00:00.000Z`).getTime();
+  const blockedSizes = new Set<string>();
+  let wholeDressBlocked = false;
+
+  for (const entry of entries) {
+    const start = new Date(entry.startDate).getTime();
+    const end = new Date(entry.endDate).getTime();
+
+    if (target < start || target > end) {
+      continue;
+    }
+
+    if (entry.size === null) {
+      wholeDressBlocked = true;
+    } else {
+      blockedSizes.add(entry.size);
+    }
+  }
+
+  return { blockedSizes, wholeDressBlocked };
+}
+
+// A dress stays in the date-filtered catalog as long as at least one of its
+// sizes is free on the chosen date - it's only excluded once every size (or
+// the whole dress, for a no-size dress) is blocked.
+function isDressAvailableOnDate(dress: Dress, dateValue: string, entries: DressAvailabilityEntry[]): boolean {
+  if (dress.sizes.length === 0) {
+    return !isDateBlocked(dateValue, entries);
+  }
+
+  const { blockedSizes, wholeDressBlocked } = getBlockedSizesForDate(dateValue, entries);
+
+  if (wholeDressBlocked) {
+    return false;
+  }
+
+  return dress.sizes.some((size) => !blockedSizes.has(size.size));
+}
+
 export default function CatalogPage() {
   const [dresses, setDresses] = useState<Dress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +96,18 @@ export default function CatalogPage() {
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [sort, setSort] = useState<SortOption>("recommended");
+
+  const [availabilityDate, setAvailabilityDate] = useState("");
+  // Keyed by dressId - fetched lazily (only once a date is picked) and kept
+  // for the rest of the session, so switching the date around never
+  // re-fetches anything already known.
+  const [availabilityCache, setAvailabilityCache] = useState<
+    Record<number, DressAvailabilityEntry[]>
+  >({});
+  const [availabilityErrorIds, setAvailabilityErrorIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   async function loadDresses() {
     try {
@@ -50,6 +126,72 @@ export default function CatalogPage() {
   useEffect(() => {
     loadDresses();
   }, []);
+
+  // Fetches per-dress availability (GET /bookings/dress/:id/availability -
+  // the only public endpoint for this data) only for dresses not already in
+  // the cache, and only once a date filter is actually active. Changing the
+  // date itself never re-fetches anything already cached; only newly-seen
+  // dress ids (e.g. after a catalog reload) trigger new requests.
+  useEffect(() => {
+    if (!availabilityDate) {
+      return;
+    }
+
+    const missingIds = dresses
+      .map((dress) => dress.id)
+      .filter((id) => !(id in availabilityCache) && !availabilityErrorIds.has(id));
+
+    if (missingIds.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    setAvailabilityLoading(true);
+
+    Promise.all(
+      missingIds.map(async (id) => {
+        try {
+          const entries = await getDressAvailability(id);
+          return { id, entries };
+        } catch {
+          // A single dress's availability failing to load must not break
+          // the rest of the catalog - it's simply excluded from the
+          // date-filtered cache and left visible (fails open).
+          return { id, entries: null as DressAvailabilityEntry[] | null };
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) {
+        return;
+      }
+
+      setAvailabilityCache((prev) => {
+        const next = { ...prev };
+        for (const result of results) {
+          if (result.entries) {
+            next[result.id] = result.entries;
+          }
+        }
+        return next;
+      });
+
+      setAvailabilityErrorIds((prev) => {
+        const next = new Set(prev);
+        for (const result of results) {
+          if (!result.entries) {
+            next.add(result.id);
+          }
+        }
+        return next;
+      });
+
+      setAvailabilityLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [availabilityDate, dresses, availabilityCache, availabilityErrorIds]);
 
   const categories = useMemo(
     () => uniqueSorted(dresses.map((dress) => dress.category)),
@@ -116,6 +258,16 @@ export default function CatalogPage() {
       );
     }
 
+    if (availabilityDate) {
+      result = result.filter((dress) => {
+        const entries = availabilityCache[dress.id];
+        // Not loaded yet (or failed to load) - fail open rather than
+        // hiding a dress we simply don't have an answer for yet.
+        if (!entries) return true;
+        return isDressAvailableOnDate(dress, availabilityDate, entries);
+      });
+    }
+
     return result;
   }, [
     dresses,
@@ -125,7 +277,47 @@ export default function CatalogPage() {
     selectedSize,
     priceMinValue,
     priceMaxValue,
+    availabilityDate,
+    availabilityCache,
   ]);
+
+  // For dresses that stay in the results (>= 1 free size), this drives the
+  // per-size available/blocked chip styling on each DressCard.
+  const sizeAvailabilityByDressId = useMemo(() => {
+    if (!availabilityDate) {
+      return null;
+    }
+
+    const map = new Map<number, { available: string[]; blocked: string[] }>();
+
+    for (const dress of dresses) {
+      if (dress.sizes.length === 0) {
+        continue;
+      }
+
+      const entries = availabilityCache[dress.id];
+
+      if (!entries) {
+        continue;
+      }
+
+      const { blockedSizes, wholeDressBlocked } = getBlockedSizesForDate(
+        availabilityDate,
+        entries,
+      );
+
+      map.set(dress.id, {
+        available: wholeDressBlocked
+          ? []
+          : dress.sizes.filter((size) => !blockedSizes.has(size.size)).map((size) => size.size),
+        blocked: wholeDressBlocked
+          ? dress.sizes.map((size) => size.size)
+          : dress.sizes.filter((size) => blockedSizes.has(size.size)).map((size) => size.size),
+      });
+    }
+
+    return map;
+  }, [availabilityDate, availabilityCache, dresses]);
 
   const sortedDresses = useMemo(() => {
     if (sort === "recommended") {
@@ -162,7 +354,8 @@ export default function CatalogPage() {
       selectedColor ||
       selectedSize ||
       priceMinValue !== null ||
-      priceMaxValue !== null,
+      priceMaxValue !== null ||
+      availabilityDate,
   );
 
   function resetFilters() {
@@ -172,6 +365,7 @@ export default function CatalogPage() {
     setSelectedSize("");
     setPriceMin("");
     setPriceMax("");
+    setAvailabilityDate("");
   }
 
   const chips = [
@@ -207,6 +401,11 @@ export default function CatalogPage() {
         setPriceMin("");
         setPriceMax("");
       },
+    },
+    availabilityDate && {
+      key: "availability",
+      label: `זמינה ב־${new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${availabilityDate}T00:00:00.000Z`))}`,
+      onRemove: () => setAvailabilityDate(""),
     },
   ].filter((chip): chip is { key: string; label: string; onRemove: () => void } =>
     Boolean(chip),
@@ -310,6 +509,9 @@ export default function CatalogPage() {
               priceBounds={priceBounds}
               sort={sort}
               onSortChange={setSort}
+              availabilityDate={availabilityDate}
+              onAvailabilityDateChange={setAvailabilityDate}
+              availabilityLoading={availabilityLoading}
               resultCount={sortedDresses.length}
               totalCount={dresses.length}
               hasActiveFilters={hasActiveFilters}
@@ -384,7 +586,9 @@ export default function CatalogPage() {
               </h3>
 
               <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-500">
-                נסי לשנות את החיפוש או להסיר חלק מהסינונים.
+                {availabilityDate
+                  ? "אין שמלות פנויות בתאריך שנבחר. נסי תאריך אחר או הסירי חלק מהסינונים."
+                  : "נסי לשנות את החיפוש או להסיר חלק מהסינונים."}
               </p>
 
               <button
@@ -404,6 +608,7 @@ export default function CatalogPage() {
                   key={dress.id}
                   dress={dress}
                   style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+                  sizeAvailability={sizeAvailabilityByDressId?.get(dress.id) ?? null}
                 />
               ))}
             </div>
