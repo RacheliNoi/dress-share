@@ -119,24 +119,38 @@ model DressSize {
   @@index([dressId])
 }
 
+// Represents a date range during which a Dress is held - anywhere from a
+// loose fitting-coordination interest (INTERESTED) to a finalized rental
+// (RENTED). One row is meant to live through that whole lifecycle: it can
+// start sparse (no renter/size/price yet) and get filled in as it firms up,
+// rather than needing a separate table per stage. renterId/size/price stay
+// optional for exactly that reason - only dressId + the date range + status
+// are guaranteed to be set.
+//
+// The composite (dressId, startDate, endDate) index exists specifically so a
+// future overlap query - "is this dress free between X and Y" - can be
+// answered with a single indexed range scan; no overlap-checking logic is
+// implemented yet, this stage only prepares for it. A CHECK ("endDate" >=
+// "startDate") is enforced at the database level too - this Prisma version's
+// schema DSL has no @@check attribute, so it's added via raw SQL in this
+// model's migration instead (see migration.sql).
 model Booking {
   id        Int           @id @default(autoincrement())
   dressId   Int
-  renterId  Int
-  size      String
+  renterId  Int?
+  size      String?
   startDate DateTime
   endDate   DateTime
-  price     Int
-  status    BookingStatus @default(PENDING)
+  price     Int?
+  status    BookingStatus @default(INTERESTED)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
   dress  Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
-  renter User  @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  renter User? @relation(fields: [renterId], references: [id], onDelete: SetNull)
 
-  @@index([dressId])
+  @@index([dressId, startDate, endDate])
   @@index([renterId])
-  @@index([startDate, endDate])
 }
 
 enum BookingStatus {
@@ -144,4 +158,6 @@ enum BookingStatus {
   CONFIRMED
   CANCELLED
   COMPLETED
+  INTERESTED
+  RENTED
 }
