@@ -8,6 +8,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ClothingItemsModule } from './clothing-items/clothing-items.module';
 import { DressesModule } from './dresses/dresses.module';
+import { BookingsModule } from './bookings/bookings.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 
@@ -21,6 +22,7 @@ import { AdminModule } from './admin/admin.module';
     UsersModule,
     ClothingItemsModule,
     DressesModule,
+    BookingsModule,
     AuthModule,
     AdminModule,
   ],
