@@ -152,6 +152,23 @@ export function getDressImageUrl(photo: DressPhoto) {
   return `${API_URL}${photo.processedUrl ?? photo.originalUrl}`;
 }
 
+// Mirrors exactly what GET /bookings/dress/:dressId/availability returns -
+// no renterId, no user details, nothing beyond what that public endpoint
+// actually sends.
+export type DressAvailabilityStatus = "INTERESTED" | "RENTED";
+
+export type DressAvailabilityEntry = {
+  startDate: string;
+  endDate: string;
+  status: DressAvailabilityStatus;
+};
+
+export function getDressAvailability(dressId: number) {
+  return request<DressAvailabilityEntry[]>(
+    `/bookings/dress/${dressId}/availability`,
+  );
+}
+
 export function getMyDresses(token: string) {
   return request<Dress[]>("/dresses", { token });
 }

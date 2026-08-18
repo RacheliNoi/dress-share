@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
+import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
 import { Dress, getApprovedDressById, getDressImageUrl } from "@/lib/api";
 
 export default function DressDetailsPage() {
@@ -174,6 +175,8 @@ export default function DressDetailsPage() {
                   </p>
                 )}
               </div>
+
+              <DressAvailabilityCalendar dressId={dress.id} />
             </div>
           </div>
         ) : null}
