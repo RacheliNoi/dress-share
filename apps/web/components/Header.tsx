@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import { getUser, logout } from "@/lib/auth";
 import type { AuthUser } from "@/lib/api";
 
+// Temporarily hides the "הארון שלי" (wardrobe) nav link from the header
+// without touching the /wardrobe route, its page, or the clothing-items
+// API - the feature stays fully intact and reachable by direct URL, just
+// not promoted in navigation. Flip back to true to restore the nav link.
+const SHOW_WARDROBE_LINK = false;
+
 export default function Header() {
   const router = useRouter();
   const [user, setUserState] = useState<AuthUser | null>(null);
@@ -45,12 +51,14 @@ export default function Header() {
 
             {mounted && user && (
               <>
-                <Link
-                  href="/wardrobe"
-                  className="transition hover:text-rose-500"
-                >
-                  הארון שלי
-                </Link>
+                {SHOW_WARDROBE_LINK && (
+                  <Link
+                    href="/wardrobe"
+                    className="transition hover:text-rose-500"
+                  >
+                    הארון שלי
+                  </Link>
+                )}
                 <Link
                   href="/dresses"
                   className="transition hover:text-rose-500"
