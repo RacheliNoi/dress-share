@@ -433,7 +433,7 @@ export default function CatalogPage() {
 
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
         {/* Hero */}
-        <section className="relative mb-8 overflow-hidden rounded-[2rem] bg-zinc-900 px-7 py-9 text-white shadow-xl sm:px-10 lg:px-14 lg:py-11">
+        <section className="relative mb-8 overflow-hidden rounded-[28px] bg-zinc-900 px-7 py-9 text-white shadow-xl sm:px-10 lg:px-14 lg:py-11">
           <div className="relative z-10 max-w-2xl">
             <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur">
               ✦ קטלוג שמלות להשכרה
@@ -556,7 +556,7 @@ export default function CatalogPage() {
               {Array.from({ length: 8 }).map((_, item) => (
                 <div
                   key={item}
-                  className="overflow-hidden rounded-[1.5rem] bg-white ring-1 ring-zinc-200/60 sm:rounded-[1.75rem]"
+                  className="overflow-hidden rounded-[20px] bg-white ring-1 ring-zinc-200/60"
                 >
                   <div className="aspect-[3/4] w-full animate-pulse bg-zinc-200" />
 
@@ -572,7 +572,7 @@ export default function CatalogPage() {
             /* No dresses in the catalog at all (nothing extra to say if an
                error already explains why - avoids stacking two messages) */
             error ? null : (
-              <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
+              <section className="rounded-[28px] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-4xl">
                   👗
                 </div>
@@ -588,7 +588,7 @@ export default function CatalogPage() {
             )
           ) : sortedDresses.length === 0 ? (
             /* Dresses exist, but none match the current search/filters */
-            <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
+            <section className="rounded-[28px] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-4xl">
                 🔍
               </div>

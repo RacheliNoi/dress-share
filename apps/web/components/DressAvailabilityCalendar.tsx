@@ -238,7 +238,7 @@ export default function DressAvailabilityCalendar({
   }
 
   return (
-    <section className="mt-8 rounded-[1.75rem] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
+    <section className="mt-8 rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-lg font-bold text-zinc-900">זמינות</h2>
       </div>
@@ -301,7 +301,7 @@ export default function DressAvailabilityCalendar({
               type="date"
               value={jumpValue}
               onChange={(event) => handleJumpToDate(event.target.value)}
-              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 sm:w-auto"
+              className="w-full rounded-[10px] border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft sm:w-auto"
             />
           </div>
 

@@ -257,7 +257,7 @@ export default function NewDressPage() {
         </p>
 
         {submitted ? (
-          <section className="mt-8 rounded-[2rem] border border-success-soft bg-white px-6 py-16 text-center shadow-sm">
+          <section className="mt-8 rounded-[28px] border border-success-soft bg-white px-6 py-16 text-center shadow-sm">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success-soft text-4xl">
               ✅
             </div>
@@ -279,7 +279,7 @@ export default function NewDressPage() {
             </Link>
           </section>
         ) : !dress ? (
-          <section className="mt-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
+          <section className="mt-8 rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
             <h2 className="text-lg font-bold text-zinc-900">
               1. פרטי השמלה
             </h2>
@@ -338,7 +338,7 @@ export default function NewDressPage() {
           </section>
         ) : (
           <div className="mt-8 space-y-6">
-            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
+            <section className="rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-zinc-900">
                   {dress.name}
@@ -361,7 +361,7 @@ export default function NewDressPage() {
               )}
             </section>
 
-            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
+            <section className="rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
               <h2 className="text-lg font-bold text-zinc-900">
                 2. מידות ומחירים
               </h2>
@@ -414,7 +414,7 @@ export default function NewDressPage() {
               )}
             </section>
 
-            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60 sm:p-7">
+            <section className="rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60 sm:p-7">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="text-lg font-bold text-zinc-900">
                   3. תמונות
@@ -566,7 +566,7 @@ export default function NewDressPage() {
               )}
             </section>
 
-            <section className="rounded-3xl bg-zinc-900 p-6 text-white shadow-sm">
+            <section className="rounded-[20px] bg-zinc-900 p-6 text-white shadow-sm">
               <h2 className="text-lg font-bold">4. שליחה לאישור</h2>
 
               <p className="mt-2 text-sm leading-6 text-zinc-300">

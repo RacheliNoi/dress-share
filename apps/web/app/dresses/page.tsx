@@ -132,7 +132,7 @@ return (<main
 
   <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
     {/* Hero */}
-    <section className="relative mb-10 overflow-hidden rounded-[2rem] bg-zinc-900 px-7 py-10 text-white shadow-xl sm:px-10 lg:px-14 lg:py-14">
+    <section className="relative mb-10 overflow-hidden rounded-[28px] bg-zinc-900 px-7 py-10 text-white shadow-xl sm:px-10 lg:px-14 lg:py-14">
       <div className="relative z-10 max-w-2xl">
         <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur">
           ✦ ניהול השמלות שלך
@@ -239,7 +239,7 @@ return (<main
         {[1, 2, 3].map((item) => (
           <div
             key={item}
-            className="overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60"
+            className="overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60"
           >
             <div className="h-80 animate-pulse bg-zinc-200" />
 
@@ -253,7 +253,7 @@ return (<main
       </div>
     ) : dresses.length === 0 ? (
       /* Empty state */
-      <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
+      <section className="rounded-[28px] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
           👗
         </div>
@@ -286,7 +286,7 @@ return (<main
             <Link
               key={dress.id}
               href={`/dresses/${dress.id}`}
-              className="group block overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+              className="group block overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
             >
               {/* Image */}
               <div className="relative h-[380px] overflow-hidden bg-zinc-100">

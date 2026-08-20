@@ -35,9 +35,9 @@ export default function WelcomeNotice() {
       dir="rtl"
       className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-4 sm:inset-x-auto sm:bottom-6 sm:left-6 sm:justify-start sm:px-0 sm:pb-0"
     >
-      <div className="animate-fade-scale-in w-full max-w-sm rounded-2xl bg-white p-5 shadow-[0_20px_45px_-15px_rgba(24,24,27,0.25)] ring-1 ring-zinc-200/70">
+      <div className="animate-fade-scale-in w-full max-w-sm rounded-[20px] bg-surface p-5 shadow-[0_20px_45px_-15px_rgba(34,31,31,0.25)] ring-1 ring-line">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-sm font-black text-zinc-900">
+          <h2 className="font-display text-sm font-bold text-ink">
             כמה דברים שכדאי לדעת
           </h2>
 
@@ -45,13 +45,13 @@ export default function WelcomeNotice() {
             type="button"
             onClick={dismiss}
             aria-label="סגירת ההודעה"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-faint transition hover:bg-surface-sunken hover:text-ink"
           >
             ✕
           </button>
         </div>
 
-        <div className="mt-3 space-y-3 text-sm leading-6 text-zinc-600">
+        <div className="mt-3 space-y-3 text-sm leading-6 text-ink-soft">
           <div className="flex gap-2.5">
             <span className="mt-0.5 text-base" aria-hidden>
               🛡️
@@ -75,7 +75,7 @@ export default function WelcomeNotice() {
         <button
           type="button"
           onClick={dismiss}
-          className="mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-700"
+          className="mt-4 w-full rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-ink/80"
         >
           הבנתי, תודה
         </button>

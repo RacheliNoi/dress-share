@@ -166,12 +166,12 @@ export default function AdminDashboardPage() {
             {[1, 2].map((item) => (
               <div
                 key={item}
-                className="h-64 animate-pulse rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60"
+                className="h-64 animate-pulse rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60"
               />
             ))}
           </div>
         ) : dresses.length === 0 ? (
-          <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
+          <section className="rounded-[28px] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
               ✨
             </div>
@@ -242,7 +242,7 @@ export default function AdminDashboardPage() {
               return (
                 <article
                   key={dress.id}
-                  className="overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-zinc-200/60"
+                  className="overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60"
                 >
                   <div className="flex flex-col sm:flex-row">
                     <div className="shrink-0 p-3 sm:w-56">

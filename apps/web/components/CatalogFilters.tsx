@@ -136,7 +136,7 @@ export default function CatalogFilters({
   }
 
   const selectClassName =
-    "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-zinc-400 sm:w-auto";
+    "w-full rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft sm:w-auto";
 
   return (
     <section className="mb-6 sm:mb-7">
@@ -160,7 +160,7 @@ export default function CatalogFilters({
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="חיפוש לפי שם, קטגוריה, צבע או תיאור..."
-            className="w-full rounded-2xl border border-zinc-200 bg-white py-3.5 pe-11 ps-4 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-zinc-400"
+            className="w-full rounded-2xl border border-line-strong bg-white py-3.5 pe-11 ps-4 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent focus:ring-4 focus:ring-accent-soft"
           />
         </div>
 
@@ -171,7 +171,7 @@ export default function CatalogFilters({
             className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-bold transition sm:hidden ${
               panelOpen
                 ? "border-zinc-900 bg-zinc-900 text-white"
-                : "border-zinc-200 bg-white text-zinc-700"
+                : "border-line-strong bg-white text-zinc-700"
             }`}
           >
             סינון ומיון
@@ -219,7 +219,7 @@ export default function CatalogFilters({
               type="date"
               value={availabilityDate}
               onChange={(event) => onAvailabilityDateChange(event.target.value)}
-              className="rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-zinc-400"
+              className="rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
             />
 
             {availabilityDate && (
@@ -256,7 +256,7 @@ export default function CatalogFilters({
               value={hebrewYear}
               onChange={(event) => handleHebrewYearChange(Number(event.target.value))}
               aria-label="שנה עברית"
-              className="rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-zinc-400"
+              className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
             >
               {hebrewYearOptions.map((year) => (
                 <option key={year} value={year}>
@@ -269,7 +269,7 @@ export default function CatalogFilters({
               value={hebrewMonthName}
               onChange={(event) => handleHebrewMonthChange(event.target.value)}
               aria-label="חודש עברי"
-              className="rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-zinc-400"
+              className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
             >
               <option value="">חודש</option>
               {hebrewTable.map((month) => (
@@ -284,7 +284,7 @@ export default function CatalogFilters({
               onChange={(event) => handleHebrewDayChange(event.target.value)}
               aria-label="יום עברי"
               disabled={!hebrewMonthName}
-              className="rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="">יום</option>
               {hebrewDayOptions.map((day) => (
@@ -378,7 +378,7 @@ export default function CatalogFilters({
                   onChange={(event) => onPriceMinChange(event.target.value)}
                   placeholder={`מ־${priceBounds.min} ₪`}
                   min={0}
-                  className="w-24 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-zinc-400"
+                  className="w-24 rounded-xl border border-line-strong bg-white px-3 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
                 <span className="text-zinc-300">–</span>
                 <input
@@ -388,7 +388,7 @@ export default function CatalogFilters({
                   onChange={(event) => onPriceMaxChange(event.target.value)}
                   placeholder={`עד ${priceBounds.max} ₪`}
                   min={0}
-                  className="w-24 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-zinc-400"
+                  className="w-24 rounded-xl border border-line-strong bg-white px-3 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
               </div>
             )}

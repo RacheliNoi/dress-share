@@ -45,7 +45,7 @@ export default function DressCard({
     <Link
       href={`/dress/${dress.id}`}
       style={style}
-      className="animate-fade-scale-in group block overflow-hidden rounded-[1.5rem] bg-white ring-1 ring-zinc-200/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_-15px_rgba(24,24,27,0.18)] sm:rounded-[1.75rem]"
+      className="animate-fade-scale-in group block overflow-hidden rounded-[20px] bg-white ring-1 ring-zinc-200/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_-15px_rgba(34,31,31,0.18)]"
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-zinc-100">
         {showImage ? (

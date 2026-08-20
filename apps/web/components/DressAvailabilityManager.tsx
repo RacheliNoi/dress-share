@@ -337,7 +337,7 @@ export default function DressAvailabilityManager({
     <section className="mt-8 space-y-6">
       <DressAvailabilityCalendar dressId={dressId} sizes={sizes} key={calendarKey} />
 
-      <div className="rounded-[1.75rem] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
+      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
         <h2 className="text-lg font-bold text-zinc-900">ניהול זמינות</h2>
         <p className="mt-1 text-sm text-zinc-500">
           {hasSizes
@@ -487,7 +487,7 @@ export default function DressAvailabilityManager({
         </form>
       </div>
 
-      <div className="rounded-[1.75rem] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
+      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
         <h2 className="text-lg font-bold text-zinc-900">רשומות זמינות</h2>
 
         {actionError && (

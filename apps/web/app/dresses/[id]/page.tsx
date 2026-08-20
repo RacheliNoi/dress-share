@@ -221,7 +221,7 @@ export default function MyDressDetailsPage() {
 
         {loading ? (
           <div className="grid gap-8 lg:grid-cols-2">
-            <div className="h-[480px] animate-pulse rounded-[2rem] bg-zinc-200" />
+            <div className="h-[480px] animate-pulse rounded-[28px] bg-zinc-200" />
             <div className="space-y-4">
               <div className="h-8 w-2/3 animate-pulse rounded bg-zinc-200" />
               <div className="h-5 w-1/3 animate-pulse rounded bg-zinc-100" />
@@ -229,7 +229,7 @@ export default function MyDressDetailsPage() {
             </div>
           </div>
         ) : error ? (
-          <div className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
+          <div className="rounded-[28px] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
               👗
             </div>
@@ -249,7 +249,7 @@ export default function MyDressDetailsPage() {
           <div className="grid gap-8 lg:grid-cols-2">
             {/* Photos */}
             <div>
-              <div className="relative h-[480px] overflow-hidden rounded-[2rem] bg-zinc-100 shadow-sm ring-1 ring-zinc-200/60">
+              <div className="relative h-[480px] overflow-hidden rounded-[28px] bg-zinc-100 shadow-sm ring-1 ring-zinc-200/60">
                 {activePhoto ? (
                   <img
                     src={getDressImageUrl(activePhoto)}
@@ -306,7 +306,7 @@ export default function MyDressDetailsPage() {
 
               <StatusPanel dress={dress} />
 
-              <div className="mt-8 rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
+              <div className="mt-8 rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
                 <h2 className="text-lg font-bold text-zinc-900">
                   מידות ומחירים
                 </h2>

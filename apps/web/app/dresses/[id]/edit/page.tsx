@@ -580,11 +580,11 @@ export default function EditDressPage() {
 
         {loading ? (
           <div className="mt-8 space-y-4">
-            <div className="h-40 animate-pulse rounded-3xl bg-zinc-200" />
-            <div className="h-64 animate-pulse rounded-3xl bg-zinc-100" />
+            <div className="h-40 animate-pulse rounded-[20px] bg-zinc-200" />
+            <div className="h-64 animate-pulse rounded-[20px] bg-zinc-100" />
           </div>
         ) : loadError ? (
-          <section className="mt-8 rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm">
+          <section className="mt-8 rounded-[28px] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
               👗
             </div>
@@ -603,7 +603,7 @@ export default function EditDressPage() {
         ) : dress ? (
           <div className="mt-8 space-y-6">
             {isApprovedEdit && (
-              <section className="rounded-3xl border border-sky-100 bg-sky-50 p-6">
+              <section className="rounded-[20px] border border-sky-100 bg-sky-50 p-6">
                 <p className="text-sm font-bold text-sky-800">
                   את עורכת שמלה שכבר מאושרת ומוצגת בקטלוג
                 </p>
@@ -616,7 +616,7 @@ export default function EditDressPage() {
             )}
 
             {dress.status === "REJECTED" && (
-              <section className="rounded-3xl border border-error-soft bg-error-soft p-6">
+              <section className="rounded-[20px] border border-error-soft bg-error-soft p-6">
                 <p className="text-sm font-bold text-error">
                   השמלה נדחתה על ידי מנהל
                 </p>
@@ -632,7 +632,7 @@ export default function EditDressPage() {
               </section>
             )}
 
-            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
+            <section className="rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
               <h2 className="text-lg font-bold text-zinc-900">
                 1. פרטי השמלה
               </h2>
@@ -696,7 +696,7 @@ export default function EditDressPage() {
               </form>
             </section>
 
-            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
+            <section className="rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
               <h2 className="text-lg font-bold text-zinc-900">
                 2. מידות ומחירים
               </h2>
@@ -885,7 +885,7 @@ export default function EditDressPage() {
               )}
             </section>
 
-            <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/60 sm:p-7">
+            <section className="rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60 sm:p-7">
               <h2 className="text-lg font-bold text-zinc-900">3. תמונות</h2>
 
               <p className="mt-1 text-sm text-zinc-500">
@@ -1038,7 +1038,7 @@ export default function EditDressPage() {
             </section>
 
             {canResubmit && (
-              <section className="rounded-3xl bg-zinc-900 p-6 text-white shadow-sm">
+              <section className="rounded-[20px] bg-zinc-900 p-6 text-white shadow-sm">
                 <h2 className="text-lg font-bold">שליחה מחדש לאישור</h2>
 
                 <p className="mt-2 text-sm leading-6 text-zinc-300">
@@ -1064,7 +1064,7 @@ export default function EditDressPage() {
             )}
 
             {isApprovedEdit && (
-              <section className="rounded-3xl bg-zinc-900 p-6 text-white shadow-sm">
+              <section className="rounded-[20px] bg-zinc-900 p-6 text-white shadow-sm">
                 <h2 className="text-lg font-bold">שליחת העריכה לאישור</h2>
 
                 <p className="mt-2 text-sm leading-6 text-zinc-300">
