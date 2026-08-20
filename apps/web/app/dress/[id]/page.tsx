@@ -58,7 +58,7 @@ export default function DressDetailsPage() {
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 lg:py-14">
         <Link
           href="/"
-          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-rose-500"
+          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-accent"
         >
           → חזרה לקטלוג
         </Link>
@@ -74,7 +74,7 @@ export default function DressDetailsPage() {
           </div>
         ) : error ? (
           <div className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50 text-4xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
               👗
             </div>
 
@@ -101,7 +101,7 @@ export default function DressDetailsPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-8xl">
+                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-8xl">
                     👗
                   </div>
                 )}
@@ -116,7 +116,7 @@ export default function DressDetailsPage() {
                       onClick={() => setActivePhotoIndex(index)}
                       className={`h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-2 transition ${
                         index === activePhotoIndex
-                          ? "ring-rose-400"
+                          ? "ring-accent"
                           : "ring-transparent hover:ring-zinc-200"
                       }`}
                     >
@@ -133,7 +133,7 @@ export default function DressDetailsPage() {
 
             {/* Details */}
             <div>
-              <p className="text-sm font-medium text-rose-500">
+              <p className="text-sm font-medium text-accent">
                 {dress.category || "ללא קטגוריה"}
                 {dress.color && ` · ${dress.color}`}
               </p>

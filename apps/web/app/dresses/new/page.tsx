@@ -18,6 +18,7 @@ import {
   submitDressForApproval,
 } from "@/lib/api";
 import Header from "@/components/Header";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 export default function NewDressPage() {
   const router = useRouter();
@@ -53,6 +54,7 @@ export default function NewDressPage() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [photoError, setPhotoError] = useState("");
   const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
+  const [pendingDeletePhotoId, setPendingDeletePhotoId] = useState<number | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -183,16 +185,16 @@ export default function NewDressPage() {
     }
   }
 
-  async function handleDeletePhoto(photoId: number) {
+  function handleDeletePhoto(photoId: number) {
+    setPendingDeletePhotoId(photoId);
+  }
+
+  async function confirmDeletePhoto() {
     const token = getToken();
+    const photoId = pendingDeletePhotoId;
 
-    if (!token || !dress) {
-      return;
-    }
-
-    const confirmed = window.confirm("למחוק את התמונה?");
-
-    if (!confirmed) {
+    if (!token || !dress || photoId === null) {
+      setPendingDeletePhotoId(null);
       return;
     }
 
@@ -208,6 +210,7 @@ export default function NewDressPage() {
       );
     } finally {
       setDeletingPhotoId(null);
+      setPendingDeletePhotoId(null);
     }
   }
 
@@ -240,7 +243,7 @@ export default function NewDressPage() {
       <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 lg:py-14">
         <Link
           href="/dresses"
-          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-rose-500"
+          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-accent"
         >
           → חזרה לשמלות שלי
         </Link>
@@ -254,8 +257,8 @@ export default function NewDressPage() {
         </p>
 
         {submitted ? (
-          <section className="mt-8 rounded-[2rem] border border-emerald-100 bg-white px-6 py-16 text-center shadow-sm">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-4xl">
+          <section className="mt-8 rounded-[2rem] border border-success-soft bg-white px-6 py-16 text-center shadow-sm">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success-soft text-4xl">
               ✅
             </div>
 
@@ -291,7 +294,7 @@ export default function NewDressPage() {
                 onChange={(event) => setName(event.target.value)}
                 placeholder="שם השמלה"
                 required
-                className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500 md:col-span-2"
+                className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft md:col-span-2"
               />
 
               <input
@@ -299,7 +302,7 @@ export default function NewDressPage() {
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
                 placeholder="קטגוריה (למשל: ערב)"
-                className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
               />
 
               <input
@@ -307,7 +310,7 @@ export default function NewDressPage() {
                 value={color}
                 onChange={(event) => setColor(event.target.value)}
                 placeholder="צבע"
-                className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
               />
 
               <textarea
@@ -315,11 +318,11 @@ export default function NewDressPage() {
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="תיאור השמלה"
                 rows={4}
-                className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500 md:col-span-2"
+                className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft md:col-span-2"
               />
 
               {createError && (
-                <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700 md:col-span-2">
+                <div className="rounded-2xl bg-error-soft p-4 text-sm text-error md:col-span-2">
                   {createError}
                 </div>
               )}
@@ -385,7 +388,7 @@ export default function NewDressPage() {
                   value={sizeValue}
                   onChange={(event) => setSizeValue(event.target.value)}
                   placeholder="מידה (למשל: M)"
-                  className="flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <input
@@ -394,7 +397,7 @@ export default function NewDressPage() {
                   value={priceValue}
                   onChange={(event) => setPriceValue(event.target.value)}
                   placeholder="מחיר בש״ח"
-                  className="flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <button
@@ -407,7 +410,7 @@ export default function NewDressPage() {
               </form>
 
               {sizeError && (
-                <p className="mt-3 text-sm text-red-600">{sizeError}</p>
+                <p className="mt-3 text-sm text-error">{sizeError}</p>
               )}
             </section>
 
@@ -435,7 +438,7 @@ export default function NewDressPage() {
               {photos.length > 0 && (
                 <div className="mt-6">
                   <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-success" />
                     תמונות שהועלו
                   </p>
 
@@ -463,7 +466,7 @@ export default function NewDressPage() {
                           onClick={() => handleDeletePhoto(photo.id)}
                           disabled={deletingPhotoId === photo.id}
                           aria-label="מחיקת תמונה"
-                          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/60 text-xs font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:scale-110 hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/60 text-xs font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:scale-110 hover:bg-error disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {deletingPhotoId === photo.id ? (
                             <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -480,8 +483,8 @@ export default function NewDressPage() {
               {/* Selected, waiting to upload */}
               {selectedPreviews.length > 0 && (
                 <div className="mt-6">
-                  <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-600">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                  <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-warning">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-warning" />
                     ממתינות להעלאה
                   </p>
 
@@ -489,7 +492,7 @@ export default function NewDressPage() {
                     {selectedPreviews.map((preview, index) => (
                       <div
                         key={preview}
-                        className="relative aspect-square animate-fade-scale-in overflow-hidden rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/40"
+                        className="relative aspect-square animate-fade-scale-in overflow-hidden rounded-2xl border-2 border-dashed border-warning/50 bg-warning-soft/40"
                         style={{ animationDelay: `${index * 40}ms` }}
                       >
                         <img
@@ -505,7 +508,7 @@ export default function NewDressPage() {
 
               {/* Empty state */}
               {photos.length === 0 && selectedPreviews.length === 0 && (
-                <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 px-6 py-10 text-center">
+                <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 px-6 py-10 text-center">
                   <span className="text-4xl">👗</span>
                   <p className="mt-3 text-sm font-medium text-zinc-600">
                     עדיין לא הועלו תמונות
@@ -521,9 +524,9 @@ export default function NewDressPage() {
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <label
                   htmlFor="dress-photos"
-                  className="group flex flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 px-4 py-3.5 text-sm text-zinc-600 transition duration-200 hover:border-rose-300 hover:bg-rose-50/40"
+                  className="group flex flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 px-4 py-3.5 text-sm text-zinc-600 transition duration-200 hover:border-accent-soft-strong hover:bg-accent-soft/40"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1 ring-zinc-200 transition duration-200 group-hover:ring-rose-200">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1 ring-zinc-200 transition duration-200 group-hover:ring-accent-soft-strong">
                     📷
                   </span>
 
@@ -559,7 +562,7 @@ export default function NewDressPage() {
               </div>
 
               {photoError && (
-                <p className="mt-3 text-sm text-red-600">{photoError}</p>
+                <p className="mt-3 text-sm text-error">{photoError}</p>
               )}
             </section>
 
@@ -572,7 +575,7 @@ export default function NewDressPage() {
               </p>
 
               {submitError && (
-                <div className="mt-4 rounded-2xl bg-red-500/10 p-4 text-sm text-red-200">
+                <div className="mt-4 rounded-2xl bg-error/15 p-4 text-sm text-error-soft">
                   {submitError}
                 </div>
               )}
@@ -581,7 +584,7 @@ export default function NewDressPage() {
                 type="button"
                 onClick={handleSubmitForApproval}
                 disabled={submitting}
-                className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-bold text-zinc-900 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-bold text-zinc-900 transition hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? "שולחת..." : "שליחה לאישור"}
               </button>
@@ -589,6 +592,17 @@ export default function NewDressPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDeletePhotoId !== null}
+        title="למחוק את התמונה?"
+        confirmLabel="מחיקת התמונה"
+        cancelLabel="ביטול"
+        danger
+        loading={deletingPhotoId === pendingDeletePhotoId}
+        onConfirm={confirmDeletePhoto}
+        onCancel={() => setPendingDeletePhotoId(null)}
+      />
     </main>
   );
 }

@@ -16,7 +16,7 @@ import Header from "@/components/Header";
 const statusConfig: Record<DressStatus, { label: string; className: string }> = {
 DRAFT: {
 label: "טיוטה",
-className: "bg-zinc-100 text-zinc-600",
+className: "bg-surface-sunken text-ink-soft",
 },
 AI_PROCESSING: {
 label: "בעיבוד",
@@ -28,19 +28,19 @@ className: "bg-sky-50 text-sky-700",
 },
 OWNER_REVIEW: {
 label: "ממתינה לבדיקתך",
-className: "bg-amber-50 text-amber-700",
+className: "bg-warning-soft text-warning",
 },
 PENDING_APPROVAL: {
 label: "ממתינה לאישור",
-className: "bg-amber-50 text-amber-700",
+className: "bg-warning-soft text-warning",
 },
 APPROVED: {
 label: "מאושרת",
-className: "bg-emerald-50 text-emerald-700",
+className: "bg-success-soft text-success",
 },
 REJECTED: {
 label: "נדחתה",
-className: "bg-red-50 text-red-700",
+className: "bg-error-soft text-error",
 },
 };
 
@@ -141,7 +141,7 @@ return (<main
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
           השמלות שלך,
           <br />
-          <span className="text-rose-300">הסיפור שלהן.</span>
+          <span className="text-accent-light">הסיפור שלהן.</span>
         </h1>
 
         <p className="mt-5 max-w-xl text-base leading-7 text-zinc-300 sm:text-lg">
@@ -151,14 +151,14 @@ return (<main
 
         <a
           href="/dresses/new"
-          className="mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-bold text-zinc-900 shadow-lg transition hover:-translate-y-0.5 hover:bg-rose-50"
+          className="mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-bold text-zinc-900 shadow-lg transition hover:-translate-y-0.5 hover:bg-accent-soft"
         >
           <span className="text-lg">+</span>
           הוספת שמלה חדשה
         </a>
       </div>
 
-      <div className="pointer-events-none absolute -left-20 -top-32 h-80 w-80 rounded-full bg-rose-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 -top-32 h-80 w-80 rounded-full bg-accent/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 right-1/3 h-96 w-96 rounded-full bg-purple-400/10 blur-3xl" />
 
       <div className="pointer-events-none absolute bottom-0 left-8 hidden opacity-10 lg:block">
@@ -197,7 +197,7 @@ return (<main
     {/* Header */}
     <section className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="mb-2 text-sm font-medium text-rose-500">
+        <p className="mb-2 text-sm font-medium text-accent">
           הארון שלך
         </p>
 
@@ -220,7 +220,7 @@ return (<main
 
     {/* Error */}
     {error && (
-      <div className="mb-6 flex items-center justify-between rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700">
+      <div className="mb-6 flex items-center justify-between rounded-2xl border border-error-soft bg-error-soft px-5 py-4 text-sm text-error">
         <span>{error}</span>
 
         <button
@@ -254,7 +254,7 @@ return (<main
     ) : dresses.length === 0 ? (
       /* Empty state */
       <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50 text-4xl">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
           👗
         </div>
 
@@ -300,7 +300,7 @@ return (<main
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-7xl">
+                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-7xl">
                     👗
                   </div>
                 )}
@@ -367,7 +367,7 @@ return (<main
                   )}
                 </div>
 
-                <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4 text-sm font-bold text-zinc-700 transition group-hover:text-rose-500">
+                <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4 text-sm font-bold text-zinc-700 transition group-hover:text-accent">
                   <span>צפייה בשמלה</span>
                   <span aria-hidden>←</span>
                 </div>

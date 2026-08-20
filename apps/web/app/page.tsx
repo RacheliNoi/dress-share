@@ -442,7 +442,7 @@ export default function CatalogPage() {
             <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
               שמלה לכל אירוע,
               <br />
-              <span className="text-rose-300">בלי לקנות.</span>
+              <span className="text-accent-light">בלי לקנות.</span>
             </h1>
 
             <p className="mt-4 max-w-xl text-base leading-7 text-zinc-300">
@@ -453,7 +453,7 @@ export default function CatalogPage() {
             <button
               type="button"
               onClick={scrollToCatalog}
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-rose-50"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-accent-soft"
             >
               לצפייה בקטלוג
               <svg
@@ -469,7 +469,7 @@ export default function CatalogPage() {
             </button>
           </div>
 
-          <div className="pointer-events-none absolute -left-20 -top-32 h-80 w-80 rounded-full bg-rose-400/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 -top-32 h-80 w-80 rounded-full bg-accent/20 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-40 right-1/3 h-96 w-96 rounded-full bg-purple-400/10 blur-3xl" />
 
           <div className="pointer-events-none absolute bottom-0 left-8 hidden opacity-10 lg:block">
@@ -490,7 +490,7 @@ export default function CatalogPage() {
         <div id="catalog" className="scroll-mt-24">
           {/* Catalog heading */}
           <section className="mb-5">
-            <p className="mb-2 text-sm font-medium text-rose-500">הקטלוג שלנו</p>
+            <p className="mb-2 text-sm font-medium text-accent">הקטלוג שלנו</p>
 
             <h2 className="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">
               שמלות זמינות להשכרה
@@ -534,7 +534,7 @@ export default function CatalogPage() {
 
           {/* Error */}
           {error && (
-            <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-error-soft bg-error-soft px-5 py-4 text-sm text-error sm:flex-row sm:items-center sm:justify-between">
               <span className="flex items-center gap-2">
                 <span aria-hidden>⚠</span>
                 {error}
@@ -543,7 +543,7 @@ export default function CatalogPage() {
               <button
                 type="button"
                 onClick={loadDresses}
-                className="self-start rounded-full border border-red-200 px-4 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100 sm:self-auto"
+                className="self-start rounded-full border border-error-soft px-4 py-1.5 text-xs font-bold text-error transition hover:bg-error-soft sm:self-auto"
               >
                 נסי שוב
               </button>
@@ -573,7 +573,7 @@ export default function CatalogPage() {
                error already explains why - avoids stacking two messages) */
             error ? null : (
               <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-4xl">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-4xl">
                   👗
                 </div>
 
@@ -589,7 +589,7 @@ export default function CatalogPage() {
           ) : sortedDresses.length === 0 ? (
             /* Dresses exist, but none match the current search/filters */
             <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-4xl">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-4xl">
                 🔍
               </div>
 

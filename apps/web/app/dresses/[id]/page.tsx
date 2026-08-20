@@ -29,12 +29,12 @@ function StatusPanel({ dress }: { dress: Dress }) {
 
     case "REJECTED":
       return (
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
-          <p className="text-sm font-bold text-red-700">
+        <div className="mt-6 rounded-2xl border border-error-soft bg-error-soft p-5">
+          <p className="text-sm font-bold text-error">
             השמלה נדחתה לאישור
           </p>
 
-          <p className="mt-1 text-sm leading-6 text-red-700">
+          <p className="mt-1 text-sm leading-6 text-error">
             {dress.rejectionReason || "לא צוינה סיבה."}
           </p>
 
@@ -49,11 +49,11 @@ function StatusPanel({ dress }: { dress: Dress }) {
 
     case "PENDING_APPROVAL":
       return (
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-sm font-bold text-amber-700">
+        <div className="mt-6 rounded-2xl border border-warning-soft bg-warning-soft p-5">
+          <p className="text-sm font-bold text-warning">
             ממתינה לאישור מנהל
           </p>
-          <p className="mt-1 text-sm leading-6 text-amber-700">
+          <p className="mt-1 text-sm leading-6 text-warning">
             השמלה נשלחה לבדיקה ותופיע בקטלוג הציבורי לאחר שתאושר. לא ניתן
             לערוך אותה בזמן שהיא ממתינה לאישור.
           </p>
@@ -63,11 +63,11 @@ function StatusPanel({ dress }: { dress: Dress }) {
     case "APPROVED":
       if (dress.pendingReviewSubmittedAt) {
         return (
-          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-            <p className="text-sm font-bold text-amber-700">
+          <div className="mt-6 rounded-2xl border border-warning-soft bg-warning-soft p-5">
+            <p className="text-sm font-bold text-warning">
               העריכה שלך ממתינה לאישור מנהל
             </p>
-            <p className="mt-1 text-sm leading-6 text-amber-700">
+            <p className="mt-1 text-sm leading-6 text-warning">
               הציבור עדיין רואה את הגרסה המאושרת הנוכחית. השינויים שהצעת
               יופיעו בקטלוג רק לאחר אישור מנהל. לא ניתן לערוך שוב עד להחלטה.
             </p>
@@ -77,11 +77,11 @@ function StatusPanel({ dress }: { dress: Dress }) {
 
       return (
         <div className="mt-6 space-y-3">
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-            <p className="text-sm font-bold text-emerald-700">
+          <div className="rounded-2xl border border-success-soft bg-success-soft p-5">
+            <p className="text-sm font-bold text-success">
               מאושרת וזמינה להשכרה
             </p>
-            <p className="mt-1 text-sm leading-6 text-emerald-700">
+            <p className="mt-1 text-sm leading-6 text-success">
               השמלה מאושרת ומוצגת בקטלוג הציבורי.
             </p>
 
@@ -94,14 +94,14 @@ function StatusPanel({ dress }: { dress: Dress }) {
           </div>
 
           {dress.rejectionReason && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-              <p className="text-sm font-bold text-red-700">
+            <div className="rounded-2xl border border-error-soft bg-error-soft p-5">
+              <p className="text-sm font-bold text-error">
                 העריכה האחרונה שלך נדחתה
               </p>
-              <p className="mt-1 text-sm leading-6 text-red-700">
+              <p className="mt-1 text-sm leading-6 text-error">
                 {dress.rejectionReason}
               </p>
-              <p className="mt-2 text-xs text-red-600">
+              <p className="mt-2 text-xs text-error">
                 הגרסה המאושרת הנוכחית (זו שהציבור רואה) לא נפגעה.
               </p>
             </div>
@@ -214,7 +214,7 @@ export default function MyDressDetailsPage() {
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 lg:py-14">
         <Link
           href="/dresses"
-          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-rose-500"
+          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-accent"
         >
           → חזרה לשמלות שלי
         </Link>
@@ -230,7 +230,7 @@ export default function MyDressDetailsPage() {
           </div>
         ) : error ? (
           <div className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50 text-4xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
               👗
             </div>
 
@@ -257,7 +257,7 @@ export default function MyDressDetailsPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-8xl">
+                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-8xl">
                     👗
                   </div>
                 )}
@@ -272,7 +272,7 @@ export default function MyDressDetailsPage() {
                       onClick={() => setActivePhotoIndex(index)}
                       className={`h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-2 transition ${
                         index === activePhotoIndex
-                          ? "ring-rose-400"
+                          ? "ring-accent"
                           : "ring-transparent hover:ring-zinc-200"
                       }`}
                     >
@@ -289,7 +289,7 @@ export default function MyDressDetailsPage() {
 
             {/* Details */}
             <div>
-              <p className="text-sm font-medium text-rose-500">
+              <p className="text-sm font-medium text-accent">
                 {dress.category || "ללא קטגוריה"}
                 {dress.color && ` · ${dress.color}`}
               </p>

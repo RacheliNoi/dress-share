@@ -3,13 +3,55 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Design tokens - see design audit for rationale. */
+  --color-ink: #221f1f;
+  --color-ink-soft: #6b6260;
+  --color-ink-faint: #a89e9a;
+  --color-paper: #fbf6f3;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f3ece7;
+  --color-line: #e7ddd6;
+  --color-line-strong: #d8c9c0;
+  --color-accent: #9c3752;
+  --color-accent-deep: #7a2a40;
+  --color-accent-light: #e7a6b7;
+  --color-accent-soft: #f4dee3;
+  --color-accent-soft-strong: #ecc7d0;
+  --color-success: #3f7a5c;
+  --color-success-soft: #e1efe6;
+  --color-warning: #b07c2c;
+  --color-warning-soft: #f6ead2;
+  --color-error: #b0413f;
+  --color-error-soft: #f6dfde;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-rubik);
+  --font-display: var(--font-frank-ruhl-libre);
   --font-mono: var(--font-geist-mono);
+
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-ink-faint: var(--color-ink-faint);
+  --color-paper: var(--color-paper);
+  --color-surface: var(--color-surface);
+  --color-surface-sunken: var(--color-surface-sunken);
+  --color-line: var(--color-line);
+  --color-line-strong: var(--color-line-strong);
+  --color-accent: var(--color-accent);
+  --color-accent-deep: var(--color-accent-deep);
+  --color-accent-light: var(--color-accent-light);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-accent-soft-strong: var(--color-accent-soft-strong);
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-error: var(--color-error);
+  --color-error-soft: var(--color-error-soft);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,7 +64,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-rubik), "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 @keyframes fade-scale-in {

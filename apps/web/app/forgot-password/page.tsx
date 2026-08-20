@@ -4,6 +4,9 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { requestPasswordReset, ApiError } from "@/lib/api";
 import Header from "@/components/Header";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
+import FormMessage from "@/components/ui/FormMessage";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -32,53 +35,48 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-zinc-100">
+    <main dir="rtl" className="min-h-screen bg-paper text-ink">
       <Header />
 
       <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
-          <h1 className="text-3xl font-bold text-zinc-900">שכחת סיסמה?</h1>
-          <p className="mt-2 text-sm text-zinc-500">
+        <div className="w-full max-w-md rounded-[20px] bg-surface p-8 shadow-sm ring-1 ring-line">
+          <h1 className="font-display text-3xl font-semibold text-ink">
+            שכחת סיסמה?
+          </h1>
+          <p className="mt-2 text-sm text-ink-soft">
             הזיני את כתובת האימייל שלך. אם קיים חשבון תואם, יישלח אליו קישור
             לאיפוס הסיסמה.
           </p>
 
           {submitted ? (
-            <div className="mt-6 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-700">
-              אם קיים חשבון עם האימייל הזה, קישור לאיפוס הסיסמה נשלח אליו.
+            <div className="mt-6">
+              <FormMessage variant="success">
+                אם קיים חשבון עם האימייל הזה, קישור לאיפוס הסיסמה נשלח אליו.
+              </FormMessage>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-              <input
+              <TextField
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="אימייל"
                 required
-                className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
               />
 
-              {error && (
-                <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
+              {error && <FormMessage variant="error">{error}</FormMessage>}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-xl bg-zinc-900 px-4 py-3 font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
+              <Button type="submit" disabled={loading} fullWidth>
                 {loading ? "שולחת..." : "שליחת קישור לאיפוס"}
-              </button>
+              </Button>
             </form>
           )}
 
-          <p className="mt-6 text-center text-sm text-zinc-500">
+          <p className="mt-6 text-center text-sm text-ink-soft">
             נזכרת בסיסמה?{" "}
             <Link
               href="/login"
-              className="font-medium text-zinc-900 underline underline-offset-4"
+              className="font-medium text-ink underline underline-offset-4"
             >
               התחברות
             </Link>

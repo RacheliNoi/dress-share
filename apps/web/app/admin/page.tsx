@@ -128,7 +128,7 @@ export default function AdminDashboardPage() {
       <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
         <section className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="mb-2 text-sm font-medium text-rose-500">
+            <p className="mb-2 text-sm font-medium text-accent">
               אזור ניהול
             </p>
 
@@ -148,7 +148,7 @@ export default function AdminDashboardPage() {
         </section>
 
         {error && (
-          <div className="mb-6 flex items-center justify-between rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700">
+          <div className="mb-6 flex items-center justify-between rounded-2xl border border-error-soft bg-error-soft px-5 py-4 text-sm text-error">
             <span>{error}</span>
 
             <button
@@ -172,7 +172,7 @@ export default function AdminDashboardPage() {
           </div>
         ) : dresses.length === 0 ? (
           <section className="rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-20 text-center shadow-sm">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50 text-4xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
               ✨
             </div>
 
@@ -306,7 +306,7 @@ export default function AdminDashboardPage() {
                             {addedSizes.map((size) => (
                               <span
                                 key={size.id}
-                                className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700"
+                                className="rounded-full bg-success-soft px-3 py-1 text-xs font-semibold text-success"
                               >
                                 + מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
                               </span>
@@ -314,7 +314,7 @@ export default function AdminDashboardPage() {
                             {removedSizes.map((size) => (
                               <span
                                 key={size.id}
-                                className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 line-through"
+                                className="rounded-full bg-error-soft px-3 py-1 text-xs font-semibold text-error line-through"
                               >
                                 מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
                               </span>
@@ -338,8 +338,8 @@ export default function AdminDashboardPage() {
                       )}
 
                       {rejectingId === dress.id ? (
-                        <div className="mt-5 rounded-xl border border-red-200 bg-red-50/50 p-3">
-                          <label className="block text-xs font-bold text-red-700">
+                        <div className="mt-5 rounded-xl border border-error-soft bg-error-soft/50 p-3">
+                          <label className="block text-xs font-bold text-error">
                             סיבת הדחייה (חובה)
                           </label>
 
@@ -351,7 +351,7 @@ export default function AdminDashboardPage() {
                             placeholder="למשל: התמונות לא ברורות, חסרים פרטים..."
                             rows={3}
                             autoFocus
-                            className="mt-2 w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-red-400"
+                            className="mt-2 w-full rounded-lg border border-error-soft bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-error"
                           />
 
                           <div className="mt-3 flex gap-2">
@@ -362,7 +362,7 @@ export default function AdminDashboardPage() {
                                 actioningId === dress.id ||
                                 !rejectReason.trim()
                               }
-                              className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="flex-1 rounded-xl bg-error px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {actioningId === dress.id
                                 ? "דוחה..."
@@ -385,7 +385,7 @@ export default function AdminDashboardPage() {
                             type="button"
                             onClick={() => handleApprove(dress.id)}
                             disabled={actioningId === dress.id}
-                            className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex-1 rounded-xl bg-success px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {actioningId === dress.id ? "מעדכנת..." : "אישור"}
                           </button>
@@ -394,7 +394,7 @@ export default function AdminDashboardPage() {
                             type="button"
                             onClick={() => openRejectForm(dress.id)}
                             disabled={actioningId === dress.id}
-                            className="flex-1 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex-1 rounded-xl border border-error-soft px-4 py-2.5 text-sm font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             דחייה
                           </button>

@@ -6,6 +6,9 @@ import Link from "next/link";
 import { markWelcomeNoticePending, setToken, setUser } from "@/lib/auth";
 import { login, ApiError } from "@/lib/api";
 import Header from "@/components/Header";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
+import FormMessage from "@/components/ui/FormMessage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,64 +41,56 @@ export default function LoginPage() {
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-zinc-100">
+    <main dir="rtl" className="min-h-screen bg-paper text-ink">
       <Header />
 
       <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
-        <h1 className="text-3xl font-bold text-zinc-900">התחברות</h1>
+        <div className="w-full max-w-md rounded-[20px] bg-surface p-8 shadow-sm ring-1 ring-line">
+          <h1 className="font-display text-3xl font-semibold text-ink">
+            התחברות
+          </h1>
 
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="אימייל"
-            required
-            className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
-          />
+          <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
+            <TextField
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="אימייל"
+              required
+            />
 
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="סיסמה"
-            required
-            className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
-          />
+            <TextField
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="סיסמה"
+              required
+            />
 
-          <Link
-            href="/forgot-password"
-            className="-mt-2 text-sm font-medium text-zinc-500 underline underline-offset-4 hover:text-zinc-900"
-          >
-            שכחת סיסמה?
-          </Link>
+            <Link
+              href="/forgot-password"
+              className="-mt-2 text-sm font-medium text-ink-faint underline underline-offset-4 hover:text-accent"
+            >
+              שכחת סיסמה?
+            </Link>
 
-          {error && (
-            <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
-              {error}
-            </div>
-          )}
+            {error && <FormMessage variant="error">{error}</FormMessage>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-xl bg-zinc-900 px-4 py-3 font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "מתחברת..." : "התחברות"}
-          </button>
-        </form>
+            <Button type="submit" disabled={loading} fullWidth>
+              {loading ? "מתחברת..." : "התחברות"}
+            </Button>
+          </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-500">
-          עדיין אין לך חשבון?{" "}
-          <Link
-            href="/register"
-            className="font-medium text-zinc-900 underline underline-offset-4"
-          >
-            הרשמה
-          </Link>
-        </p>
-      </div>
+          <p className="mt-6 text-center text-sm text-ink-soft">
+            עדיין אין לך חשבון?{" "}
+            <Link
+              href="/register"
+              className="font-medium text-ink underline underline-offset-4"
+            >
+              הרשמה
+            </Link>
+          </p>
+        </div>
       </div>
     </main>
   );

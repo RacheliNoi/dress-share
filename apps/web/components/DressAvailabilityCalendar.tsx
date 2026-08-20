@@ -157,8 +157,8 @@ function parseDateInputValue(value: string): Date | null {
 
 const STATUS_CELL_CLASSES: Record<DayStatus, string> = {
   FREE: "bg-white text-zinc-700 ring-1 ring-zinc-200/70",
-  INTERESTED: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
-  RENTED: "bg-rose-500 text-white",
+  INTERESTED: "bg-warning-soft text-warning ring-1 ring-warning-soft",
+  RENTED: "bg-accent text-white",
 };
 
 export default function DressAvailabilityCalendar({
@@ -256,7 +256,7 @@ export default function DressAvailabilityCalendar({
           </div>
         </div>
       ) : error ? (
-        <div className="mt-5 flex flex-col items-start gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-5 flex flex-col items-start gap-3 rounded-2xl border border-error-soft bg-error-soft px-4 py-3 text-sm text-error sm:flex-row sm:items-center sm:justify-between">
           <span>{error}</span>
           <button
             type="button"
@@ -377,11 +377,11 @@ export default function DressAvailabilityCalendar({
               פנוי
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-amber-100 ring-1 ring-amber-200" />
+              <span className="h-3 w-3 rounded bg-warning-soft ring-1 ring-warning-soft" />
               מישהו מתעניין
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-rose-500" />
+              <span className="h-3 w-3 rounded bg-accent" />
               מושכר
             </div>
           </div>

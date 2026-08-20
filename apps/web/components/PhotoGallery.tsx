@@ -15,7 +15,7 @@ export default function PhotoGallery({
 
   if (sorted.length === 0) {
     return (
-      <div className="flex h-56 w-full items-center justify-center rounded-2xl bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-5xl sm:h-44">
+      <div className="flex h-56 w-full items-center justify-center rounded-2xl bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-5xl sm:h-44">
         👗
       </div>
     );
@@ -77,7 +77,7 @@ export default function PhotoGallery({
               aria-label={`מעבר לתמונה ${photoIndex + 1}`}
               className={`h-10 w-10 shrink-0 overflow-hidden rounded-lg ring-2 transition ${
                 photoIndex === index
-                  ? "ring-rose-400"
+                  ? "ring-accent"
                   : "ring-transparent hover:ring-zinc-300"
               }`}
             >

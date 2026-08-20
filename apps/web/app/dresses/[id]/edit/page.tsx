@@ -22,6 +22,12 @@ import {
   updateDressSize,
 } from "@/lib/api";
 import Header from "@/components/Header";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+
+type PendingConfirm =
+  | { type: "removeSize"; sizeId: number }
+  | { type: "deletePhoto"; photoId: number }
+  | { type: "cancelEdit" };
 
 export default function EditDressPage() {
   const router = useRouter();
@@ -67,6 +73,8 @@ export default function EditDressPage() {
   const [submitEditError, setSubmitEditError] = useState("");
   const [cancellingEdit, setCancellingEdit] = useState(false);
   const [cancelEditError, setCancelEditError] = useState("");
+
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
   const isApprovedEdit = dress?.status === "APPROVED";
 
@@ -295,16 +303,14 @@ export default function EditDressPage() {
     }
   }
 
-  async function handleRemoveSize(sizeId: number) {
+  function handleRemoveSize(sizeId: number) {
+    setPendingConfirm({ type: "removeSize", sizeId });
+  }
+
+  async function performRemoveSize(sizeId: number) {
     const token = getToken();
 
     if (!token || !dress) {
-      return;
-    }
-
-    const confirmed = window.confirm("להסיר את המידה?");
-
-    if (!confirmed) {
       return;
     }
 
@@ -328,6 +334,7 @@ export default function EditDressPage() {
       );
     } finally {
       setRemovingSizeId(null);
+      setPendingConfirm(null);
     }
   }
 
@@ -407,16 +414,14 @@ export default function EditDressPage() {
     }
   }
 
-  async function handleDeletePhoto(photoId: number) {
+  function handleDeletePhoto(photoId: number) {
+    setPendingConfirm({ type: "deletePhoto", photoId });
+  }
+
+  async function performDeletePhoto(photoId: number) {
     const token = getToken();
 
     if (!token || !dress) {
-      return;
-    }
-
-    const confirmed = window.confirm("למחוק את התמונה?");
-
-    if (!confirmed) {
       return;
     }
 
@@ -432,6 +437,7 @@ export default function EditDressPage() {
       );
     } finally {
       setDeletingPhotoId(null);
+      setPendingConfirm(null);
     }
   }
 
@@ -520,18 +526,14 @@ export default function EditDressPage() {
     }
   }
 
-  async function handleCancelEdit() {
+  function handleCancelEdit() {
+    setPendingConfirm({ type: "cancelEdit" });
+  }
+
+  async function performCancelEdit() {
     const token = getToken();
 
     if (!token || !dress) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "לבטל את כל השינויים שביצעת ולחזור לגרסה המאושרת הנוכחית?",
-    );
-
-    if (!confirmed) {
       return;
     }
 
@@ -547,6 +549,7 @@ export default function EditDressPage() {
       );
     } finally {
       setCancellingEdit(false);
+      setPendingConfirm(null);
     }
   }
 
@@ -566,7 +569,7 @@ export default function EditDressPage() {
       <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 lg:py-14">
         <Link
           href="/dresses"
-          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-rose-500"
+          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-accent"
         >
           → חזרה לשמלות שלי
         </Link>
@@ -582,7 +585,7 @@ export default function EditDressPage() {
           </div>
         ) : loadError ? (
           <section className="mt-8 rounded-[2rem] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-rose-50 text-4xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-4xl">
               👗
             </div>
 
@@ -613,16 +616,16 @@ export default function EditDressPage() {
             )}
 
             {dress.status === "REJECTED" && (
-              <section className="rounded-3xl border border-red-100 bg-red-50 p-6">
-                <p className="text-sm font-bold text-red-700">
+              <section className="rounded-3xl border border-error-soft bg-error-soft p-6">
+                <p className="text-sm font-bold text-error">
                   השמלה נדחתה על ידי מנהל
                 </p>
 
-                <p className="mt-1 text-sm leading-6 text-red-700">
+                <p className="mt-1 text-sm leading-6 text-error">
                   {dress.rejectionReason || "לא צוינה סיבה."}
                 </p>
 
-                <p className="mt-3 text-xs text-red-600">
+                <p className="mt-3 text-xs text-error">
                   תקני את הפרטים, המידות והתמונות בהתאם, ולאחר מכן שלחי מחדש
                   לאישור.
                 </p>
@@ -644,7 +647,7 @@ export default function EditDressPage() {
                   onChange={(event) => setName(event.target.value)}
                   placeholder="שם השמלה"
                   required
-                  className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500 md:col-span-2"
+                  className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft md:col-span-2"
                 />
 
                 <input
@@ -652,7 +655,7 @@ export default function EditDressPage() {
                   value={category}
                   onChange={(event) => setCategory(event.target.value)}
                   placeholder="קטגוריה (למשל: ערב)"
-                  className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                  className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <input
@@ -660,7 +663,7 @@ export default function EditDressPage() {
                   value={color}
                   onChange={(event) => setColor(event.target.value)}
                   placeholder="צבע"
-                  className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                  className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <textarea
@@ -668,17 +671,17 @@ export default function EditDressPage() {
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="תיאור השמלה"
                   rows={4}
-                  className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500 md:col-span-2"
+                  className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft md:col-span-2"
                 />
 
                 {saveError && (
-                  <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700 md:col-span-2">
+                  <div className="rounded-2xl bg-error-soft p-4 text-sm text-error md:col-span-2">
                     {saveError}
                   </div>
                 )}
 
                 {saveSuccess && (
-                  <div className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-700 md:col-span-2">
+                  <div className="rounded-2xl bg-success-soft p-4 text-sm text-success md:col-span-2">
                     {saveSuccess}
                   </div>
                 )}
@@ -711,12 +714,12 @@ export default function EditDressPage() {
                       return (
                         <div
                           key={size.id}
-                          className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 p-3"
+                          className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-error-soft bg-error-soft/40 p-3"
                         >
-                          <span className="text-sm text-red-700 line-through">
+                          <span className="text-sm text-error line-through">
                             מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
                           </span>
-                          <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                          <span className="rounded-full bg-error-soft px-2.5 py-1 text-[11px] font-bold text-error">
                             מסומן להסרה
                           </span>
                           <button
@@ -736,12 +739,12 @@ export default function EditDressPage() {
                         key={size.id}
                         className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${
                           size.pendingAction === "ADD"
-                            ? "border-emerald-200 bg-emerald-50/40"
+                            ? "border-success-soft bg-success-soft/40"
                             : "border-zinc-200"
                         }`}
                       >
                         {size.pendingAction === "ADD" && (
-                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                          <span className="rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-bold text-success">
                             חדש - ממתין לאישור
                           </span>
                         )}
@@ -756,7 +759,7 @@ export default function EditDressPage() {
                             }))
                           }
                           aria-label="עריכת שם המידה"
-                          className="w-24 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500"
+                          className="w-24 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                         />
 
                         <input
@@ -770,7 +773,7 @@ export default function EditDressPage() {
                             }))
                           }
                           aria-label="עריכת מחיר המידה"
-                          className="w-28 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500"
+                          className="w-28 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                         />
 
                         <span className="text-sm text-zinc-400">₪</span>
@@ -787,7 +790,7 @@ export default function EditDressPage() {
                           }
                           aria-label="עריכת כמות היחידות"
                           title="כמות יחידות"
-                          className="w-20 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500"
+                          className="w-20 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                         />
 
                         <span className="text-sm text-zinc-400">יחידות</span>
@@ -811,7 +814,7 @@ export default function EditDressPage() {
                           type="button"
                           onClick={() => handleRemoveSize(size.id)}
                           disabled={removingSizeId === size.id}
-                          className="rounded-lg px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-lg px-3 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {removingSizeId === size.id ? "מסירה..." : "הסרה"}
                         </button>
@@ -822,13 +825,13 @@ export default function EditDressPage() {
               )}
 
               {sizeActionWarning && (
-                <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                <p className="mt-3 rounded-xl bg-warning-soft p-3 text-sm text-warning">
                   {sizeActionWarning}
                 </p>
               )}
 
               {sizeActionError && (
-                <p className="mt-3 text-sm text-red-600">{sizeActionError}</p>
+                <p className="mt-3 text-sm text-error">{sizeActionError}</p>
               )}
 
               <form
@@ -840,7 +843,7 @@ export default function EditDressPage() {
                   value={newSizeValue}
                   onChange={(event) => setNewSizeValue(event.target.value)}
                   placeholder="מידה (למשל: M)"
-                  className="flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <input
@@ -849,7 +852,7 @@ export default function EditDressPage() {
                   value={newPriceValue}
                   onChange={(event) => setNewPriceValue(event.target.value)}
                   placeholder="מחיר בש״ח"
-                  className="flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <input
@@ -859,7 +862,7 @@ export default function EditDressPage() {
                   onChange={(event) => setNewQuantityValue(event.target.value)}
                   placeholder="כמות יחידות"
                   aria-label="כמות יחידות"
-                  className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500 sm:w-32"
+                  className="w-full rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft sm:w-32"
                 />
 
                 <button
@@ -878,7 +881,7 @@ export default function EditDressPage() {
               </form>
 
               {addSizeError && (
-                <p className="mt-3 text-sm text-red-600">{addSizeError}</p>
+                <p className="mt-3 text-sm text-error">{addSizeError}</p>
               )}
             </section>
 
@@ -896,9 +899,9 @@ export default function EditDressPage() {
                       key={photo.id}
                       className={`group relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 ring-1 transition duration-300 hover:shadow-lg ${
                         photo.pendingAction === "REMOVE"
-                          ? "opacity-50 ring-red-200"
+                          ? "opacity-50 ring-error/40"
                           : photo.pendingAction === "ADD"
-                            ? "ring-emerald-300"
+                            ? "ring-success/50"
                             : "ring-zinc-200/70"
                       }`}
                     >
@@ -915,13 +918,13 @@ export default function EditDressPage() {
                       )}
 
                       {photo.pendingAction === "ADD" && (
-                        <span className="absolute bottom-2 right-2 rounded-full bg-emerald-100/95 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-sm backdrop-blur">
+                        <span className="absolute bottom-2 right-2 rounded-full bg-success-soft/95 px-2 py-0.5 text-[10px] font-bold text-success shadow-sm backdrop-blur">
                           ממתין לאישור
                         </span>
                       )}
 
                       {photo.pendingAction === "REMOVE" && (
-                        <span className="absolute bottom-2 right-2 rounded-full bg-red-100/95 px-2 py-0.5 text-[10px] font-bold text-red-700 shadow-sm backdrop-blur">
+                        <span className="absolute bottom-2 right-2 rounded-full bg-error-soft/95 px-2 py-0.5 text-[10px] font-bold text-error shadow-sm backdrop-blur">
                           מסומן להסרה
                         </span>
                       )}
@@ -942,7 +945,7 @@ export default function EditDressPage() {
                           onClick={() => handleDeletePhoto(photo.id)}
                           disabled={deletingPhotoId === photo.id}
                           aria-label="מחיקת תמונה"
-                          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/60 text-xs font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:scale-110 hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/60 text-xs font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:scale-110 hover:bg-error disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {deletingPhotoId === photo.id ? (
                             <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -958,8 +961,8 @@ export default function EditDressPage() {
 
               {selectedPreviews.length > 0 && (
                 <div className="mt-6">
-                  <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-600">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                  <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-warning">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-warning" />
                     ממתינות להעלאה
                   </p>
 
@@ -967,7 +970,7 @@ export default function EditDressPage() {
                     {selectedPreviews.map((preview, index) => (
                       <div
                         key={preview}
-                        className="relative aspect-square overflow-hidden rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/40"
+                        className="relative aspect-square overflow-hidden rounded-2xl border-2 border-dashed border-warning/50 bg-warning-soft/40"
                       >
                         <img
                           src={preview}
@@ -981,7 +984,7 @@ export default function EditDressPage() {
               )}
 
               {dress.photos.length === 0 && selectedPreviews.length === 0 && (
-                <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 px-6 py-10 text-center">
+                <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 px-6 py-10 text-center">
                   <span className="text-4xl">👗</span>
                   <p className="mt-3 text-sm font-medium text-zinc-600">
                     עדיין לא הועלו תמונות
@@ -992,9 +995,9 @@ export default function EditDressPage() {
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <label
                   htmlFor="dress-photos"
-                  className="group flex flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 px-4 py-3.5 text-sm text-zinc-600 transition duration-200 hover:border-rose-300 hover:bg-rose-50/40"
+                  className="group flex flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 px-4 py-3.5 text-sm text-zinc-600 transition duration-200 hover:border-accent-soft-strong hover:bg-accent-soft/40"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1 ring-zinc-200 transition duration-200 group-hover:ring-rose-200">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1 ring-zinc-200 transition duration-200 group-hover:ring-accent-soft-strong">
                     📷
                   </span>
 
@@ -1030,7 +1033,7 @@ export default function EditDressPage() {
               </div>
 
               {photoError && (
-                <p className="mt-3 text-sm text-red-600">{photoError}</p>
+                <p className="mt-3 text-sm text-error">{photoError}</p>
               )}
             </section>
 
@@ -1044,7 +1047,7 @@ export default function EditDressPage() {
                 </p>
 
                 {resubmitError && (
-                  <div className="mt-4 rounded-2xl bg-red-500/10 p-4 text-sm text-red-200">
+                  <div className="mt-4 rounded-2xl bg-error/15 p-4 text-sm text-error-soft">
                     {resubmitError}
                   </div>
                 )}
@@ -1053,7 +1056,7 @@ export default function EditDressPage() {
                   type="button"
                   onClick={handleResubmit}
                   disabled={resubmitting}
-                  className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-bold text-zinc-900 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-bold text-zinc-900 transition hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {resubmitting ? "שולחת..." : "שמור ושלח מחדש לאישור"}
                 </button>
@@ -1071,13 +1074,13 @@ export default function EditDressPage() {
                 </p>
 
                 {submitEditError && (
-                  <div className="mt-4 rounded-2xl bg-red-500/10 p-4 text-sm text-red-200">
+                  <div className="mt-4 rounded-2xl bg-error/15 p-4 text-sm text-error-soft">
                     {submitEditError}
                   </div>
                 )}
 
                 {cancelEditError && (
-                  <div className="mt-4 rounded-2xl bg-red-500/10 p-4 text-sm text-red-200">
+                  <div className="mt-4 rounded-2xl bg-error/15 p-4 text-sm text-error-soft">
                     {cancelEditError}
                   </div>
                 )}
@@ -1087,7 +1090,7 @@ export default function EditDressPage() {
                     type="button"
                     onClick={handleSubmitEdit}
                     disabled={submittingEdit || cancellingEdit || !hasPendingChanges}
-                    className="flex-1 rounded-xl bg-white px-4 py-3 font-bold text-zinc-900 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex-1 rounded-xl bg-white px-4 py-3 font-bold text-zinc-900 transition hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {submittingEdit ? "שולחת..." : "שלח עריכה לאישור"}
                   </button>
@@ -1106,6 +1109,48 @@ export default function EditDressPage() {
           </div>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={
+          pendingConfirm?.type === "removeSize"
+            ? "להסיר את המידה?"
+            : pendingConfirm?.type === "deletePhoto"
+              ? "למחוק את התמונה?"
+              : "לבטל את כל השינויים?"
+        }
+        description={
+          pendingConfirm?.type === "cancelEdit"
+            ? "כל השינויים שביצעת יימחקו ותחזרי לגרסה המאושרת הנוכחית."
+            : undefined
+        }
+        confirmLabel={
+          pendingConfirm?.type === "removeSize"
+            ? "הסרת המידה"
+            : pendingConfirm?.type === "deletePhoto"
+              ? "מחיקת התמונה"
+              : "ביטול השינויים"
+        }
+        cancelLabel="חזרה"
+        danger
+        loading={
+          pendingConfirm?.type === "removeSize"
+            ? removingSizeId === pendingConfirm.sizeId
+            : pendingConfirm?.type === "deletePhoto"
+              ? deletingPhotoId === pendingConfirm.photoId
+              : cancellingEdit
+        }
+        onConfirm={() => {
+          if (pendingConfirm?.type === "removeSize") {
+            performRemoveSize(pendingConfirm.sizeId);
+          } else if (pendingConfirm?.type === "deletePhoto") {
+            performDeletePhoto(pendingConfirm.photoId);
+          } else if (pendingConfirm?.type === "cancelEdit") {
+            performCancelEdit();
+          }
+        }}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </main>
   );
 }

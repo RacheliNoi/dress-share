@@ -56,15 +56,15 @@ export default function DressCard({
             className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.06]"
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-rose-50 via-zinc-50 to-purple-50 text-6xl sm:text-7xl">
+          <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-6xl sm:text-7xl">
             👗
           </div>
         )}
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-        <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm backdrop-blur sm:right-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-xs">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+        <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-success shadow-sm backdrop-blur sm:right-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
           זמינה להשכרה
         </div>
 

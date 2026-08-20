@@ -14,10 +14,11 @@ import {
 } from "@/lib/api";
 import DressAvailabilityCalendar from "./DressAvailabilityCalendar";
 import { getPeakUsageForRange } from "@/lib/availability";
+import ConfirmDialog from "./ui/ConfirmDialog";
 
 const STATUS_BADGES: Partial<Record<Booking["status"], { label: string; className: string }>> = {
-  INTERESTED: { label: "מישהו מתעניין", className: "bg-amber-100 text-amber-800" },
-  RENTED: { label: "מושכר", className: "bg-rose-100 text-rose-700" },
+  INTERESTED: { label: "מישהו מתעניין", className: "bg-warning-soft text-warning" },
+  RENTED: { label: "מושכר", className: "bg-accent-soft text-accent-deep" },
   CANCELLED: { label: "בוטל", className: "bg-zinc-100 text-zinc-500" },
 };
 
@@ -124,6 +125,7 @@ export default function DressAvailabilityManager({
 
   const [actioningId, setActioningId] = useState<number | null>(null);
   const [actionError, setActionError] = useState("");
+  const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
 
   // Which INTERESTED row (if any) is currently showing its rent-confirmation
   // panel. The size itself is no longer picked here - it was already fixed
@@ -302,16 +304,16 @@ export default function DressAvailabilityManager({
     }
   }
 
-  async function handleCancel(bookingId: number) {
+  function handleCancel(bookingId: number) {
+    setPendingCancelId(bookingId);
+  }
+
+  async function confirmCancel() {
     const token = getToken();
+    const bookingId = pendingCancelId;
 
-    if (!token) {
-      return;
-    }
-
-    const confirmed = window.confirm("לבטל את הרשומה?");
-
-    if (!confirmed) {
+    if (!token || bookingId === null) {
+      setPendingCancelId(null);
       return;
     }
 
@@ -327,6 +329,7 @@ export default function DressAvailabilityManager({
       );
     } finally {
       setActioningId(null);
+      setPendingCancelId(null);
     }
   }
 
@@ -349,7 +352,7 @@ export default function DressAvailabilityManager({
               onClick={() => setNewStatus("INTERESTED")}
               className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
                 newStatus === "INTERESTED"
-                  ? "bg-amber-500 text-white"
+                  ? "bg-warning text-white"
                   : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
               }`}
             >
@@ -360,7 +363,7 @@ export default function DressAvailabilityManager({
               onClick={() => setNewStatus("RENTED")}
               className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
                 newStatus === "RENTED"
-                  ? "bg-rose-500 text-white"
+                  ? "bg-accent text-white"
                   : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
               }`}
             >
@@ -374,7 +377,7 @@ export default function DressAvailabilityManager({
             onChange={(event) => setStartDate(event.target.value)}
             required
             aria-label="תאריך התחלה"
-            className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+            className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
           />
 
           <input
@@ -383,7 +386,7 @@ export default function DressAvailabilityManager({
             onChange={(event) => setEndDate(event.target.value)}
             required
             aria-label="תאריך סיום"
-            className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
+            className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
           />
 
           {hasSizes ? (
@@ -393,7 +396,7 @@ export default function DressAvailabilityManager({
                   onChange={(event) => addSizeToSelection(event.target.value)}
                   aria-label="הוספת מידה"
                   disabled={sizesAvailableToAdd.length === 0}
-                  className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  className="w-full rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   <option value="">
                     {sizesAvailableToAdd.length === 0
@@ -415,7 +418,7 @@ export default function DressAvailabilityManager({
                 </select>
 
                 {sizesUnavailableForRange.length > 0 && (
-                  <p className="mt-2 text-xs text-amber-700">
+                  <p className="mt-2 text-xs text-warning">
                     תפוסות בטווח התאריכים שנבחר (כל היחידות תפוסות):{" "}
                     {sizesUnavailableForRange.map((size) => size.size).join(", ")}
                   </p>
@@ -451,7 +454,7 @@ export default function DressAvailabilityManager({
             </div>
           ) : (
             newStatus === "RENTED" && (
-              <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-800 sm:col-span-2">
+              <div className="rounded-2xl bg-warning-soft p-4 text-sm text-warning sm:col-span-2">
                 לא ניתן לסמן את השמלה כמושכרת לפני שמוגדרות לה מידות
                 ומחירים. הוסיפי מידות בעמוד העריכה של השמלה.
               </div>
@@ -459,7 +462,7 @@ export default function DressAvailabilityManager({
           )}
 
           {createError && (
-            <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700 sm:col-span-2">
+            <div className="rounded-2xl bg-error-soft p-4 text-sm text-error sm:col-span-2">
               {createError}
             </div>
           )}
@@ -488,7 +491,7 @@ export default function DressAvailabilityManager({
         <h2 className="text-lg font-bold text-zinc-900">רשומות זמינות</h2>
 
         {actionError && (
-          <div className="mt-3 rounded-2xl bg-red-50 p-4 text-sm text-red-700">
+          <div className="mt-3 rounded-2xl bg-error-soft p-4 text-sm text-error">
             {actionError}
           </div>
         )}
@@ -503,7 +506,7 @@ export default function DressAvailabilityManager({
             ))}
           </div>
         ) : loadError ? (
-          <div className="mt-4 flex flex-col items-start gap-3 rounded-2xl bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col items-start gap-3 rounded-2xl bg-error-soft p-4 text-sm text-error sm:flex-row sm:items-center sm:justify-between">
             <span>{loadError}</span>
             <button
               type="button"
@@ -576,7 +579,7 @@ export default function DressAvailabilityManager({
                           type="button"
                           onClick={() => handleCancel(booking.id)}
                           disabled={actioningId === booking.id}
-                          className="rounded-xl border border-red-200 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-error-soft px-4 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           ביטול
                         </button>
@@ -588,7 +591,7 @@ export default function DressAvailabilityManager({
                         type="button"
                         onClick={() => handleCancel(booking.id)}
                         disabled={actioningId === booking.id}
-                        className="self-start rounded-xl border border-red-200 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:self-center"
+                        className="self-start rounded-xl border border-error-soft px-4 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50 sm:self-center"
                       >
                         ביטול השכרה
                       </button>
@@ -598,12 +601,12 @@ export default function DressAvailabilityManager({
                   {booking.status === "INTERESTED" && isRentingThis && (
                     <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                       {!hasSizes ? (
-                        <p className="text-sm font-medium text-amber-700">
+                        <p className="text-sm font-medium text-warning">
                           לא ניתן לסמן את השמלה כמושכרת לפני שמוגדרות לה מידות
                           ומחירים. הוסיפי מידות בעמוד העריכה של השמלה.
                         </p>
                       ) : !booking.size || !matchingSize ? (
-                        <p className="text-sm font-medium text-amber-700">
+                        <p className="text-sm font-medium text-warning">
                           לא ניתן להשלים את ההשכרה - למידה שנבחרה בהתעניינות
                           אין (עוד) הגדרת מחיר תקפה עבור שמלה זו.
                         </p>
@@ -645,6 +648,17 @@ export default function DressAvailabilityManager({
           </ul>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingCancelId !== null}
+        title="לבטל את הרשומה?"
+        confirmLabel="ביטול הרשומה"
+        cancelLabel="חזרה"
+        danger
+        loading={actioningId === pendingCancelId}
+        onConfirm={confirmCancel}
+        onCancel={() => setPendingCancelId(null)}
+      />
     </section>
   );
 }

@@ -204,7 +204,7 @@ export default function CatalogFilters({
       {/* Date-of-rental availability filter - always visible (not tucked
           inside the collapsible mobile panel) since it's a distinct kind of
           filter from the rest. */}
-      <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-rose-100 bg-rose-50/60 p-4">
+      <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-accent-soft bg-accent-soft/60 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           <label
             htmlFor="availability-date-filter"
@@ -226,7 +226,7 @@ export default function CatalogFilters({
               <button
                 type="button"
                 onClick={() => onAvailabilityDateChange("")}
-                className="rounded-xl px-3 py-2.5 text-sm font-bold text-rose-500 transition hover:bg-rose-100"
+                className="rounded-xl px-3 py-2.5 text-sm font-bold text-accent transition hover:bg-accent-soft-strong"
               >
                 ניקוי תאריך
               </button>
@@ -240,13 +240,13 @@ export default function CatalogFilters({
           </div>
 
           {availabilityDate && !availabilityLoading && (
-            <span className="text-xs font-medium text-rose-600 sm:ms-auto">
+            <span className="text-xs font-medium text-accent-deep sm:ms-auto">
               מוצגות רק שמלות שפנויות בתאריך שנבחר
             </span>
           )}
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-rose-100/70 pt-3 sm:flex-row sm:items-center sm:gap-2">
+        <div className="flex flex-col gap-2 border-t border-accent-soft/70 pt-3 sm:flex-row sm:items-center sm:gap-2">
           <span className="text-xs font-bold text-zinc-500">
             או לפי תאריך עברי:
           </span>
@@ -397,7 +397,7 @@ export default function CatalogFilters({
               <button
                 type="button"
                 onClick={onReset}
-                className="rounded-xl px-3 py-2.5 text-sm font-bold text-rose-500 transition hover:bg-rose-50 sm:me-auto"
+                className="rounded-xl px-3 py-2.5 text-sm font-bold text-accent transition hover:bg-accent-soft sm:me-auto"
               >
                 נקה סינון
               </button>

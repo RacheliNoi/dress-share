@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { getToken, logout } from "@/lib/auth";
 import { API_URL } from "@/lib/api";
 import Header from "@/components/Header";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
+import FormMessage from "@/components/ui/FormMessage";
 
 type ClothingItem = {
   id: number;
@@ -194,67 +197,61 @@ export default function WardrobePage() {
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-zinc-100">
+    <main dir="rtl" className="min-h-screen bg-paper text-ink">
       <Header />
 
-      <div className="mx-auto max-w-5xl p-6">
-        <header className="mb-8 mt-2">
-          <h1 className="mt-1 text-4xl font-bold text-zinc-900">
+      <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+        <header className="mb-8">
+          <h1 className="font-display text-3xl font-semibold text-ink">
             הארון שלי
           </h1>
 
-          <p className="mt-2 text-zinc-600">
+          <p className="mt-2 text-sm text-ink-soft">
             כל הפריטים שלך במקום אחד
           </p>
         </header>
 
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-zinc-900">
-            הוספת פריט
-          </h2>
+        <section className="rounded-[20px] bg-surface p-6 shadow-sm ring-1 ring-line">
+          <h2 className="text-lg font-bold text-ink">הוספת פריט</h2>
 
           <form
             onSubmit={handleSubmit}
             className="mt-5 grid gap-4 md:grid-cols-2"
           >
-            <input
+            <TextField
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="שם הפריט"
               required
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
             />
 
-            <input
+            <TextField
               type="text"
               value={category}
               onChange={(event) => setCategory(event.target.value)}
               placeholder="קטגוריה"
               required
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
             />
 
-            <input
+            <TextField
               type="text"
               value={size}
               onChange={(event) => setSize(event.target.value)}
               placeholder="מידה"
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
             />
 
-            <input
+            <TextField
               type="text"
               value={color}
               onChange={(event) => setColor(event.target.value)}
               placeholder="צבע"
-              className="rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
             />
 
             <div className="md:col-span-2">
               <label
                 htmlFor="clothing-image"
-                className="block text-sm font-medium text-zinc-700"
+                className="block text-sm font-medium text-ink-soft"
               >
                 תמונה
               </label>
@@ -264,49 +261,43 @@ export default function WardrobePage() {
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
-                className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-700"
+                className="mt-2 block w-full rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-sm text-ink-soft"
               />
 
               {image && (
-                <p className="mt-2 text-sm text-zinc-500">
+                <p className="mt-2 text-sm text-ink-faint">
                   נבחר: {image.name}
                 </p>
               )}
             </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-xl bg-zinc-900 px-4 py-3 font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2"
-            >
+            <Button type="submit" disabled={saving} className="md:col-span-2">
               {saving ? "שומר..." : "+ הוספת פריט"}
-            </button>
+            </Button>
           </form>
         </section>
 
         {error && (
-          <div className="mt-6 rounded-2xl bg-red-50 p-4 text-red-700">
-            {error}
+          <div className="mt-6">
+            <FormMessage variant="error">{error}</FormMessage>
           </div>
         )}
 
         <section className="mt-8">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-zinc-900">
-              הפריטים שלי
-            </h2>
+            <h2 className="text-2xl font-bold text-ink">הפריטים שלי</h2>
 
-            <span className="rounded-full bg-zinc-200 px-3 py-1 text-sm text-zinc-700">
+            <span className="rounded-full bg-surface-sunken px-3 py-1 text-sm text-ink-soft">
               {items.length} פריטים
             </span>
           </div>
 
           {loading ? (
-            <div className="rounded-3xl bg-white p-8 text-center text-zinc-500">
+            <div className="rounded-[20px] bg-surface p-8 text-center text-ink-faint ring-1 ring-line">
               טוען את הארון...
             </div>
           ) : items.length === 0 ? (
-            <div className="rounded-3xl bg-white p-8 text-center text-zinc-500">
+            <div className="rounded-[20px] bg-surface p-8 text-center text-ink-faint ring-1 ring-line">
               עדיין אין פריטים בארון.
             </div>
           ) : (
@@ -314,7 +305,7 @@ export default function WardrobePage() {
               {items.map((item) => (
                 <article
                   key={item.id}
-                  className="overflow-hidden rounded-3xl bg-white shadow-sm"
+                  className="overflow-hidden rounded-[20px] bg-surface shadow-sm ring-1 ring-line"
                 >
                   {item.imageUrl ? (
                     <img
@@ -323,29 +314,29 @@ export default function WardrobePage() {
                       className="h-64 w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-64 items-center justify-center bg-zinc-100 text-5xl">
+                    <div className="flex h-64 items-center justify-center bg-surface-sunken text-5xl">
                       👕
                     </div>
                   )}
 
                   <div className="p-6">
-                    <h3 className="text-lg font-bold text-zinc-900">
+                    <h3 className="text-lg font-bold text-ink">
                       {item.name}
                     </h3>
 
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <p className="mt-1 text-sm text-ink-faint">
                       {item.category}
                     </p>
 
                     <div className="mt-4 flex flex-wrap gap-2 text-sm">
                       {item.size && (
-                        <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-700">
+                        <span className="rounded-full bg-surface-sunken px-3 py-1 text-ink-soft">
                           מידה {item.size}
                         </span>
                       )}
 
                       {item.color && (
-                        <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-700">
+                        <span className="rounded-full bg-surface-sunken px-3 py-1 text-ink-soft">
                           {item.color}
                         </span>
                       )}
@@ -354,7 +345,7 @@ export default function WardrobePage() {
                     <button
                       type="button"
                       onClick={() => handleDelete(item.id)}
-                      className="mt-4 w-full rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                      className="mt-4 w-full rounded-2xl border border-error-soft px-4 py-2 text-sm font-medium text-error transition hover:bg-error-soft"
                     >
                       🗑️ מחיקת פריט
                     </button>
