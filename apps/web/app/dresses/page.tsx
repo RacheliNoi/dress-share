@@ -211,7 +211,7 @@ return (<main
         </p>
       </div>
 
-      <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm shadow-sm ring-1 ring-zinc-200/70">
+      <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm shadow-sm ring-1 ring-line">
         <span className="font-bold text-zinc-900">
           {dresses.length}
         </span>

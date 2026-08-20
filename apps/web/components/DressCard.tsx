@@ -46,7 +46,7 @@ export default function DressCard({
     <Link
       href={`/dress/${dress.id}`}
       style={style}
-      className="animate-fade-scale-in group block overflow-hidden rounded-[20px] bg-white ring-1 ring-zinc-200/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_-15px_rgba(34,31,31,0.18)]"
+      className="animate-fade-scale-in group block overflow-hidden rounded-[20px] bg-white ring-1 ring-line transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_-15px_rgba(34,31,31,0.18)] hover:ring-accent-soft-strong"
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-zinc-100">
         {showImage ? (
@@ -92,7 +92,7 @@ export default function DressCard({
               <p className="text-[10px] uppercase tracking-wide text-zinc-400">
                 {price.eyebrow}
               </p>
-              <p className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900">
+              <p className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900 transition-colors duration-300 group-hover:text-accent">
                 {price.value}
               </p>
             </div>

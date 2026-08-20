@@ -493,6 +493,24 @@ export default function CatalogPage() {
           </div>
         </section>
 
+        {/* Editorial moment - a quiet pause between the marketing Hero and
+            the functional catalog below, so the page doesn't jump straight
+            from "welcome" to a search form. Intentionally undecorated: no
+            card, no ring, no shadow - just typography on the page's own
+            canvas, closer to a magazine spread than a UI component. */}
+        <section className="border-t border-line py-16 sm:py-20 lg:py-24">
+          <div className="max-w-2xl">
+            <h2 className="font-display text-3xl font-semibold leading-tight text-ink text-balance sm:text-4xl lg:text-[2.75rem]">
+              השמלות שעושות את הרגע.
+            </h2>
+
+            <p className="mt-4 max-w-md text-base leading-7 text-ink-soft">
+              כל שמלה כאן כבר הייתה חלק מרגע מיוחד אחד, ומוכנה עכשיו לרגע הבא
+              — שלך.
+            </p>
+          </div>
+        </section>
+
         <div id="catalog" className="scroll-mt-24">
           {/* Catalog heading */}
           <section className="mb-5">

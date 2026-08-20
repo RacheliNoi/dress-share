@@ -36,6 +36,9 @@ export default function AccountPage() {
     return null;
   }
 
+  const user = getUser();
+  const greetingName = user?.name || user?.email || "";
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -73,13 +76,21 @@ export default function AccountPage() {
     <main dir="rtl" className="min-h-screen bg-paper text-ink">
       <Header />
 
-      <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-[20px] bg-surface p-8 shadow-sm ring-1 ring-line">
-          <h1 className="font-display text-3xl font-semibold text-ink">
-            שינוי סיסמה
-          </h1>
-          <p className="mt-2 text-sm text-ink-soft">
-            עדכני את סיסמת החשבון שלך. תצטרכי להזין את הסיסמה הנוכחית.
+      <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8 lg:py-14">
+        <p className="mb-2 text-sm font-medium text-accent">החשבון שלך</p>
+
+        <h1 className="font-display text-3xl font-semibold text-ink sm:text-4xl">
+          {greetingName ? `שלום, ${greetingName}` : "החשבון שלך"}
+        </h1>
+
+        <p className="mt-2 text-sm text-ink-soft">
+          כאן תוכלי לעדכן את הסיסמה שלך ולשמור על החשבון מאובטח.
+        </p>
+
+        <div className="mt-8 w-full max-w-md rounded-[20px] bg-surface p-8 shadow-sm ring-1 ring-line">
+          <h2 className="text-lg font-bold text-ink">שינוי סיסמה</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            תצטרכי להזין את הסיסמה הנוכחית.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 grid gap-4">

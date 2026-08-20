@@ -254,18 +254,25 @@ export default function MyDressDetailsPage() {
           <div className="grid gap-8 lg:grid-cols-2">
             {/* Photos */}
             <div>
-              <div className="relative h-[480px] overflow-hidden rounded-[28px] bg-zinc-100 shadow-sm ring-1 ring-zinc-200/60">
+              <div
+                className={`animate-fade-scale-in group relative overflow-hidden rounded-[28px] shadow-sm ring-1 ring-line ${
+                  activePhoto && !activePhotoFailed
+                    ? "h-[480px] bg-zinc-100"
+                    : "h-[320px] bg-surface-sunken sm:h-[360px]"
+                }`}
+              >
                 {activePhoto && !activePhotoFailed ? (
                   <img
+                    key={activePhoto.id}
                     src={getDressImageUrl(activePhoto)}
                     alt={dress.name}
                     onError={() =>
                       setFailedPhotoIds((current) => new Set(current).add(activePhoto.id))
                     }
-                    className="h-full w-full object-cover"
+                    className="animate-fade-scale-in h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
                   />
                 ) : (
-                  <DressPlaceholder size="xl" />
+                  <DressPlaceholder key={activePhoto?.id ?? "none"} size="xl" />
                 )}
               </div>
 
@@ -302,12 +309,12 @@ export default function MyDressDetailsPage() {
 
             {/* Details */}
             <div>
-              <p className="text-sm font-medium text-accent">
+              <p className="text-sm font-medium tracking-wide text-accent">
                 {dress.category || "ללא קטגוריה"}
                 {dress.color && ` · ${dress.color}`}
               </p>
 
-              <h1 className="mt-2 text-4xl font-black tracking-tight text-zinc-900">
+              <h1 className="font-display mt-2 text-4xl font-semibold tracking-tight text-zinc-900">
                 {dress.name}
               </h1>
 
@@ -319,8 +326,8 @@ export default function MyDressDetailsPage() {
 
               <StatusPanel dress={dress} />
 
-              <div className="mt-8 rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-zinc-200/60">
-                <h2 className="text-lg font-bold text-zinc-900">
+              <div className="mt-8 rounded-[20px] bg-white p-6 shadow-sm ring-1 ring-line">
+                <h2 className="font-display text-lg font-semibold text-zinc-900">
                   מידות ומחירים
                 </h2>
 

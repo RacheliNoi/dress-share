@@ -132,7 +132,7 @@ export default function AdminDashboardPage() {
               אזור ניהול
             </p>
 
-            <h1 className="text-3xl font-black tracking-tight text-zinc-900">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-zinc-900">
               שמלות הממתינות לאישור
             </h1>
 
@@ -141,9 +141,9 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm shadow-sm ring-1 ring-zinc-200/70">
-            <span className="font-bold text-zinc-900">{dresses.length}</span>
-            <span className="text-zinc-500">ממתינות</span>
+          <div className="flex items-center gap-2 rounded-full bg-accent-soft px-4 py-2.5 text-sm shadow-sm ring-1 ring-accent-soft-strong">
+            <span className="font-bold text-accent-deep">{dresses.length}</span>
+            <span className="text-accent-deep/80">ממתינות</span>
           </div>
         </section>
 
@@ -166,7 +166,7 @@ export default function AdminDashboardPage() {
             {[1, 2].map((item) => (
               <div
                 key={item}
-                className="h-64 animate-pulse rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60"
+                className="h-64 animate-pulse rounded-[20px] bg-white shadow-sm ring-1 ring-line"
               />
             ))}
           </div>
@@ -186,7 +186,7 @@ export default function AdminDashboardPage() {
           </section>
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
-            {dresses.map((dress) => {
+            {dresses.map((dress, index) => {
               // A card is either a brand-new dress submission (status
               // PENDING_APPROVAL) or an edit to an already-approved dress
               // (status stays APPROVED, pendingReviewSubmittedAt is set) -
@@ -242,14 +242,17 @@ export default function AdminDashboardPage() {
               return (
                 <article
                   key={dress.id}
-                  className="overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60"
+                  style={{ animationDelay: `${Math.min(index, 10) * 60}ms` }}
+                  className="animate-fade-scale-in overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-line transition-shadow duration-300 hover:shadow-md"
                 >
                   <div className="flex flex-col sm:flex-row">
                     <div className="shrink-0 p-3 sm:w-56">
-                      <PhotoGallery
-                        photos={dress.photos.filter((photo) => photo.pendingAction !== "REMOVE")}
-                        alt={dress.name}
-                      />
+                      <div className="overflow-hidden rounded-2xl ring-1 ring-line">
+                        <PhotoGallery
+                          photos={dress.photos.filter((photo) => photo.pendingAction !== "REMOVE")}
+                          alt={dress.name}
+                        />
+                      </div>
                     </div>
 
                     <div className="flex-1 p-5">
@@ -259,7 +262,7 @@ export default function AdminDashboardPage() {
                         </span>
                       )}
 
-                      <h3 className="text-lg font-black text-zinc-900">
+                      <h3 className="font-display text-lg font-semibold text-zinc-900">
                         {dress.name}
                       </h3>
 

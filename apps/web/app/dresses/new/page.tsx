@@ -65,6 +65,19 @@ export default function NewDressPage() {
     return null;
   }
 
+  // Purely a display derivation of state that already exists - not a wizard
+  // gate. Sizes/photos/submit are all already visible and actionable at
+  // once once `dress` exists (see the render below), so this only reflects
+  // that reality back to the user rather than pretending it's a locked,
+  // strictly sequential flow.
+  const steps = [
+    { label: "פרטי השמלה", done: Boolean(dress) },
+    { label: "מידות ומחירים", done: sizes.length > 0 },
+    { label: "תמונות", done: photos.length > 0 },
+    { label: "שליחה לאישור", done: false },
+  ];
+  const activeStepIndex = steps.findIndex((step) => !step.done);
+
   async function handleCreateDress(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -256,6 +269,49 @@ export default function NewDressPage() {
         <p className="mt-2 text-sm text-zinc-500">
           מלאי את פרטי השמלה, הוסיפי מידות ותמונות, ושלחי לאישור מנהל.
         </p>
+
+        {!submitted && (
+          <ol className="mt-7 flex items-start gap-2">
+            {steps.map((step, index) => (
+              <li key={step.label} className="flex flex-1 items-center gap-2">
+                <div className="flex flex-col items-center gap-2">
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      step.done
+                        ? "bg-accent text-white"
+                        : index === activeStepIndex
+                          ? "bg-surface text-accent ring-2 ring-accent"
+                          : "bg-surface-sunken text-ink-faint"
+                    }`}
+                  >
+                    {step.done ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  <span
+                    className={`hidden text-center text-[11px] font-medium sm:block ${
+                      step.done || index === activeStepIndex ? "text-ink" : "text-ink-faint"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+
+                {index < steps.length - 1 && (
+                  <div
+                    className={`h-px flex-1 transition-colors ${
+                      step.done ? "bg-accent" : "bg-line"
+                    }`}
+                  />
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
 
         {submitted ? (
           <section className="mt-8 rounded-[28px] border border-success-soft bg-white px-6 py-16 text-center shadow-sm">
