@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
+import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import { Dress, getApprovedDressById, getDressImageUrl } from "@/lib/api";
 
 export default function DressDetailsPage() {
@@ -14,6 +15,9 @@ export default function DressDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  // Photo ids whose <img> failed to load - shown with the shared branded
+  // placeholder instead of the browser's own broken-image UI.
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -50,6 +54,7 @@ export default function DressDetailsPage() {
     ? [...dress.photos].sort((a, b) => a.sortOrder - b.sortOrder)
     : [];
   const activePhoto = photos[activePhotoIndex];
+  const activePhotoFailed = activePhoto ? failedPhotoIds.has(activePhoto.id) : false;
 
   return (
     <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
@@ -94,16 +99,17 @@ export default function DressDetailsPage() {
             {/* Photos */}
             <div>
               <div className="relative h-[480px] overflow-hidden rounded-[28px] bg-zinc-100 shadow-sm ring-1 ring-zinc-200/60">
-                {activePhoto ? (
+                {activePhoto && !activePhotoFailed ? (
                   <img
                     src={getDressImageUrl(activePhoto)}
                     alt={dress.name}
+                    onError={() =>
+                      setFailedPhotoIds((current) => new Set(current).add(activePhoto.id))
+                    }
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-8xl">
-                    👗
-                  </div>
+                  <DressPlaceholder size="xl" />
                 )}
               </div>
 
@@ -120,11 +126,18 @@ export default function DressDetailsPage() {
                           : "ring-transparent hover:ring-zinc-200"
                       }`}
                     >
-                      <img
-                        src={getDressImageUrl(photo)}
-                        alt={`${dress.name} ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
+                      {failedPhotoIds.has(photo.id) ? (
+                        <DressPlaceholder size="md" />
+                      ) : (
+                        <img
+                          src={getDressImageUrl(photo)}
+                          alt={`${dress.name} ${index + 1}`}
+                          onError={() =>
+                            setFailedPhotoIds((current) => new Set(current).add(photo.id))
+                          }
+                          className="h-full w-full object-cover"
+                        />
+                      )}
                     </button>
                   ))}
                 </div>
