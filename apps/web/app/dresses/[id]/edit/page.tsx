@@ -23,6 +23,7 @@ import {
 } from "@/lib/api";
 import Header from "@/components/Header";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import DressPlaceholder from "@/components/ui/DressPlaceholder";
 
 type PendingConfirm =
   | { type: "removeSize"; sizeId: number }
@@ -984,9 +985,11 @@ export default function EditDressPage() {
               )}
 
               {dress.photos.length === 0 && selectedPreviews.length === 0 && (
-                <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 px-6 py-10 text-center">
-                  <span className="text-4xl">👗</span>
-                  <p className="mt-3 text-sm font-medium text-zinc-600">
+                <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-2xl bg-surface-sunken px-6 py-10 text-center">
+                  <div className="h-16 w-16 overflow-hidden rounded-2xl">
+                    <DressPlaceholder size="md" />
+                  </div>
+                  <p className="text-sm font-medium text-zinc-600">
                     עדיין לא הועלו תמונות
                   </p>
                 </div>

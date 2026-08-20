@@ -404,8 +404,14 @@ export default function CatalogPage() {
     (priceMinValue !== null || priceMaxValue !== null) && {
       key: "price",
       label:
+        // ⁦/⁩ (LRI/PDI) isolate the "min–max" run as a single
+        // left-to-right unit - without it the bidi algorithm can visually
+        // swap the two numbers around the "–" inside this RTL chip label,
+        // the same class of bug already fixed with dir="ltr" for date
+        // ranges elsewhere. This label is a plain string (not JSX), so the
+        // Unicode isolate characters are the equivalent fix here.
         priceMinValue !== null && priceMaxValue !== null
-          ? `${priceMinValue}–${priceMaxValue} ₪`
+          ? `⁦${priceMinValue}–${priceMaxValue}⁩ ₪`
           : priceMinValue !== null
             ? `מ־${priceMinValue} ₪`
             : `עד ${priceMaxValue} ₪`,

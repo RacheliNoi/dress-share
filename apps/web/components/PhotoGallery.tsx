@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DressPhoto, getDressImageUrl } from "@/lib/api";
+import DressPlaceholder from "@/components/ui/DressPlaceholder";
 
 export default function PhotoGallery({
   photos,
@@ -12,16 +13,24 @@ export default function PhotoGallery({
 }) {
   const sorted = [...photos].sort((a, b) => a.sortOrder - b.sortOrder);
   const [index, setIndex] = useState(0);
+  // Photo ids whose <img> failed to load - shown with the shared branded
+  // placeholder instead of the browser's own broken-image UI.
+  const [failedIds, setFailedIds] = useState<Set<number>>(new Set());
+
+  function markFailed(photoId: number) {
+    setFailedIds((current) => new Set(current).add(photoId));
+  }
 
   if (sorted.length === 0) {
     return (
-      <div className="flex h-56 w-full items-center justify-center rounded-2xl bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-5xl sm:h-44">
-        👗
+      <div className="h-56 w-full overflow-hidden rounded-2xl sm:h-44">
+        <DressPlaceholder size="lg" />
       </div>
     );
   }
 
   const current = sorted[Math.min(index, sorted.length - 1)];
+  const currentFailed = failedIds.has(current.id);
 
   function goPrev() {
     setIndex((current) => (current - 1 + sorted.length) % sorted.length);
@@ -34,11 +43,16 @@ export default function PhotoGallery({
   return (
     <div className="w-full">
       <div className="relative h-56 w-full overflow-hidden rounded-2xl bg-zinc-100 sm:h-44">
-        <img
-          src={getDressImageUrl(current)}
-          alt={alt}
-          className="h-full w-full object-cover"
-        />
+        {currentFailed ? (
+          <DressPlaceholder size="lg" />
+        ) : (
+          <img
+            src={getDressImageUrl(current)}
+            alt={alt}
+            onError={() => markFailed(current.id)}
+            className="h-full w-full object-cover"
+          />
+        )}
 
         {sorted.length > 1 && (
           <>
@@ -81,11 +95,16 @@ export default function PhotoGallery({
                   : "ring-transparent hover:ring-zinc-300"
               }`}
             >
-              <img
-                src={getDressImageUrl(photo)}
-                alt={`${alt} ${photoIndex + 1}`}
-                className="h-full w-full object-cover"
-              />
+              {failedIds.has(photo.id) ? (
+                <DressPlaceholder size="sm" />
+              ) : (
+                <img
+                  src={getDressImageUrl(photo)}
+                  alt={`${alt} ${photoIndex + 1}`}
+                  onError={() => markFailed(photo.id)}
+                  className="h-full w-full object-cover"
+                />
+              )}
             </button>
           ))}
         </div>

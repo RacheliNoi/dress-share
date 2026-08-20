@@ -12,6 +12,7 @@ import {
   getMyDresses,
 } from "@/lib/api";
 import Header from "@/components/Header";
+import DressPlaceholder from "@/components/ui/DressPlaceholder";
 
 const statusConfig: Record<DressStatus, { label: string; className: string }> = {
 DRAFT: {
@@ -300,9 +301,7 @@ return (<main
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-7xl">
-                    👗
-                  </div>
+                  <DressPlaceholder size="lg" />
                 )}
 
                 <div className="absolute right-4 top-4">
@@ -339,7 +338,11 @@ return (<main
                       <p className="text-xs text-zinc-400">
                         מחיר
                       </p>
-                      <p className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900">
+                      {/* dir="ltr" pins the digit order - without it, the
+                          Unicode bidi algorithm can visually swap a min/max
+                          price range around the "–" inside this RTL page,
+                          even though the underlying text is already correct. */}
+                      <p dir="ltr" className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900">
                         {getPriceRange(dress)}
                       </p>
                     </div>

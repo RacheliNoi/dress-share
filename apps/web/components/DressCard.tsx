@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useState } from "react";
 import { Dress, getDressImageUrl } from "@/lib/api";
+import DressPlaceholder from "@/components/ui/DressPlaceholder";
 
 function getPriceLabel(dress: Dress) {
   if (dress.sizes.length === 0) {
@@ -56,9 +57,7 @@ export default function DressCard({
             className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.06]"
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-6xl sm:text-7xl">
-            👗
-          </div>
+          <DressPlaceholder size="lg" />
         )}
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
