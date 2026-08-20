@@ -121,6 +121,16 @@ export class DressesService {
     });
   }
 
+  private assertValidQuantity(quantity: number | undefined) {
+    if (quantity === undefined) {
+      return;
+    }
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new BadRequestException('כמות חייבת להיות מספר שלם 1 ומעלה');
+    }
+  }
+
   private isUniqueConstraintError(error: unknown): boolean {
     return Boolean(
       error &&
@@ -159,6 +169,7 @@ export class DressesService {
     dressId: number;
     size: string;
     price: number;
+    quantity?: number;
     ownerId: number;
   }) {
     const dress = await this.prisma.dress.findUnique({
@@ -176,6 +187,7 @@ export class DressesService {
     }
 
     this.assertEditable(dress);
+    this.assertValidQuantity(data.quantity);
 
     try {
       return await this.prisma.dressSize.create({
@@ -183,6 +195,7 @@ export class DressesService {
           dressId: data.dressId,
           size: data.size,
           price: data.price,
+          quantity: data.quantity ?? 1,
           pendingAction: dress.status === DressStatus.APPROVED ? 'ADD' : undefined,
         },
       });
@@ -199,7 +212,7 @@ export class DressesService {
     dressId: number,
     sizeId: number,
     ownerId: number,
-    data: { size?: string; price?: number },
+    data: { size?: string; price?: number; quantity?: number },
   ) {
     const existingSize = await this.prisma.dressSize.findUnique({
       where: {
@@ -219,13 +232,14 @@ export class DressesService {
     }
 
     this.assertEditable(existingSize.dress);
+    this.assertValidQuantity(data.quantity);
 
     if (existingSize.dress.status !== DressStatus.APPROVED) {
       // DRAFT/REJECTED - direct update, unchanged behavior.
       try {
         return await this.prisma.dressSize.update({
           where: { id: sizeId },
-          data: { size: data.size, price: data.price },
+          data: { size: data.size, price: data.price, quantity: data.quantity },
         });
       } catch (error) {
         if (this.isUniqueConstraintError(error)) {
@@ -248,7 +262,7 @@ export class DressesService {
       try {
         return await this.prisma.dressSize.update({
           where: { id: sizeId },
-          data: { size: data.size, price: data.price },
+          data: { size: data.size, price: data.price, quantity: data.quantity },
         });
       } catch (error) {
         if (this.isUniqueConstraintError(error)) {
@@ -263,6 +277,10 @@ export class DressesService {
     // must not change what the public sees before approval, so it's
     // modeled as flagging the live row for removal and proposing a new row
     // with the edited values, rather than mutating the live row in place.
+    // This applies to a quantity reduction too: lowering quantity below the
+    // number of currently active bookings is allowed (existing bookings are
+    // never touched or invalidated) - activeBookingsCount is returned so
+    // the owner can be warned, not to block the change.
     const activeBookingsCount = await this.prisma.booking.count({
       where: {
         dressId,
@@ -282,12 +300,13 @@ export class DressesService {
             dressId,
             size: data.size ?? existingSize.size,
             price: data.price ?? existingSize.price,
+            quantity: data.quantity ?? existingSize.quantity,
             pendingAction: 'ADD',
           },
         }),
       ]);
 
-      return { ...added, hasActiveBookings: activeBookingsCount > 0 };
+      return { ...added, activeBookingsCount };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         throw new BadRequestException('קיימת כבר מידה כזו לשמלה הזו');
@@ -348,7 +367,7 @@ export class DressesService {
       data: { pendingAction: 'REMOVE' },
     });
 
-    return { ...updated, hasActiveBookings: activeBookingsCount > 0 };
+    return { ...updated, activeBookingsCount };
   }
 
   // Undoes a single pending size change before the whole edit is submitted:

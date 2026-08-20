@@ -138,6 +138,12 @@ model DressSize {
   dressId   Int
   size      String
   price     Int
+  // Physical units available for this size (e.g. M x 3). Defaults to 1 so
+  // every pre-existing row keeps behaving exactly as it did under the old
+  // implicit-single-unit model. Enforced >= 1 at the database level via a
+  // hand-added CHECK (see this model's migration.sql) - this Prisma
+  // version's schema DSL has no @@check attribute.
+  quantity  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -300,7 +300,7 @@ export default function AdminDashboardPage() {
                                 key={size.id}
                                 className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600"
                               >
-                                מידה {size.size} · {size.price} ₪
+                                מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
                               </span>
                             ))}
                             {addedSizes.map((size) => (
@@ -308,7 +308,7 @@ export default function AdminDashboardPage() {
                                 key={size.id}
                                 className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700"
                               >
-                                + מידה {size.size} · {size.price} ₪
+                                + מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
                               </span>
                             ))}
                             {removedSizes.map((size) => (
@@ -316,7 +316,7 @@ export default function AdminDashboardPage() {
                                 key={size.id}
                                 className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 line-through"
                               >
-                                מידה {size.size} · {size.price} ₪
+                                מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
                               </span>
                             ))}
                           </>

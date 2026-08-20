@@ -21,6 +21,7 @@ describe('BookingsController', () => {
       update: jest.Mock;
       delete: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const approvedDress = { id: 1, ownerId: 7, status: DressStatus.APPROVED };
@@ -38,12 +39,15 @@ describe('BookingsController', () => {
       dress: { findUnique: jest.fn() },
       booking: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
+      $transaction: jest.fn((operation: (tx: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+      ),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({

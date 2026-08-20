@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ describe('BookingsService', () => {
       update: jest.Mock;
       delete: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const approvedDress = { id: 1, ownerId: 7, status: DressStatus.APPROVED };
@@ -35,12 +37,19 @@ describe('BookingsService', () => {
       },
       booking: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
+      // In tests, the "transaction client" is just the same mocked prisma
+      // object - real Postgres SERIALIZABLE isolation isn't something a
+      // unit test can meaningfully simulate; the retry-on-conflict behavior
+      // itself is covered separately below by rejecting with a P2034 error.
+      $transaction: jest.fn((operation: (tx: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -394,9 +403,9 @@ describe('BookingsService', () => {
       ).resolves.toBeDefined();
     });
 
-    it('scopes the overlap check to the requested size (OR size=null) when the dress has sizes', async () => {
+    it('scopes the capacity check to the requested size (OR size=null) when the dress has sizes', async () => {
       prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
-      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.findMany.mockResolvedValue([]);
       prisma.booking.create.mockResolvedValue({ id: 1 });
 
       await service.createInterested({
@@ -407,23 +416,25 @@ describe('BookingsService', () => {
         ownerId: 7,
       });
 
-      expect(prisma.booking.findFirst).toHaveBeenCalledWith({
+      expect(prisma.booking.findMany).toHaveBeenCalledWith({
         where: {
           dressId: 1,
           status: { in: [BookingStatus.INTERESTED, BookingStatus.RENTED] },
           startDate: { lte: new Date('2026-09-05') },
           endDate: { gte: new Date('2026-09-01') },
-          OR: [{ size: null }, { size: 'M' }],
+          OR: [{ size: 'M' }, { size: null }],
         },
+        select: { startDate: true, endDate: true, size: true },
       });
     });
 
-    it('allows booking a different size for the same overlapping date range (a conflicting-size findFirst result means no conflict)', async () => {
+    it('allows booking a different size when an existing booking for another size overlaps the same range', async () => {
       prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
-      // Simulates the DB query correctly excluding a same-range, different-size
-      // booking - findFirst returns null because the real query is scoped by
-      // size, so no conflict is found even though dates overlap another size.
-      prisma.booking.findFirst.mockResolvedValue(null);
+      // A booking for size M overlaps the requested range, but the request
+      // is for size L - each size has its own capacity pool.
+      prisma.booking.findMany.mockResolvedValue([
+        { startDate: new Date('2026-09-01'), endDate: new Date('2026-09-05'), size: 'M' },
+      ]);
       prisma.booking.create.mockResolvedValue({ id: 2, size: 'L' });
 
       await expect(
@@ -437,9 +448,11 @@ describe('BookingsService', () => {
       ).resolves.toBeDefined();
     });
 
-    it('rejects a real conflict on the same size', async () => {
+    it('rejects when the single unit (default quantity 1) of a size is already booked on an overlapping day', async () => {
       prisma.dress.findUnique.mockResolvedValue(dressWithSizes);
-      prisma.booking.findFirst.mockResolvedValue({ id: 9, size: 'M' });
+      prisma.booking.findMany.mockResolvedValue([
+        { startDate: new Date('2026-09-03'), endDate: new Date('2026-09-03'), size: 'M' },
+      ]);
 
       await expect(
         service.createInterested({
@@ -620,6 +633,298 @@ describe('BookingsService', () => {
           expect.objectContaining({ data: expect.objectContaining({ price: 150 }) }),
         );
       });
+    });
+  });
+
+  describe('multi-unit quantity availability', () => {
+    const dressWithQuantities = {
+      id: 1,
+      ownerId: 7,
+      status: DressStatus.APPROVED,
+      sizes: [
+        { id: 1, size: 'S', price: 100, quantity: 1 },
+        { id: 2, size: 'M', price: 150, quantity: 3 },
+        { id: 3, size: 'L', price: 200, quantity: 1 },
+      ],
+    };
+
+    it('allows a booking when quantity=3 and only 2 units are already booked on the overlapping day', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithQuantities);
+      prisma.booking.findMany.mockResolvedValue([
+        { startDate: new Date('2026-09-10'), endDate: new Date('2026-09-12'), size: 'M' },
+        { startDate: new Date('2026-09-11'), endDate: new Date('2026-09-13'), size: 'M' },
+      ]);
+      prisma.booking.create.mockResolvedValue({ id: 5, size: 'M' });
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-10',
+          endDate: '2026-09-12',
+          size: 'M',
+          ownerId: 7,
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('rejects a booking once all 3 units of quantity=3 are already booked on at least one overlapping day', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithQuantities);
+      prisma.booking.findMany.mockResolvedValue([
+        { startDate: new Date('2026-09-10'), endDate: new Date('2026-09-12'), size: 'M' },
+        { startDate: new Date('2026-09-10'), endDate: new Date('2026-09-12'), size: 'M' },
+        { startDate: new Date('2026-09-11'), endDate: new Date('2026-09-11'), size: 'M' },
+      ]);
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-10',
+          endDate: '2026-09-12',
+          size: 'M',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('uses correct day-by-day peak usage: two non-concurrent existing bookings must not block a request that never actually exceeds quantity=1', async () => {
+      // Two existing L bookings (quantity=1) that never overlap each other
+      // (Sep 1-3 and Sep 10-12) both loosely "overlap" a wide new request
+      // (Sep 2-11) - but a naive row-count (2) would wrongly compare
+      // against quantity 1 the same way as a real conflict. Here it SHOULD
+      // still be rejected, but only because each individually already
+      // exceeds quantity=1 on its own days - verifying the day-level
+      // reasoning is actually being applied (see the next test for the
+      // case where day-level reasoning changes the outcome).
+      prisma.dress.findUnique.mockResolvedValue(dressWithQuantities);
+      prisma.booking.findMany.mockResolvedValue([
+        { startDate: new Date('2026-09-01'), endDate: new Date('2026-09-03'), size: 'L' },
+        { startDate: new Date('2026-09-10'), endDate: new Date('2026-09-12'), size: 'L' },
+      ]);
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-02',
+          endDate: '2026-09-11',
+          size: 'L',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('day-by-day peak usage ALLOWS a request that a naive overlapping-row-count would incorrectly reject', async () => {
+      // quantity=2. Two existing bookings, staggered and never concurrent
+      // with each other (Sep 1-5, Sep 10-15). A new Sep 4-11 request
+      // overlaps BOTH in the loose interval sense (2 overlapping rows),
+      // which a naive "row count >= quantity" check (2 >= 2) would wrongly
+      // reject - but actual peak concurrent usage on any single day never
+      // exceeds 1 existing + 1 new = 2, exactly at (not over) capacity.
+      const dressQuantityTwo = {
+        ...dressWithQuantities,
+        sizes: [{ id: 2, size: 'M', price: 150, quantity: 2 }],
+      };
+      prisma.dress.findUnique.mockResolvedValue(dressQuantityTwo);
+      prisma.booking.findMany.mockResolvedValue([
+        { startDate: new Date('2026-09-01'), endDate: new Date('2026-09-05'), size: 'M' },
+        { startDate: new Date('2026-09-10'), endDate: new Date('2026-09-15'), size: 'M' },
+      ]);
+      prisma.booking.create.mockResolvedValue({ id: 9, size: 'M' });
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-04',
+          endDate: '2026-09-11',
+          size: 'M',
+          ownerId: 7,
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('a size:null (whole-dress) active booking blocks every size regardless of its quantity', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithQuantities);
+      prisma.booking.findMany.mockResolvedValue([
+        { startDate: new Date('2026-09-10'), endDate: new Date('2026-09-12'), size: null },
+      ]);
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-10',
+          endDate: '2026-09-12',
+          size: 'M',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('CANCELLED bookings never consume a unit - excluded at the DB query level via ACTIVE_BOOKING_STATUSES', async () => {
+      prisma.dress.findUnique.mockResolvedValue(dressWithQuantities);
+      // Simulates the CANCELLED row already excluded by the where clause -
+      // findMany simply never returns it.
+      prisma.booking.findMany.mockResolvedValue([]);
+      prisma.booking.create.mockResolvedValue({ id: 1, size: 'L' });
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-10',
+          endDate: '2026-09-12',
+          size: 'L',
+          ownerId: 7,
+        }),
+      ).resolves.toBeDefined();
+
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { in: [BookingStatus.INTERESTED, BookingStatus.RENTED] },
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('concurrency (SERIALIZABLE transaction + one automatic retry)', () => {
+    function serializationConflictError() {
+      return Object.assign(new Error('could not serialize access due to concurrent update'), {
+        code: 'P2034',
+      });
+    }
+
+    // The shape actually thrown by @prisma/adapter-pg in this Prisma
+    // version for a real Postgres SQLSTATE 40001 conflict - confirmed
+    // against a live concurrent-request race (see the stage report). This
+    // does NOT have a top-level `code: 'P2034'` the way serializationConflictError()
+    // above simulates - the retry logic must handle both shapes, since
+    // relying only on the P2034 shape silently disabled the retry and let
+    // real conflicts surface as raw 500s.
+    function driverAdapterConflictError() {
+      return Object.assign(new Error('TransactionWriteConflict'), {
+        name: 'DriverAdapterError',
+        cause: {
+          originalCode: '40001',
+          originalMessage: 'could not serialize access due to read/write dependencies among transactions',
+          kind: 'TransactionWriteConflict',
+        },
+      });
+    }
+
+    it('uses SERIALIZABLE isolation for the capacity-check + create transaction', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({ id: 1 });
+
+      await service.createInterested({
+        dressId: 1,
+        startDate: '2026-09-01',
+        endDate: '2026-09-05',
+        ownerId: 7,
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ isolationLevel: 'Serializable' }),
+      );
+    });
+
+    it('retries exactly once on a serialization conflict, and succeeds if the retry passes', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({ id: 1, status: BookingStatus.INTERESTED });
+
+      let call = 0;
+      prisma.$transaction.mockImplementation(
+        async (operation: (tx: typeof prisma) => Promise<unknown>) => {
+          call += 1;
+          if (call === 1) {
+            throw serializationConflictError();
+          }
+          return operation(prisma);
+        },
+      );
+
+      const result = await service.createInterested({
+        dressId: 1,
+        startDate: '2026-09-01',
+        endDate: '2026-09-05',
+        ownerId: 7,
+      });
+
+      expect(call).toBe(2);
+      expect(result.status).toBe(BookingStatus.INTERESTED);
+    });
+
+    it('retries on the real @prisma/adapter-pg DriverAdapterError conflict shape (not just a top-level P2034 code)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({ id: 1, status: BookingStatus.INTERESTED });
+
+      let call = 0;
+      prisma.$transaction.mockImplementation(
+        async (operation: (tx: typeof prisma) => Promise<unknown>) => {
+          call += 1;
+          if (call === 1) {
+            throw driverAdapterConflictError();
+          }
+          return operation(prisma);
+        },
+      );
+
+      const result = await service.createInterested({
+        dressId: 1,
+        startDate: '2026-09-01',
+        endDate: '2026-09-05',
+        ownerId: 7,
+      });
+
+      expect(call).toBe(2);
+      expect(result.status).toBe(BookingStatus.INTERESTED);
+    });
+
+    it('surfaces a clear ConflictException (not a raw 500) when the retry also fails with the real DriverAdapterError conflict shape', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.$transaction.mockRejectedValue(driverAdapterConflictError());
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('surfaces a clear ConflictException if the retry also fails with a serialization conflict (two requests racing for the last unit)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.$transaction.mockRejectedValue(serializationConflictError());
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry, and does not mask, a non-conflict error', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.$transaction.mockRejectedValue(new Error('some other db error'));
+
+      await expect(
+        service.createInterested({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          ownerId: 7,
+        }),
+      ).rejects.toThrow('some other db error');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -41,7 +41,7 @@ export default function EditDressPage() {
   const [saveSuccess, setSaveSuccess] = useState("");
 
   const [sizeDrafts, setSizeDrafts] = useState<
-    Record<number, { size: string; price: string }>
+    Record<number, { size: string; price: string; quantity: string }>
   >({});
   const [savingSizeId, setSavingSizeId] = useState<number | null>(null);
   const [removingSizeId, setRemovingSizeId] = useState<number | null>(null);
@@ -50,6 +50,7 @@ export default function EditDressPage() {
 
   const [newSizeValue, setNewSizeValue] = useState("");
   const [newPriceValue, setNewPriceValue] = useState("");
+  const [newQuantityValue, setNewQuantityValue] = useState("1");
   const [addingSize, setAddingSize] = useState(false);
   const [addSizeError, setAddSizeError] = useState("");
 
@@ -122,7 +123,7 @@ export default function EditDressPage() {
         Object.fromEntries(
           found.sizes.map((size) => [
             size.id,
-            { size: size.size, price: String(size.price) },
+            { size: size.size, price: String(size.price), quantity: String(size.quantity) },
           ]),
         ),
       );
@@ -202,7 +203,7 @@ export default function EditDressPage() {
         Object.fromEntries(
           updated.sizes.map((size) => [
             size.id,
-            { size: size.size, price: String(size.price) },
+            { size: size.size, price: String(size.price), quantity: String(size.quantity) },
           ]),
         ),
       );
@@ -216,8 +217,9 @@ export default function EditDressPage() {
 
     const token = getToken();
     const price = Number(newPriceValue);
+    const quantity = Number(newQuantityValue);
 
-    if (!token || !dress || !newSizeValue.trim() || !price) {
+    if (!token || !dress || !newSizeValue.trim() || !price || !quantity || quantity < 1) {
       return;
     }
 
@@ -228,11 +230,13 @@ export default function EditDressPage() {
       await addDressSize(token, dress.id, {
         size: newSizeValue.trim(),
         price,
+        quantity,
       });
 
       await refreshDressAndSizeDrafts(token, dress.id);
       setNewSizeValue("");
       setNewPriceValue("");
+      setNewQuantityValue("1");
     } catch (err) {
       setAddSizeError(
         err instanceof ApiError ? err.message : "שגיאה בהוספת המידה",
@@ -246,8 +250,17 @@ export default function EditDressPage() {
     const token = getToken();
     const draft = sizeDrafts[sizeId];
     const price = Number(draft?.price);
+    const quantity = Number(draft?.quantity);
 
-    if (!token || !dress || !draft || !draft.size.trim() || !price) {
+    if (
+      !token ||
+      !dress ||
+      !draft ||
+      !draft.size.trim() ||
+      !price ||
+      !quantity ||
+      quantity < 1
+    ) {
       return;
     }
 
@@ -259,11 +272,16 @@ export default function EditDressPage() {
       const result = await updateDressSize(token, dress.id, sizeId, {
         size: draft.size.trim(),
         price,
+        quantity,
       });
 
-      if (result.hasActiveBookings) {
+      if (result.activeBookingsCount && result.activeBookingsCount > quantity) {
         setSizeActionWarning(
-          `יש הזמנות פעילות במידה ${draft.size.trim()} - הן ימשיכו להתקיים כפי שהן; המידה הקודמת פשוט לא תהיה זמינה להזמנות חדשות לאחר אישור העריכה.`,
+          `יש ${result.activeBookingsCount} הזמנות פעילות במידה ${draft.size.trim()}, יותר מהכמות החדשה (${quantity}) - הן ימשיכו להתקיים כפי שהן, אך לא ניתן יהיה ליצור הזמנות חדשות במידה זו עד שהשימוש בפועל יירד מתחת לכמות החדשה.`,
+        );
+      } else if (result.activeBookingsCount) {
+        setSizeActionWarning(
+          `יש ${result.activeBookingsCount} הזמנות פעילות במידה ${draft.size.trim()} - הן ימשיכו להתקיים כפי שהן; המידה הקודמת פשוט לא תהיה זמינה להזמנות חדשות לאחר אישור העריכה.`,
         );
       }
 
@@ -297,9 +315,9 @@ export default function EditDressPage() {
     try {
       const result = await deleteDressSize(token, dress.id, sizeId);
 
-      if (result.hasActiveBookings) {
+      if (result.activeBookingsCount) {
         setSizeActionWarning(
-          "יש הזמנות פעילות במידה זו - הן ימשיכו להתקיים כפי שהן, אך לא ניתן יהיה ליצור הזמנות חדשות במידה זו לאחר אישור העריכה.",
+          `יש ${result.activeBookingsCount} הזמנות פעילות במידה זו - הן ימשיכו להתקיים כפי שהן, אך לא ניתן יהיה ליצור הזמנות חדשות במידה זו לאחר אישור העריכה.`,
         );
       }
 
@@ -686,6 +704,7 @@ export default function EditDressPage() {
                     const draft = sizeDrafts[size.id] ?? {
                       size: size.size,
                       price: String(size.price),
+                      quantity: String(size.quantity),
                     };
 
                     if (size.pendingAction === "REMOVE") {
@@ -695,7 +714,7 @@ export default function EditDressPage() {
                           className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 p-3"
                         >
                           <span className="text-sm text-red-700 line-through">
-                            מידה {size.size} · {size.price} ₪
+                            מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
                           </span>
                           <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
                             מסומן להסרה
@@ -756,13 +775,32 @@ export default function EditDressPage() {
 
                         <span className="text-sm text-zinc-400">₪</span>
 
+                        <input
+                          type="number"
+                          min={1}
+                          value={draft.quantity}
+                          onChange={(event) =>
+                            setSizeDrafts((current) => ({
+                              ...current,
+                              [size.id]: { ...draft, quantity: event.target.value },
+                            }))
+                          }
+                          aria-label="עריכת כמות היחידות"
+                          title="כמות יחידות"
+                          className="w-20 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500"
+                        />
+
+                        <span className="text-sm text-zinc-400">יחידות</span>
+
                         <button
                           type="button"
                           onClick={() => handleUpdateSize(size.id)}
                           disabled={
                             savingSizeId === size.id ||
                             !draft.size.trim() ||
-                            !draft.price
+                            !draft.price ||
+                            !draft.quantity ||
+                            Number(draft.quantity) < 1
                           }
                           className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -814,9 +852,25 @@ export default function EditDressPage() {
                   className="flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500"
                 />
 
+                <input
+                  type="number"
+                  min={1}
+                  value={newQuantityValue}
+                  onChange={(event) => setNewQuantityValue(event.target.value)}
+                  placeholder="כמות יחידות"
+                  aria-label="כמות יחידות"
+                  className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-500 sm:w-32"
+                />
+
                 <button
                   type="submit"
-                  disabled={addingSize || !newSizeValue.trim() || !newPriceValue}
+                  disabled={
+                    addingSize ||
+                    !newSizeValue.trim() ||
+                    !newPriceValue ||
+                    !newQuantityValue ||
+                    Number(newQuantityValue) < 1
+                  }
                   className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {addingSize ? "מוסיפה..." : "+ הוספת מידה"}

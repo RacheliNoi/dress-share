@@ -446,7 +446,7 @@ describe('DressesService', () => {
       expect(prisma.booking.count).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ dressId: 1, size: 'M' }) }),
       );
-      expect((result as { hasActiveBookings?: boolean }).hasActiveBookings).toBe(true);
+      expect((result as { activeBookingsCount?: number }).activeBookingsCount).toBe(2);
     });
 
     it('editing a not-yet-approved ADD-flagged row updates it directly (no remove+add pair)', async () => {
@@ -606,7 +606,7 @@ describe('DressesService', () => {
       expect(result.pendingAction).toBe('REMOVE');
     });
 
-    it('flags hasActiveBookings when removing a size that has active bookings (non-blocking)', async () => {
+    it('returns activeBookingsCount when removing a size that has active bookings (non-blocking)', async () => {
       prisma.dressSize.findUnique.mockResolvedValue({
         id: 3,
         dressId: 1,
@@ -615,12 +615,12 @@ describe('DressesService', () => {
         pendingAction: null,
         dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
       });
-      prisma.booking.count.mockResolvedValue(1);
+      prisma.booking.count.mockResolvedValue(3);
       prisma.dressSize.update.mockResolvedValue({ id: 3, pendingAction: 'REMOVE' });
 
       const result = await service.removeSize(1, 3, 7);
 
-      expect((result as { hasActiveBookings?: boolean }).hasActiveBookings).toBe(true);
+      expect((result as { activeBookingsCount?: number }).activeBookingsCount).toBe(3);
     });
 
     it('removing a not-yet-approved ADD-flagged size hard-deletes it (never went live)', async () => {
@@ -697,6 +697,124 @@ describe('DressesService', () => {
         NotFoundException,
       );
       expect(prisma.dressSize.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('quantity (multi-unit sizes)', () => {
+    it('addSize defaults quantity to 1 when not provided', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dressSize.create.mockResolvedValue({ id: 1, size: 'M', price: 100, quantity: 1 });
+
+      await service.addSize({ dressId: 1, size: 'M', price: 100, ownerId: 7 });
+
+      expect(prisma.dressSize.create).toHaveBeenCalledWith({
+        data: { dressId: 1, size: 'M', price: 100, quantity: 1, pendingAction: undefined },
+      });
+    });
+
+    it('addSize stores an explicit quantity', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dressSize.create.mockResolvedValue({ id: 1, size: 'M', price: 100, quantity: 3 });
+
+      await service.addSize({ dressId: 1, size: 'M', price: 100, quantity: 3, ownerId: 7 });
+
+      expect(prisma.dressSize.create).toHaveBeenCalledWith({
+        data: { dressId: 1, size: 'M', price: 100, quantity: 3, pendingAction: undefined },
+      });
+    });
+
+    it('rejects a quantity below 1', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+
+      await expect(
+        service.addSize({ dressId: 1, size: 'M', price: 100, quantity: 0, ownerId: 7 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressSize.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-integer quantity', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+
+      await expect(
+        service.addSize({ dressId: 1, size: 'M', price: 100, quantity: 1.5, ownerId: 7 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.dressSize.create).not.toHaveBeenCalled();
+    });
+
+    it('updateSize on an APPROVED dress carries the new quantity into the ADD-flagged replacement row', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        quantity: 1,
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.dressSize.update.mockResolvedValue({ id: 3, pendingAction: 'REMOVE' });
+      prisma.dressSize.create.mockResolvedValue({ id: 9, dressId: 1, size: 'M', price: 100, quantity: 3, pendingAction: 'ADD' });
+
+      const result = await service.updateSize(1, 3, 7, { quantity: 3 });
+
+      expect(prisma.dressSize.create).toHaveBeenCalledWith({
+        data: { dressId: 1, size: 'M', price: 100, quantity: 3, pendingAction: 'ADD' },
+      });
+      expect(result.quantity).toBe(3);
+    });
+
+    it('updateSize allows reducing quantity below the current active-bookings count, and reports the count', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        quantity: 3,
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.APPROVED, pendingReviewSubmittedAt: null },
+      });
+      prisma.booking.count.mockResolvedValue(3);
+      prisma.dressSize.update.mockResolvedValue({ id: 3 });
+      prisma.dressSize.create.mockResolvedValue({ id: 9, dressId: 1, size: 'M', price: 100, quantity: 1 });
+
+      const result = await service.updateSize(1, 3, 7, { quantity: 1 });
+
+      expect(prisma.dressSize.create).toHaveBeenCalledWith({
+        data: { dressId: 1, size: 'M', price: 100, quantity: 1, pendingAction: 'ADD' },
+      });
+      expect((result as { activeBookingsCount?: number }).activeBookingsCount).toBe(3);
+    });
+
+    it('rejects an invalid quantity on updateSize', async () => {
+      prisma.dressSize.findUnique.mockResolvedValue({
+        id: 3,
+        dressId: 1,
+        size: 'M',
+        price: 100,
+        quantity: 1,
+        pendingAction: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.REJECTED, pendingReviewSubmittedAt: null },
+      });
+
+      await expect(service.updateSize(1, 3, 7, { quantity: -1 })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.dressSize.update).not.toHaveBeenCalled();
     });
   });
 
@@ -935,7 +1053,7 @@ describe('DressesService', () => {
       const result = await service.addSize({ dressId: 1, size: 'M', price: 100, ownerId: 7 });
 
       expect(prisma.dressSize.create).toHaveBeenCalledWith({
-        data: { dressId: 1, size: 'M', price: 100, pendingAction: 'ADD' },
+        data: { dressId: 1, size: 'M', price: 100, quantity: 1, pendingAction: 'ADD' },
       });
       expect(result.pendingAction).toBe('ADD');
     });

@@ -60,6 +60,7 @@ addSize(
   body: {
     size: string;
     price: number;
+    quantity?: number;
   },
   @CurrentUser() user: { sub: number },
 ) {
@@ -67,6 +68,7 @@ addSize(
     dressId: Number(id),
     size: body.size,
     price: Number(body.price),
+    quantity: body.quantity !== undefined ? Number(body.quantity) : undefined,
     ownerId: user.sub,
   });
 }
@@ -80,6 +82,7 @@ updateSize(
   body: {
     size?: string;
     price?: number;
+    quantity?: number;
   },
   @CurrentUser() user: { sub: number },
 ) {
@@ -90,6 +93,7 @@ updateSize(
     {
       size: body.size,
       price: body.price !== undefined ? Number(body.price) : undefined,
+      quantity: body.quantity !== undefined ? Number(body.quantity) : undefined,
     },
   );
 }

@@ -13,6 +13,7 @@ import {
   markBookingAsRented,
 } from "@/lib/api";
 import DressAvailabilityCalendar from "./DressAvailabilityCalendar";
+import { getPeakUsageForRange } from "@/lib/availability";
 
 const STATUS_BADGES: Partial<Record<Booking["status"], { label: string; className: string }>> = {
   INTERESTED: { label: "מישהו מתעניין", className: "bg-amber-100 text-amber-800" },
@@ -52,10 +53,13 @@ export default function DressAvailabilityManager({
   );
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  // Booking now happens per-size (Fix 3), and the owner can hold several
-  // sizes in one action (Fix 2) - selectedSizeIds is an ordered,
-  // duplicate-free list of DressSize ids the create-form will submit one
-  // booking each for.
+  // Booking happens per-size, and the owner can hold several units in one
+  // action - selectedSizeIds is an ordered MULTISET (duplicates allowed) of
+  // DressSize ids: each entry represents exactly one intended physical
+  // unit/Booking. quantity is inventory/capacity only - it is never treated
+  // as "how many can be picked in one go" by itself, and a single Booking
+  // never represents more than one unit (see handleCreate below, which
+  // creates one request per entry here, never a Booking with a quantity).
   const [selectedSizeIds, setSelectedSizeIds] = useState<string[]>([]);
   const [sizeToAdd, setSizeToAdd] = useState("");
   const [creating, setCreating] = useState(false);
@@ -64,9 +68,59 @@ export default function DressAvailabilityManager({
   const selectedSizes = selectedSizeIds
     .map((id) => sizes.find((candidate) => String(candidate.id) === id))
     .filter((size): size is DressSize => Boolean(size));
-  const sizesAvailableToAdd = sizes.filter(
-    (size) => !selectedSizeIds.includes(String(size.id)),
+
+  // Active (INTERESTED/RENTED) bookings for THIS dress, used to compute how
+  // many units of each size are actually still free for the chosen date
+  // range - mirrors the backend's day-by-day capacity check exactly (see
+  // lib/availability.ts). This is UX only: the backend's SERIALIZABLE
+  // capacity check on every submit is still the sole protection against
+  // overselling, regardless of what this form shows.
+  const activeBookings = bookings.filter(
+    (booking) => booking.status === "INTERESTED" || booking.status === "RENTED",
   );
+  const datesSelected = Boolean(startDate && endDate && endDate >= startDate);
+
+  function selectedCountFor(sizeId: string) {
+    return selectedSizeIds.filter((id) => id === sizeId).length;
+  }
+
+  // Units not already committed to an existing active booking - deliberately
+  // ignores whatever the user has provisionally picked in this same form,
+  // since that's not "occupied", just already claimed by this form. Used
+  // only to drive the "already fully booked elsewhere" warning below.
+  function existingRemainingUnits(size: DressSize): number {
+    if (!datesSelected) {
+      return size.quantity;
+    }
+
+    const { peakUsage, wholeDressBlocked } = getPeakUsageForRange(
+      startDate,
+      endDate,
+      activeBookings,
+      size.size,
+    );
+
+    if (wholeDressBlocked) {
+      return 0;
+    }
+
+    return size.quantity - peakUsage;
+  }
+
+  // What actually drives the "add size" dropdown: existing bookings AND
+  // this form's own already-selected units both count against quantity - a
+  // size with quantity=3 and no existing bookings can be picked up to 3
+  // times, but only once more if 2 units are already actively booked.
+  // Recomputed from selectedSizeIds on every render (never cached), so
+  // removing a selection immediately makes that unit pickable again.
+  function remainingUnitsForSelection(size: DressSize): number {
+    return existingRemainingUnits(size) - selectedCountFor(String(size.id));
+  }
+
+  const sizesAvailableToAdd = sizes.filter((size) => remainingUnitsForSelection(size) > 0);
+  const sizesUnavailableForRange = datesSelected
+    ? sizes.filter((size) => existingRemainingUnits(size) <= 0)
+    : [];
 
   const [actioningId, setActioningId] = useState<number | null>(null);
   const [actionError, setActionError] = useState("");
@@ -114,7 +168,12 @@ export default function DressAvailabilityManager({
   }
 
   function addSizeToSelection(id: string) {
-    if (!id || selectedSizeIds.includes(id)) {
+    // Intentionally no "already selected" guard - the same size can be
+    // picked again as long as a unit remains (the dropdown itself only
+    // offers a size while remainingUnitsForSelection > 0, so reaching here
+    // with a maxed-out size shouldn't normally happen, but this stays
+    // permissive rather than silently dropping a legitimate pick).
+    if (!id) {
       return;
     }
 
@@ -122,8 +181,11 @@ export default function DressAvailabilityManager({
     setSizeToAdd("");
   }
 
-  function removeSizeFromSelection(id: string) {
-    setSelectedSizeIds((current) => current.filter((current_) => current_ !== id));
+  // Removes exactly ONE selected unit at the given index - not "all
+  // selections of this size" - since the same size can now appear multiple
+  // times in selectedSizeIds (once per unit).
+  function removeSizeFromSelection(index: number) {
+    setSelectedSizeIds((current) => current.filter((_, current_) => current_ !== index));
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -335,29 +397,43 @@ export default function DressAvailabilityManager({
                 >
                   <option value="">
                     {sizesAvailableToAdd.length === 0
-                      ? "כל המידות נבחרו"
+                      ? datesSelected && sizesUnavailableForRange.length > 0
+                        ? "אין מידות פנויות בטווח שנבחר"
+                        : "כל היחידות הזמינות כבר נבחרו"
                       : "הוספת מידה..."}
                   </option>
-                  {sizesAvailableToAdd.map((size) => (
-                    <option key={size.id} value={size.id}>
-                      מידה {size.size} · {size.price} ₪
-                    </option>
-                  ))}
+                  {sizesAvailableToAdd.map((size) => {
+                    const remaining = remainingUnitsForSelection(size);
+
+                    return (
+                      <option key={size.id} value={size.id}>
+                        מידה {size.size} · {size.price} ₪
+                        {remaining < size.quantity ? ` · נותרו ${remaining}` : ` · ${size.quantity} יחידות`}
+                      </option>
+                    );
+                  })}
                 </select>
+
+                {sizesUnavailableForRange.length > 0 && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    תפוסות בטווח התאריכים שנבחר (כל היחידות תפוסות):{" "}
+                    {sizesUnavailableForRange.map((size) => size.size).join(", ")}
+                  </p>
+                )}
 
                 {selectedSizes.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedSizes.map((size) => (
+                    {selectedSizes.map((size, index) => (
                       <span
-                        key={size.id}
+                        key={`${size.id}-${index}`}
                         className="flex items-center gap-2 rounded-full bg-zinc-100 py-1.5 ps-3.5 pe-2 text-sm font-semibold text-zinc-700"
                       >
                         מידה {size.size}
                         {newStatus === "RENTED" && ` · ${size.price} ₪`}
                         <button
                           type="button"
-                          onClick={() => removeSizeFromSelection(String(size.id))}
-                          aria-label={`הסרת מידה ${size.size}`}
+                          onClick={() => removeSizeFromSelection(index)}
+                          aria-label={`הסרת מידה ${size.size} (בחירה ${index + 1})`}
                           className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-900"
                         >
                           ✕

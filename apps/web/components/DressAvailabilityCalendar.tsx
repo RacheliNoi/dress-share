@@ -8,6 +8,7 @@ import {
   getDressAvailability,
 } from "@/lib/api";
 import { getHebrewDateLabel } from "@/lib/hebrewDate";
+import { getSizeUsageForDay } from "@/lib/availability";
 
 const WEEKDAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 
@@ -88,10 +89,13 @@ const monthFormatter = new Intl.DateTimeFormat("he-IL", {
   timeZone: "UTC",
 });
 
-// Per-size breakdown for one calendar day - computed on demand (only when a
-// day is clicked open), never baked into the grid's own background color,
-// which intentionally keeps showing the dress's overall worst-case status
-// exactly as before. `size: null` on an entry means either a no-size dress
+// Per-size, quantity-aware breakdown for one calendar day - computed on
+// demand (only when a day is clicked open), never baked into the grid's own
+// background color, which intentionally keeps showing the dress's overall
+// worst-case status exactly as before. Mirrors the backend's
+// assertCapacityAvailable via the shared getSizeUsageForDay helper, so this
+// panel can never disagree with what the backend would actually accept for
+// this exact day. `size: null` on an entry means either a no-size dress
 // (whole-dress booking, unchanged legacy behavior) or a booking made before
 // per-size tracking existed - both are treated as blocking every size, the
 // conservative reading.
@@ -100,22 +104,25 @@ function sizeBreakdownForDate(
   availability: DressAvailabilityEntry[],
   sizes: DressSize[],
 ): { available: string[]; blocked: string[]; wholeDressBlocked: boolean } {
-  const time = date.getTime();
-  const blockedSizes = new Set<string>();
   let wholeDressBlocked = false;
+  const available: string[] = [];
+  const blocked: string[] = [];
 
-  for (const entry of availability) {
-    const start = new Date(entry.startDate).getTime();
-    const end = new Date(entry.endDate).getTime();
+  for (const size of sizes) {
+    const { usage, wholeDressBlocked: dayFullyBlocked } = getSizeUsageForDay(
+      date,
+      availability,
+      size.size,
+    );
 
-    if (time < start || time > end) {
-      continue;
+    if (dayFullyBlocked) {
+      wholeDressBlocked = true;
     }
 
-    if (entry.size === null || entry.size === undefined) {
-      wholeDressBlocked = true;
+    if (dayFullyBlocked || usage >= size.quantity) {
+      blocked.push(size.size);
     } else {
-      blockedSizes.add(entry.size);
+      available.push(size.size);
     }
   }
 
@@ -123,11 +130,7 @@ function sizeBreakdownForDate(
     return { available: [], blocked: sizes.map((size) => size.size), wholeDressBlocked: true };
   }
 
-  return {
-    available: sizes.filter((size) => !blockedSizes.has(size.size)).map((size) => size.size),
-    blocked: sizes.filter((size) => blockedSizes.has(size.size)).map((size) => size.size),
-    wholeDressBlocked: false,
-  };
+  return { available, blocked, wholeDressBlocked: false };
 }
 
 function isSameUtcDay(a: Date, b: Date) {

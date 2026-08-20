@@ -7,9 +7,11 @@ import CatalogFilters, { SortOption } from "@/components/CatalogFilters";
 import {
   Dress,
   DressAvailabilityEntry,
+  DressSize,
   getApprovedDresses,
   getDressAvailability,
 } from "@/lib/api";
+import { getSizeUsageForDay } from "@/lib/availability";
 
 function getMinPrice(dress: Dress): number | null {
   if (dress.sizes.length === 0) {
@@ -37,30 +39,35 @@ function isDateBlocked(dateValue: string, entries: DressAvailabilityEntry[]): bo
   });
 }
 
-// Per-size breakdown for one date - `size: null` on an entry means either a
-// no-size dress (whole-dress booking) or a booking made before per-size
-// tracking existed, both treated as blocking every size (the conservative
-// reading, matching the backend and DressAvailabilityCalendar).
+// Per-size, quantity-aware breakdown for one date - mirrors the backend's
+// assertCapacityAvailable via the shared getSizeUsageForDay helper (a size
+// is blocked once its active-booking usage that day reaches its quantity),
+// so the catalog can never disagree with what the backend would actually
+// accept. `size: null` on an entry means either a no-size dress (whole-dress
+// booking) or a booking made before per-size tracking existed, both treated
+// as blocking every size (the conservative reading, matching the backend).
 function getBlockedSizesForDate(
   dateValue: string,
   entries: DressAvailabilityEntry[],
+  sizes: DressSize[],
 ): { blockedSizes: Set<string>; wholeDressBlocked: boolean } {
-  const target = new Date(`${dateValue}T00:00:00.000Z`).getTime();
+  const day = new Date(`${dateValue}T00:00:00.000Z`);
   const blockedSizes = new Set<string>();
   let wholeDressBlocked = false;
 
-  for (const entry of entries) {
-    const start = new Date(entry.startDate).getTime();
-    const end = new Date(entry.endDate).getTime();
+  for (const size of sizes) {
+    const { usage, wholeDressBlocked: dayFullyBlocked } = getSizeUsageForDay(
+      day,
+      entries,
+      size.size,
+    );
 
-    if (target < start || target > end) {
-      continue;
+    if (dayFullyBlocked) {
+      wholeDressBlocked = true;
     }
 
-    if (entry.size === null) {
-      wholeDressBlocked = true;
-    } else {
-      blockedSizes.add(entry.size);
+    if (dayFullyBlocked || usage >= size.quantity) {
+      blockedSizes.add(size.size);
     }
   }
 
@@ -75,7 +82,11 @@ function isDressAvailableOnDate(dress: Dress, dateValue: string, entries: DressA
     return !isDateBlocked(dateValue, entries);
   }
 
-  const { blockedSizes, wholeDressBlocked } = getBlockedSizesForDate(dateValue, entries);
+  const { blockedSizes, wholeDressBlocked } = getBlockedSizesForDate(
+    dateValue,
+    entries,
+    dress.sizes,
+  );
 
   if (wholeDressBlocked) {
     return false;
@@ -304,6 +315,7 @@ export default function CatalogPage() {
       const { blockedSizes, wholeDressBlocked } = getBlockedSizesForDate(
         availabilityDate,
         entries,
+        dress.sizes,
       );
 
       map.set(dress.id, {

@@ -319,7 +319,7 @@ export default function MyDressDetailsPage() {
                         className="flex items-center justify-between py-3"
                       >
                         <span className="rounded-full bg-zinc-100 px-3 py-1.5 text-sm font-semibold text-zinc-700">
-                          מידה {size.size}
+                          מידה {size.size} · {size.quantity} יחידות
                         </span>
                         <span className="text-base font-black text-zinc-900">
                           {size.price} ₪

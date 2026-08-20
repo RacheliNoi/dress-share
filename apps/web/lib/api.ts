@@ -19,6 +19,8 @@ export type DressSize = {
   id: number;
   size: string;
   price: number;
+  // Physical units of this size (e.g. M x 3). Defaults to 1 server-side.
+  quantity: number;
   pendingAction: DressPendingAction;
 };
 
@@ -293,17 +295,17 @@ export function createDress(
   });
 }
 
-// The size/price-change endpoints return the affected DressSize plus,
-// when relevant, whether that size currently has active bookings - a
-// non-blocking warning surfaced to the owner (existing bookings are never
-// affected either way; this size just won't be bookable again once the
-// edit that removed/replaced it is approved).
-export type DressSizeChangeResult = DressSize & { hasActiveBookings?: boolean };
+// The size/price/quantity-change endpoints return the affected DressSize
+// plus, when relevant, how many active bookings currently exist for that
+// size - a non-blocking warning surfaced to the owner (existing bookings
+// are never affected either way; the size just won't be bookable again for
+// units beyond the new quantity once the edit that changed it is approved).
+export type DressSizeChangeResult = DressSize & { activeBookingsCount?: number };
 
 export function addDressSize(
   token: string,
   dressId: number,
-  data: { size: string; price: number },
+  data: { size: string; price: number; quantity?: number },
 ) {
   return request<DressSizeChangeResult>(`/dresses/${dressId}/sizes`, {
     method: "POST",
@@ -316,7 +318,7 @@ export function updateDressSize(
   token: string,
   dressId: number,
   sizeId: number,
-  data: { size?: string; price?: number },
+  data: { size?: string; price?: number; quantity?: number },
 ) {
   return request<DressSizeChangeResult>(`/dresses/${dressId}/sizes/${sizeId}`, {
     method: "PATCH",
