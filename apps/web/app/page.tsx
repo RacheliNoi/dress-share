@@ -608,7 +608,7 @@ export default function CatalogPage() {
                 onClick={resetFilters}
                 className="mt-7 inline-flex rounded-full bg-zinc-900 px-6 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-zinc-700"
               >
-                נקה סינון
+                נקי סינון
               </button>
             </section>
           ) : (

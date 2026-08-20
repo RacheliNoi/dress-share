@@ -399,7 +399,7 @@ export default function CatalogFilters({
                 onClick={onReset}
                 className="rounded-xl px-3 py-2.5 text-sm font-bold text-accent transition hover:bg-accent-soft sm:me-auto"
               >
-                נקה סינון
+                נקי סינון
               </button>
             )}
           </div>

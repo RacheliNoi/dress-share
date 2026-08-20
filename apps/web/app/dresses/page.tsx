@@ -334,14 +334,16 @@ return (<main
                     </p>
                   </div>
 
-                  <div className="text-left">
-                    <p className="text-xs text-zinc-400">
-                      מחיר
-                    </p>
-                    <p className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900">
-                      {getPriceRange(dress)}
-                    </p>
-                  </div>
+                  {dress.sizes.length > 0 && (
+                    <div className="text-left">
+                      <p className="text-xs text-zinc-400">
+                        מחיר
+                      </p>
+                      <p className="mt-0.5 whitespace-nowrap text-sm font-black text-zinc-900">
+                        {getPriceRange(dress)}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {dress.description && (

@@ -387,7 +387,7 @@ export default function AdminDashboardPage() {
                             disabled={actioningId === dress.id}
                             className="flex-1 rounded-xl bg-success px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {actioningId === dress.id ? "מעדכנת..." : "אישור"}
+                            {actioningId === dress.id ? "מאשרת..." : "אישור"}
                           </button>
 
                           <button

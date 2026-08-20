@@ -294,7 +294,7 @@ export default function WardrobePage() {
 
           {loading ? (
             <div className="rounded-[20px] bg-surface p-8 text-center text-ink-faint ring-1 ring-line">
-              טוען את הארון...
+              טוענת את הארון...
             </div>
           ) : items.length === 0 ? (
             <div className="rounded-[20px] bg-surface p-8 text-center text-ink-faint ring-1 ring-line">

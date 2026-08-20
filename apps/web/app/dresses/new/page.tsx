@@ -396,7 +396,7 @@ export default function NewDressPage() {
                   min={0}
                   value={priceValue}
                   onChange={(event) => setPriceValue(event.target.value)}
-                  placeholder="מחיר בש״ח"
+                  placeholder="מחיר (₪)"
                   className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 

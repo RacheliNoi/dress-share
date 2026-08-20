@@ -728,7 +728,7 @@ export default function EditDressPage() {
                             disabled={removingSizeId === size.id}
                             className="mr-auto rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {removingSizeId === size.id ? "מבטלת..." : "בטל הסרה"}
+                            {removingSizeId === size.id ? "מבטלת..." : "בטלי הסרה"}
                           </button>
                         </div>
                       );
@@ -851,7 +851,7 @@ export default function EditDressPage() {
                   min={0}
                   value={newPriceValue}
                   onChange={(event) => setNewPriceValue(event.target.value)}
-                  placeholder="מחיר בש״ח"
+                  placeholder="מחיר (₪)"
                   className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
@@ -937,7 +937,7 @@ export default function EditDressPage() {
                           aria-label="ביטול הסרה"
                           className="absolute left-2 top-2 flex h-7 items-center justify-center rounded-full bg-zinc-900/70 px-2 text-[10px] font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {deletingPhotoId === photo.id ? "..." : "בטל הסרה"}
+                          {deletingPhotoId === photo.id ? "..." : "בטלי הסרה"}
                         </button>
                       ) : (
                         <button

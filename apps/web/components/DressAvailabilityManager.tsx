@@ -152,7 +152,7 @@ export default function DressAvailabilityManager({
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : "לא הצלחנו לטעון את רשומות הזמינות. נסי שוב.",
+          : "לא הצלחנו לטעון את ההזמנות. נסי שוב.",
       );
     } finally {
       setLoading(false);
@@ -249,7 +249,7 @@ export default function DressAvailabilityManager({
 
         if (failedSizes.length > 0) {
           setCreateError(
-            `לא נוצרה רשומה עבור מידות: ${failedSizes
+            `לא נוצרה הזמנה עבור מידות: ${failedSizes
               .map(({ size }) => size.size)
               .join(", ")}`,
           );
@@ -262,7 +262,7 @@ export default function DressAvailabilityManager({
       refreshAfterMutation();
     } catch (err) {
       setCreateError(
-        err instanceof ApiError ? err.message : "שגיאה ביצירת הרשומה",
+        err instanceof ApiError ? err.message : "שגיאה ביצירת ההזמנה",
       );
     } finally {
       setCreating(false);
@@ -297,7 +297,7 @@ export default function DressAvailabilityManager({
       refreshAfterMutation();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : "שגיאה בעדכון הרשומה",
+        err instanceof ApiError ? err.message : "שגיאה בעדכון ההזמנה",
       );
     } finally {
       setActioningId(null);
@@ -325,7 +325,7 @@ export default function DressAvailabilityManager({
       refreshAfterMutation();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : "שגיאה בביטול הרשומה",
+        err instanceof ApiError ? err.message : "שגיאה בביטול ההזמנה",
       );
     } finally {
       setActioningId(null);
@@ -419,7 +419,7 @@ export default function DressAvailabilityManager({
 
                 {sizesUnavailableForRange.length > 0 && (
                   <p className="mt-2 text-xs text-warning">
-                    תפוסות בטווח התאריכים שנבחר (כל היחידות תפוסות):{" "}
+                    תפוסות בטווח שנבחר:{" "}
                     {sizesUnavailableForRange.map((size) => size.size).join(", ")}
                   </p>
                 )}
@@ -481,14 +481,14 @@ export default function DressAvailabilityManager({
             {creating
               ? "שומרת..."
               : selectedSizes.length > 1
-                ? `הוספת ${selectedSizes.length} רשומות`
-                : "הוספת רשומה"}
+                ? `הוספת ${selectedSizes.length} הזמנות`
+                : "הוספת הזמנה"}
           </button>
         </form>
       </div>
 
       <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
-        <h2 className="text-lg font-bold text-zinc-900">רשומות זמינות</h2>
+        <h2 className="text-lg font-bold text-zinc-900">הזמנות זמינות</h2>
 
         {actionError && (
           <div className="mt-3 rounded-2xl bg-error-soft p-4 text-sm text-error">
@@ -518,7 +518,7 @@ export default function DressAvailabilityManager({
           </div>
         ) : bookings.length === 0 ? (
           <p className="mt-4 text-sm text-zinc-400">
-            עדיין אין רשומות זמינות לשמלה זו.
+            עדיין אין הזמנות זמינות לשמלה זו.
           </p>
         ) : (
           <ul className="mt-4 divide-y divide-zinc-100">
@@ -572,7 +572,7 @@ export default function DressAvailabilityManager({
                           }
                           className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          הפוך למושכר
+                          הפכי למושכר
                         </button>
 
                         <button
@@ -608,7 +608,7 @@ export default function DressAvailabilityManager({
                       ) : !booking.size || !matchingSize ? (
                         <p className="text-sm font-medium text-warning">
                           לא ניתן להשלים את ההשכרה - למידה שנבחרה בהתעניינות
-                          אין (עוד) הגדרת מחיר תקפה עבור שמלה זו.
+                          עדיין אין הגדרת מחיר תקפה עבור שמלה זו.
                         </p>
                       ) : (
                         <>
@@ -651,8 +651,8 @@ export default function DressAvailabilityManager({
 
       <ConfirmDialog
         open={pendingCancelId !== null}
-        title="לבטל את הרשומה?"
-        confirmLabel="ביטול הרשומה"
+        title="לבטל את ההזמנה?"
+        confirmLabel="ביטול ההזמנה"
         cancelLabel="חזרה"
         danger
         loading={actioningId === pendingCancelId}
