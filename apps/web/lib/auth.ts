@@ -2,6 +2,7 @@ import type { AuthUser } from "./api";
 
 const TOKEN_KEY = "dressshare_token";
 const USER_KEY = "dressshare_user";
+const WELCOME_NOTICE_KEY = "dressshare_pending_welcome_notice";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") {
@@ -68,4 +69,34 @@ export function removeUser(): void {
 export function logout(): void {
   removeToken();
   removeUser();
+}
+
+// Marks that a post-login/register info notice should be shown once, the
+// next time the app checks for it - deliberately sessionStorage (not
+// localStorage): it should reappear on every fresh login, but never
+// resurface just from a page refresh within an already-handled session.
+export function markWelcomeNoticePending(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  sessionStorage.setItem(WELCOME_NOTICE_KEY, "1");
+}
+
+// Read-and-clear in one step, so the notice can only ever be consumed once
+// per login - a second check (e.g. React StrictMode's double effect
+// invocation in dev) finds nothing and does nothing.
+export function consumeWelcomeNoticePending(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const pending = sessionStorage.getItem(WELCOME_NOTICE_KEY);
+
+  if (!pending) {
+    return false;
+  }
+
+  sessionStorage.removeItem(WELCOME_NOTICE_KEY);
+  return true;
 }
