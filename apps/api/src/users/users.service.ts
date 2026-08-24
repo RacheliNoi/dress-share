@@ -7,6 +7,14 @@ export class UsersService {
 
   async findAll() {
     return this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       orderBy: {
         createdAt: 'desc',
       },
