@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ReactElement, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getToken, logout } from "@/lib/auth";
@@ -14,34 +14,89 @@ import {
 import Header from "@/components/Header";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 
-const statusConfig: Record<DressStatus, { label: string; className: string }> = {
+// Small line-art status icons, drawn in the same stroke-only style as the
+// DressPlaceholder illustration, so status reads as a design element (a
+// colored tag on the hanger) instead of a plain text pill.
+const iconProps = {
+  viewBox: "0 0 24 24",
+  fill: "none" as const,
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  className: "h-3 w-3",
+  "aria-hidden": true,
+};
+
+const PencilIcon = (
+  <svg {...iconProps}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+const ClockIcon = (
+  <svg {...iconProps}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 3" />
+  </svg>
+);
+const CheckIcon = (
+  <svg {...iconProps}>
+    <path d="M20 6 9 17l-5-5" />
+  </svg>
+);
+const XIcon = (
+  <svg {...iconProps}>
+    <path d="M18 6 6 18" />
+    <path d="M6 6l12 12" />
+  </svg>
+);
+
+const statusConfig: Record<
+  DressStatus,
+  { label: string; className: string; icon: ReactElement; barColor: string }
+> = {
 DRAFT: {
 label: "טיוטה",
 className: "bg-surface-sunken text-ink-soft",
+icon: PencilIcon,
+barColor: "bg-line-strong",
 },
 AI_PROCESSING: {
 label: "בעיבוד",
 className: "bg-sky-50 text-sky-700",
+icon: ClockIcon,
+barColor: "bg-sky-400",
 },
 AI_READY: {
 label: "מוכנה לבדיקה",
 className: "bg-sky-50 text-sky-700",
+icon: ClockIcon,
+barColor: "bg-sky-400",
 },
 OWNER_REVIEW: {
 label: "ממתינה לבדיקתך",
 className: "bg-warning-soft text-warning",
+icon: ClockIcon,
+barColor: "bg-warning",
 },
 PENDING_APPROVAL: {
 label: "ממתינה לאישור",
 className: "bg-warning-soft text-warning",
+icon: ClockIcon,
+barColor: "bg-warning",
 },
 APPROVED: {
 label: "מאושרת",
 className: "bg-success-soft text-success",
+icon: CheckIcon,
+barColor: "bg-success",
 },
 REJECTED: {
 label: "נדחתה",
 className: "bg-error-soft text-error",
+icon: XIcon,
+barColor: "bg-error",
 },
 };
 
@@ -278,7 +333,7 @@ return (<main
     ) : (
       /* Dress grid */
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {dresses.map((dress) => {
+        {dresses.map((dress, index) => {
           const imageUrl = getImageUrl(dress);
           const showImage = Boolean(imageUrl) && !failedImageIds.has(dress.id);
           const status = statusConfig[dress.status];
@@ -287,7 +342,8 @@ return (<main
             <Link
               key={dress.id}
               href={`/dresses/${dress.id}`}
-              className="group block overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+              className="animate-fade-scale-in group block overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+              style={{ animationDelay: `${Math.min(index, 10) * 60}ms` }}
             >
               {/* Image */}
               <div className="relative h-[380px] overflow-hidden bg-zinc-100">
@@ -306,8 +362,9 @@ return (<main
 
                 <div className="absolute right-4 top-4">
                   <span
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold shadow-sm backdrop-blur ${status.className}`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm backdrop-blur ${status.className}`}
                   >
+                    {status.icon}
                     {status.label}
                   </span>
                 </div>
@@ -319,11 +376,15 @@ return (<main
                 )}
               </div>
 
+              {/* Status spine - a thin colored seam between photo and info,
+                  so the state reads at a glance even before the badge text. */}
+              <div className={`h-1 w-full ${status.barColor}`} />
+
               {/* Content */}
               <div className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-xl font-black text-zinc-900">
+                    <h3 className="font-display text-xl font-semibold text-zinc-900">
                       {dress.name}
                     </h3>
 
