@@ -156,9 +156,9 @@ function parseDateInputValue(value: string): Date | null {
 }
 
 const STATUS_CELL_CLASSES: Record<DayStatus, string> = {
-  FREE: "bg-white text-zinc-700 ring-1 ring-zinc-200/70",
+  FREE: "bg-white text-zinc-700 ring-1 ring-line",
   INTERESTED: "bg-warning-soft text-warning ring-1 ring-warning-soft",
-  RENTED: "bg-accent text-white",
+  RENTED: "bg-accent text-white shadow-[0_6px_16px_-6px_rgba(156,55,82,0.55)]",
 };
 
 export default function DressAvailabilityCalendar({
@@ -180,6 +180,14 @@ export default function DressAvailabilityCalendar({
   const [jumpValue, setJumpValue] = useState("");
   const [highlightedDate, setHighlightedDate] = useState<Date | null>(null);
   const [detailDate, setDetailDate] = useState<Date | null>(null);
+  // Fixed once per mount, not recomputed per render - "today" doesn't change
+  // while this calendar is open, and this avoids any UTC-vs-local drift by
+  // matching the same UTC-midnight-anchored convention used everywhere else
+  // in this file.
+  const [todayUtc] = useState(() => {
+    const now = new Date();
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  });
   const hasSizes = sizes.length > 0;
 
   async function loadAvailability() {
@@ -238,9 +246,9 @@ export default function DressAvailabilityCalendar({
   }
 
   return (
-    <section className="mt-8 rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
+    <section className="mt-8 rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-line sm:p-6">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg font-bold text-zinc-900">זמינות</h2>
+        <h2 className="font-display text-lg font-semibold text-zinc-900">זמינות</h2>
       </div>
 
       {loading ? (
@@ -317,6 +325,7 @@ export default function DressAvailabilityCalendar({
                 highlightedDate !== null && isSameUtcDay(cell.date, highlightedDate);
               const isSelectedForDetail =
                 detailDate !== null && isSameUtcDay(cell.date, detailDate);
+              const isToday = isSameUtcDay(cell.date, todayUtc);
 
               return (
                 <button
@@ -328,12 +337,14 @@ export default function DressAvailabilityCalendar({
                       current && isSameUtcDay(current, cell.date) ? null : cell.date,
                     )
                   }
-                  className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:text-sm ${
+                  className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold transition-transform duration-150 sm:text-sm ${
                     STATUS_CELL_CLASSES[cell.status]
                   } ${cell.inCurrentMonth ? "" : "opacity-35"} ${
                     isHighlighted ? "ring-2 ring-sky-500 ring-offset-2" : ""
                   } ${isSelectedForDetail ? "ring-2 ring-zinc-900 ring-offset-2" : ""} ${
-                    hasSizes ? "cursor-pointer" : "cursor-default"
+                    isToday ? "outline outline-2 outline-offset-1 outline-accent" : ""
+                  } ${
+                    hasSizes ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
                   }`}
                 >
                   <span>{cell.date.getUTCDate()}</span>
@@ -373,7 +384,7 @@ export default function DressAvailabilityCalendar({
 
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-zinc-100 pt-4 text-xs text-zinc-500">
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded ring-1 ring-zinc-200/70" />
+              <span className="h-3 w-3 rounded ring-1 ring-line" />
               פנוי
             </div>
             <div className="flex items-center gap-1.5">
@@ -383,6 +394,10 @@ export default function DressAvailabilityCalendar({
             <div className="flex items-center gap-1.5">
               <span className="h-3 w-3 rounded bg-accent" />
               מושכר
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded outline outline-2 outline-offset-1 outline-accent" />
+              היום
             </div>
           </div>
         </>

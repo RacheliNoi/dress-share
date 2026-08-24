@@ -337,8 +337,8 @@ export default function DressAvailabilityManager({
     <section className="mt-8 space-y-6">
       <DressAvailabilityCalendar dressId={dressId} sizes={sizes} key={calendarKey} />
 
-      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
-        <h2 className="text-lg font-bold text-zinc-900">ניהול זמינות</h2>
+      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-line sm:p-6">
+        <h2 className="font-display text-lg font-semibold text-zinc-900">ניהול זמינות</h2>
         <p className="mt-1 text-sm text-zinc-500">
           {hasSizes
             ? 'סמני טווח תאריכים כ"מישהו מתעניין" או כ"מושכר" - אפשר לבחור כמה מידות בבת אחת.'
@@ -487,8 +487,8 @@ export default function DressAvailabilityManager({
         </form>
       </div>
 
-      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 sm:p-6">
-        <h2 className="text-lg font-bold text-zinc-900">הזמנות זמינות</h2>
+      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-line sm:p-6">
+        <h2 className="font-display text-lg font-semibold text-zinc-900">הזמנות זמינות</h2>
 
         {actionError && (
           <div className="mt-3 rounded-2xl bg-error-soft p-4 text-sm text-error">
@@ -532,116 +532,129 @@ export default function DressAvailabilityManager({
               const matchingSize = sizes.find(
                 (size) => size.size === booking.size,
               );
+              // Same status-as-spine device already established on the "My
+              // Dresses" cards - reused here, not reinvented, so the two
+              // screens share one visual language for status.
+              const spineColor =
+                booking.status === "RENTED"
+                  ? "bg-accent"
+                  : booking.status === "INTERESTED"
+                    ? "bg-warning"
+                    : "bg-line-strong";
 
               return (
-                <li key={booking.id} className="py-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}
-                        >
-                          {badge.label}
-                        </span>
-                        {booking.size && (
-                          <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
-                            מידה {booking.size}
+                <li key={booking.id} className="flex gap-3 py-4">
+                  <span aria-hidden className={`w-1 shrink-0 self-stretch rounded-full ${spineColor}`} />
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}
+                          >
+                            {badge.label}
                           </span>
-                        )}
+                          {booking.size && (
+                            <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
+                              מידה {booking.size}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* dir="ltr" pins the digit order - without it, the
+                            Unicode bidi algorithm can visually swap the two
+                            LTR date runs around the "–" inside this RTL page,
+                            even though the underlying text is already correct. */}
+                        <p dir="ltr" className="mt-1.5 text-right text-sm font-semibold text-ink">
+                          {formatDate(booking.startDate)} – {formatDate(booking.endDate)}
+                        </p>
                       </div>
 
-                      {/* dir="ltr" pins the digit order - without it, the
-                          Unicode bidi algorithm can visually swap the two
-                          LTR date runs around the "–" inside this RTL page,
-                          even though the underlying text is already correct. */}
-                      <p dir="ltr" className="mt-1.5 text-right text-sm text-zinc-700">
-                        {formatDate(booking.startDate)} – {formatDate(booking.endDate)}
-                      </p>
-                    </div>
+                      {booking.status === "INTERESTED" && !isRentingThis && (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openRentForm(booking.id)}
+                            disabled={actioningId === booking.id || !hasSizes}
+                            title={
+                              hasSizes
+                                ? undefined
+                                : "יש להגדיר מידות ומחירים לשמלה לפני השכרה"
+                            }
+                            className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            הפכי למושכר
+                          </button>
 
-                    {booking.status === "INTERESTED" && !isRentingThis && (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openRentForm(booking.id)}
-                          disabled={actioningId === booking.id || !hasSizes}
-                          title={
-                            hasSizes
-                              ? undefined
-                              : "יש להגדיר מידות ומחירים לשמלה לפני השכרה"
-                          }
-                          className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          הפכי למושכר
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCancel(booking.id)}
+                            disabled={actioningId === booking.id}
+                            className="rounded-xl border border-error-soft px-4 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            ביטול
+                          </button>
+                        </div>
+                      )}
 
+                      {booking.status === "RENTED" && (
                         <button
                           type="button"
                           onClick={() => handleCancel(booking.id)}
                           disabled={actioningId === booking.id}
-                          className="rounded-xl border border-error-soft px-4 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50"
+                          className="self-start rounded-xl border border-error-soft px-4 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50 sm:self-center"
                         >
-                          ביטול
+                          ביטול השכרה
                         </button>
-                      </div>
-                    )}
-
-                    {booking.status === "RENTED" && (
-                      <button
-                        type="button"
-                        onClick={() => handleCancel(booking.id)}
-                        disabled={actioningId === booking.id}
-                        className="self-start rounded-xl border border-error-soft px-4 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50 sm:self-center"
-                      >
-                        ביטול השכרה
-                      </button>
-                    )}
-                  </div>
-
-                  {booking.status === "INTERESTED" && isRentingThis && (
-                    <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                      {!hasSizes ? (
-                        <p className="text-sm font-medium text-warning">
-                          לא ניתן לסמן את השמלה כמושכרת לפני שמוגדרות לה מידות
-                          ומחירים. הוסיפי מידות בעמוד העריכה של השמלה.
-                        </p>
-                      ) : !booking.size || !matchingSize ? (
-                        <p className="text-sm font-medium text-warning">
-                          לא ניתן להשלים את ההשכרה - למידה שנבחרה בהתעניינות
-                          עדיין אין הגדרת מחיר תקפה עבור שמלה זו.
-                        </p>
-                      ) : (
-                        <>
-                          <p className="text-sm text-zinc-700">
-                            מידה: <span className="font-bold">{matchingSize.size}</span>{" "}
-                            · מחיר: <span className="font-bold">{matchingSize.price} ₪</span>
-                          </p>
-                          <p className="mt-1 text-xs text-zinc-400">
-                            המידה נקבעה כשההתעניינות נוצרה ולא ניתנת לשינוי בשלב זה.
-                          </p>
-
-                          <div className="mt-3 flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmRent(booking.id)}
-                              disabled={actioningId === booking.id}
-                              className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              אישור השכרה
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelRentForm}
-                              disabled={actioningId === booking.id}
-                              className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-bold text-zinc-600 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              ביטול
-                            </button>
-                          </div>
-                        </>
                       )}
                     </div>
-                  )}
+
+                    {booking.status === "INTERESTED" && isRentingThis && (
+                      <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                        {!hasSizes ? (
+                          <p className="text-sm font-medium text-warning">
+                            לא ניתן לסמן את השמלה כמושכרת לפני שמוגדרות לה מידות
+                            ומחירים. הוסיפי מידות בעמוד העריכה של השמלה.
+                          </p>
+                        ) : !booking.size || !matchingSize ? (
+                          <p className="text-sm font-medium text-warning">
+                            לא ניתן להשלים את ההשכרה - למידה שנבחרה בהתעניינות
+                            עדיין אין הגדרת מחיר תקפה עבור שמלה זו.
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-sm text-zinc-700">
+                              מידה: <span className="font-bold">{matchingSize.size}</span>{" "}
+                              · מחיר: <span className="font-bold">{matchingSize.price} ₪</span>
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-400">
+                              המידה נקבעה כשההתעניינות נוצרה ולא ניתנת לשינוי בשלב זה.
+                            </p>
+
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmRent(booking.id)}
+                                disabled={actioningId === booking.id}
+                                className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                אישור השכרה
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelRentForm}
+                                disabled={actioningId === booking.id}
+                                className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-bold text-zinc-600 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                ביטול
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </li>
               );
             })}
