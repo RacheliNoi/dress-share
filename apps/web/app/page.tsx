@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import DressCard from "@/components/DressCard";
 import CatalogFilters, { SortOption } from "@/components/CatalogFilters";
 import {
+  CatalogFilterParams,
   Dress,
   DressAvailabilityEntry,
   DressSize,
@@ -13,13 +14,11 @@ import {
 } from "@/lib/api";
 import { getSizeUsageForDay } from "@/lib/availability";
 
-function getMinPrice(dress: Dress): number | null {
-  if (dress.sizes.length === 0) {
-    return null;
-  }
-
-  return Math.min(...dress.sizes.map((size) => size.price));
-}
+// How long to wait after the last keystroke before the search box triggers a
+// server request - typing shouldn't fire a request per character. Only
+// search is debounced (category/color/size/price/sort already come from
+// discrete selects/inputs that don't fire nearly as often).
+const SEARCH_DEBOUNCE_MS = 350;
 
 function uniqueSorted(values: (string | null)[]): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort(
@@ -96,11 +95,27 @@ function isDressAvailableOnDate(dress: Dress, dateValue: string, entries: DressA
 }
 
 export default function CatalogPage() {
+  // The ONLY source for the displayed grid - always exactly what the server
+  // returned for the current search/category/color/size/price/sort. Never
+  // filtered or re-sorted client-side beyond the availability-date pass
+  // below (which the backend has no endpoint for yet).
   const [dresses, setDresses] = useState<Dress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Fetched once, unfiltered, on mount - used ONLY to derive the filter
+  // dropdown option lists (categories/colors/sizes/priceBounds) and the
+  // "total in catalog" count, so those never shrink just because a filter
+  // is currently narrowing the grid. Never rendered as cards, never
+  // filtered/sorted, never touched by the availability-date pass.
+  const [optionsDresses, setOptionsDresses] = useState<Dress[]>([]);
+
   const [search, setSearch] = useState("");
+  // The value actually sent to the server - updates SEARCH_DEBOUNCE_MS after
+  // the user stops typing. `search` itself still drives the input's
+  // displayed value directly, so typing feels instant even though the
+  // request lags slightly behind.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
@@ -120,22 +135,71 @@ export default function CatalogPage() {
   );
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
-  async function loadDresses() {
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  const priceMinValue = priceMin.trim() === "" ? null : Number(priceMin);
+  const priceMaxValue = priceMax.trim() === "" ? null : Number(priceMax);
+
+  // Rebuilt whenever a filter/sort/the debounced search changes; also reused
+  // directly as the error banner's retry handler, matching this file's
+  // existing pattern of a named loader function wired to both a mount effect
+  // and a manual retry button.
+  const loadDresses = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const data = await getApprovedDresses();
+      const params: CatalogFilterParams = {
+        search: debouncedSearch.trim() || undefined,
+        category: selectedCategory || undefined,
+        color: selectedColor || undefined,
+        size: selectedSize || undefined,
+        priceMin: priceMinValue ?? undefined,
+        priceMax: priceMaxValue ?? undefined,
+        // Omitted (not just "recommended") on the default/no-filter case, so
+        // the very first load fires the exact same bare request as before
+        // this endpoint accepted any query params at all.
+        sort: sort === "recommended" ? undefined : sort,
+      };
+
+      const data = await getApprovedDresses(params);
       setDresses(data);
     } catch {
       setError("לא הצלחנו לטעון את הקטלוג. נסי שוב.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [debouncedSearch, selectedCategory, selectedColor, selectedSize, priceMinValue, priceMaxValue, sort]);
 
   useEffect(() => {
     loadDresses();
+  }, [loadDresses]);
+
+  // One-time, unfiltered - see optionsDresses' declaration above. Failing
+  // silently here just leaves the dropdown option lists empty (the same
+  // graceful-empty rendering CatalogFilters already does when a list is
+  // empty), rather than surfacing a second error banner for a background,
+  // non-essential fetch.
+  useEffect(() => {
+    let cancelled = false;
+
+    getApprovedDresses()
+      .then((data) => {
+        if (!cancelled) {
+          setOptionsDresses(data);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetches per-dress availability (GET /bookings/dress/:id/availability -
@@ -204,93 +268,48 @@ export default function CatalogPage() {
     };
   }, [availabilityDate, dresses, availabilityCache, availabilityErrorIds]);
 
+  // Derived from optionsDresses (the unfiltered catalog) ONLY - these must
+  // never shrink just because a filter is currently narrowing the grid.
   const categories = useMemo(
-    () => uniqueSorted(dresses.map((dress) => dress.category)),
-    [dresses],
+    () => uniqueSorted(optionsDresses.map((dress) => dress.category)),
+    [optionsDresses],
   );
   const colors = useMemo(
-    () => uniqueSorted(dresses.map((dress) => dress.color)),
-    [dresses],
+    () => uniqueSorted(optionsDresses.map((dress) => dress.color)),
+    [optionsDresses],
   );
   const sizes = useMemo(
     () =>
-      uniqueSorted(dresses.flatMap((dress) => dress.sizes.map((size) => size.size))),
-    [dresses],
+      uniqueSorted(optionsDresses.flatMap((dress) => dress.sizes.map((size) => size.size))),
+    [optionsDresses],
   );
   const priceBounds = useMemo(() => {
-    const prices = dresses.flatMap((dress) => dress.sizes.map((size) => size.price));
+    const prices = optionsDresses.flatMap((dress) => dress.sizes.map((size) => size.price));
 
     if (prices.length === 0) {
       return null;
     }
 
     return { min: Math.min(...prices), max: Math.max(...prices) };
-  }, [dresses]);
+  }, [optionsDresses]);
 
-  const priceMinValue = priceMin.trim() === "" ? null : Number(priceMin);
-  const priceMaxValue = priceMax.trim() === "" ? null : Number(priceMax);
-
-  const filteredDresses = useMemo(() => {
-    let result = dresses;
-
-    const query = search.trim().toLowerCase();
-    if (query) {
-      result = result.filter((dress) => {
-        const haystack = [dress.name, dress.category, dress.color, dress.description]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        return haystack.includes(query);
-      });
+  // The only client-side filtering left - the backend has no availability
+  // endpoint that accepts a date yet, so this still runs here, applied on
+  // top of the server's already-filtered/sorted `dresses`. `.filter()`
+  // preserves the server's ordering, so no re-sort is needed afterward.
+  const visibleDresses = useMemo(() => {
+    if (!availabilityDate) {
+      return dresses;
     }
 
-    if (selectedCategory) {
-      result = result.filter((dress) => dress.category === selectedCategory);
-    }
-
-    if (selectedColor) {
-      result = result.filter((dress) => dress.color === selectedColor);
-    }
-
-    if (selectedSize) {
-      result = result.filter((dress) =>
-        dress.sizes.some((size) => size.size === selectedSize),
-      );
-    }
-
-    if (priceMinValue !== null || priceMaxValue !== null) {
-      result = result.filter((dress) =>
-        dress.sizes.some((size) => {
-          if (priceMinValue !== null && size.price < priceMinValue) return false;
-          if (priceMaxValue !== null && size.price > priceMaxValue) return false;
-          return true;
-        }),
-      );
-    }
-
-    if (availabilityDate) {
-      result = result.filter((dress) => {
-        const entries = availabilityCache[dress.id];
-        // Not loaded yet (or failed to load) - fail open rather than
-        // hiding a dress we simply don't have an answer for yet.
-        if (!entries) return true;
-        return isDressAvailableOnDate(dress, availabilityDate, entries);
-      });
-    }
-
-    return result;
-  }, [
-    dresses,
-    search,
-    selectedCategory,
-    selectedColor,
-    selectedSize,
-    priceMinValue,
-    priceMaxValue,
-    availabilityDate,
-    availabilityCache,
-  ]);
+    return dresses.filter((dress) => {
+      const entries = availabilityCache[dress.id];
+      // Not loaded yet (or failed to load) - fail open rather than hiding a
+      // dress we simply don't have an answer for yet.
+      if (!entries) return true;
+      return isDressAvailableOnDate(dress, availabilityDate, entries);
+    });
+  }, [dresses, availabilityDate, availabilityCache]);
 
   // For dresses that stay in the results (>= 1 free size), this drives the
   // per-size available/blocked chip styling on each DressCard.
@@ -331,35 +350,6 @@ export default function CatalogPage() {
     return map;
   }, [availabilityDate, availabilityCache, dresses]);
 
-  const sortedDresses = useMemo(() => {
-    if (sort === "recommended") {
-      return filteredDresses;
-    }
-
-    const result = [...filteredDresses];
-
-    if (sort === "newest") {
-      result.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-      return result;
-    }
-
-    const direction = sort === "price-asc" ? 1 : -1;
-    result.sort((a, b) => {
-      const priceA = getMinPrice(a);
-      const priceB = getMinPrice(b);
-
-      if (priceA === null && priceB === null) return 0;
-      if (priceA === null) return 1;
-      if (priceB === null) return -1;
-
-      return (priceA - priceB) * direction;
-    });
-
-    return result;
-  }, [filteredDresses, sort]);
-
   const hasActiveFilters = Boolean(
     search.trim() ||
       selectedCategory ||
@@ -370,8 +360,17 @@ export default function CatalogPage() {
       availabilityDate,
   );
 
-  function resetFilters() {
+  // Clears both the input's live value and the debounced value it feeds -
+  // without also resetting debouncedSearch directly, the refetch that
+  // follows a reset would still wait out SEARCH_DEBOUNCE_MS instead of
+  // firing immediately, which would make "reset" feel laggy.
+  function clearSearch() {
     setSearch("");
+    setDebouncedSearch("");
+  }
+
+  function resetFilters() {
+    clearSearch();
     setSelectedCategory("");
     setSelectedColor("");
     setSelectedSize("");
@@ -384,7 +383,7 @@ export default function CatalogPage() {
     search.trim() && {
       key: "search",
       label: `"${search.trim()}"`,
-      onRemove: () => setSearch(""),
+      onRemove: clearSearch,
     },
     selectedCategory && {
       key: "category",
@@ -525,7 +524,12 @@ export default function CatalogPage() {
             </p>
           </section>
 
-          {!loading && dresses.length > 0 && (
+          {/* dresses.length > 0 covers the normal case; hasActiveFilters
+              keeps the panel visible (so filters stay adjustable/removable)
+              even when the current filter combination matches nothing -
+              matching this panel's original visibility rule from when
+              `dresses` still held the full unfiltered catalog. */}
+          {!loading && (dresses.length > 0 || hasActiveFilters) && (
             <CatalogFilters
               search={search}
               onSearchChange={setSearch}
@@ -548,8 +552,8 @@ export default function CatalogPage() {
               availabilityDate={availabilityDate}
               onAvailabilityDateChange={setAvailabilityDate}
               availabilityLoading={availabilityLoading}
-              resultCount={sortedDresses.length}
-              totalCount={dresses.length}
+              resultCount={visibleDresses.length}
+              totalCount={optionsDresses.length}
               hasActiveFilters={hasActiveFilters}
               onReset={resetFilters}
               chips={chips}
@@ -592,7 +596,7 @@ export default function CatalogPage() {
                 </div>
               ))}
             </div>
-          ) : dresses.length === 0 ? (
+          ) : !hasActiveFilters && dresses.length === 0 ? (
             /* No dresses in the catalog at all (nothing extra to say if an
                error already explains why - avoids stacking two messages) */
             error ? null : (
@@ -610,7 +614,7 @@ export default function CatalogPage() {
                 </p>
               </section>
             )
-          ) : sortedDresses.length === 0 ? (
+          ) : visibleDresses.length === 0 ? (
             /* Dresses exist, but none match the current search/filters */
             <section className="rounded-[28px] border border-dashed border-zinc-300 bg-white px-6 py-16 text-center shadow-sm sm:py-20">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-accent-soft via-zinc-50 to-purple-50 text-4xl">
@@ -639,7 +643,7 @@ export default function CatalogPage() {
             /* Dress grid (kept visible even if a later refresh fails, so a
                failed retry doesn't wipe out already-loaded results) */
             <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
-              {sortedDresses.map((dress, index) => (
+              {visibleDresses.map((dress, index) => (
                 <DressCard
                   key={dress.id}
                   dress={dress}

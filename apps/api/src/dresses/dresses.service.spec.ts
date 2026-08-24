@@ -125,6 +125,237 @@ describe('DressesService', () => {
         orderBy: { sortOrder: 'asc' },
       });
     });
+
+    // 1. no params preserves current behavior
+    it('with no arguments, queries exactly { status: APPROVED } and createdAt-desc order (no AND, no params object required)', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved();
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({ status: DressStatus.APPROVED });
+      expect(call.orderBy).toEqual({ createdAt: 'desc' });
+    });
+
+    it('an explicit empty params object behaves identically to no arguments', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({});
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({ status: DressStatus.APPROVED });
+    });
+
+    // 2. search
+    it('search matches name/category/color/description, case-insensitively, and trims whitespace', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ search: '  Cocktail  ' });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({
+        status: DressStatus.APPROVED,
+        AND: [
+          {
+            OR: [
+              { name: { contains: 'Cocktail', mode: 'insensitive' } },
+              { category: { contains: 'Cocktail', mode: 'insensitive' } },
+              { color: { contains: 'Cocktail', mode: 'insensitive' } },
+              { description: { contains: 'Cocktail', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('a whitespace-only search is treated as no search at all', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ search: '   ' });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({ status: DressStatus.APPROVED });
+    });
+
+    // 3. category
+    it('filters by exact category', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ category: 'ערב' });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({
+        status: DressStatus.APPROVED,
+        AND: [{ category: 'ערב' }],
+      });
+    });
+
+    // 4. color
+    it('filters by exact color', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ color: 'אדום' });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({
+        status: DressStatus.APPROVED,
+        AND: [{ color: 'אדום' }],
+      });
+    });
+
+    // 5. size
+    it('filters by size, matching only live-or-pending-removal DressSize rows', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ size: 'M' });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({
+        status: DressStatus.APPROVED,
+        AND: [
+          {
+            sizes: {
+              some: {
+                OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+                size: 'M',
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    // 6. priceMin/priceMax
+    it('filters by priceMin only', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ priceMin: 200 });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where.AND).toEqual([
+        {
+          sizes: {
+            some: {
+              OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+              price: { gte: 200 },
+            },
+          },
+        },
+      ]);
+    });
+
+    it('filters by priceMax only', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ priceMax: 500 });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where.AND).toEqual([
+        {
+          sizes: {
+            some: {
+              OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+              price: { lte: 500 },
+            },
+          },
+        },
+      ]);
+    });
+
+    it('filters by priceMin and priceMax together', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ priceMin: 200, priceMax: 500 });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where.AND).toEqual([
+        {
+          sizes: {
+            some: {
+              OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+              price: { gte: 200, lte: 500 },
+            },
+          },
+        },
+      ]);
+    });
+
+    it('combines multiple filters independently with AND (size and price need not share one DressSize row)', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ category: 'כלה', size: 'M', priceMin: 100 });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where.AND).toEqual([
+        { category: 'כלה' },
+        {
+          sizes: {
+            some: {
+              OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+              size: 'M',
+            },
+          },
+        },
+        {
+          sizes: {
+            some: {
+              OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+              price: { gte: 100 },
+            },
+          },
+        },
+      ]);
+    });
+
+    // 7. each sort mode
+    it('sort "recommended" (or omitted) keeps the default createdAt-desc DB order and applies no further re-sort', async () => {
+      const unsorted = [
+        { id: 1, createdAt: new Date('2026-01-01'), sizes: [{ price: 500 }] },
+        { id: 2, createdAt: new Date('2026-02-01'), sizes: [{ price: 100 }] },
+      ];
+      prisma.dress.findMany.mockResolvedValue(unsorted);
+
+      const result = await service.findApproved({ sort: 'recommended' });
+
+      expect(result).toBe(unsorted);
+      expect(prisma.dress.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+      );
+    });
+
+    it('sort "newest" uses the same createdAt-desc DB order', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ sort: 'newest' });
+
+      expect(prisma.dress.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+      );
+    });
+
+    it('sort "price-asc" orders by each dress\'s cheapest size price, ascending; dresses with no sizes sort last', async () => {
+      prisma.dress.findMany.mockResolvedValue([
+        { id: 1, sizes: [{ price: 500 }, { price: 300 }] },
+        { id: 2, sizes: [] },
+        { id: 3, sizes: [{ price: 100 }] },
+      ]);
+
+      const result = await service.findApproved({ sort: 'price-asc' });
+
+      expect(result.map((dress: { id: number }) => dress.id)).toEqual([3, 1, 2]);
+    });
+
+    it('sort "price-desc" orders by each dress\'s cheapest size price, descending; dresses with no sizes still sort last', async () => {
+      prisma.dress.findMany.mockResolvedValue([
+        { id: 1, sizes: [{ price: 500 }, { price: 300 }] },
+        { id: 2, sizes: [] },
+        { id: 3, sizes: [{ price: 100 }] },
+      ]);
+
+      const result = await service.findApproved({ sort: 'price-desc' });
+
+      expect(result.map((dress: { id: number }) => dress.id)).toEqual([1, 3, 2]);
+    });
   });
 
   describe('submitForApproval', () => {

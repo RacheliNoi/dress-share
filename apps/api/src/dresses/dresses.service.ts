@@ -30,6 +30,21 @@ type PendingDetails = {
   color?: string | null;
 };
 
+// Mirrors the frontend's CatalogFilters SortOption exactly, so this can be
+// wired straight through from a future controller @Query() without any
+// translation layer.
+export type CatalogSortOption = 'recommended' | 'newest' | 'price-asc' | 'price-desc';
+
+export type FindApprovedParams = {
+  search?: string;
+  category?: string;
+  color?: string;
+  size?: string;
+  priceMin?: number;
+  priceMax?: number;
+  sort?: CatalogSortOption;
+};
+
 @Injectable()
 export class DressesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -77,11 +92,68 @@ export class DressesService {
   // never selected - an in-review edit to an already-approved dress must
   // never leak to the public before an admin approves it. sizes/photos are
   // filtered to LIVE_OR_PENDING_REMOVAL for the same reason.
-  async findApproved() {
-    return this.prisma.dress.findMany({
-      where: {
-        status: DressStatus.APPROVED,
-      },
+  //
+  // All filter/sort params are optional and additive - calling this with no
+  // arguments (or an empty object) produces byte-for-byte the same query and
+  // ordering as before this method accepted any params at all.
+  //
+  // size/priceMin/priceMax are each evaluated independently against the
+  // dress's applicable (LIVE_OR_PENDING_REMOVAL) sizes - matching a size
+  // filter and a price filter doesn't require the same DressSize row to
+  // satisfy both, mirroring how the existing client-side catalog filters in
+  // app/page.tsx already treat them as independent conditions.
+  async findApproved(params: FindApprovedParams = {}) {
+    const { search, category, color, size, priceMin, priceMax, sort } = params;
+
+    const andConditions: Prisma.DressWhereInput[] = [];
+
+    const trimmedSearch = search?.trim();
+    if (trimmedSearch) {
+      andConditions.push({
+        OR: [
+          { name: { contains: trimmedSearch, mode: 'insensitive' } },
+          { category: { contains: trimmedSearch, mode: 'insensitive' } },
+          { color: { contains: trimmedSearch, mode: 'insensitive' } },
+          { description: { contains: trimmedSearch, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (category) {
+      andConditions.push({ category });
+    }
+
+    if (color) {
+      andConditions.push({ color });
+    }
+
+    if (size) {
+      andConditions.push({
+        sizes: { some: { ...LIVE_OR_PENDING_REMOVAL, size } },
+      });
+    }
+
+    if (priceMin !== undefined || priceMax !== undefined) {
+      andConditions.push({
+        sizes: {
+          some: {
+            ...LIVE_OR_PENDING_REMOVAL,
+            price: {
+              ...(priceMin !== undefined ? { gte: priceMin } : {}),
+              ...(priceMax !== undefined ? { lte: priceMax } : {}),
+            },
+          },
+        },
+      });
+    }
+
+    const where: Prisma.DressWhereInput = {
+      status: DressStatus.APPROVED,
+      ...(andConditions.length > 0 ? { AND: andConditions } : {}),
+    };
+
+    const dresses = await this.prisma.dress.findMany({
+      where,
       select: {
         id: true,
         name: true,
@@ -96,10 +168,45 @@ export class DressesService {
         sizes: { where: LIVE_OR_PENDING_REMOVAL },
         photos: { where: LIVE_OR_PENDING_REMOVAL, orderBy: { sortOrder: 'asc' } },
       },
+      // "recommended" (the default/unset case) and "newest" both use this
+      // same createdAt-desc order - price sorts are applied afterwards, in
+      // application code, since Prisma has no built-in way to order a
+      // findMany by an aggregate (min/max) of a to-many relation's field.
       orderBy: {
         createdAt: 'desc',
       },
     });
+
+    if (sort === 'price-asc' || sort === 'price-desc') {
+      return this.sortByMinSizePrice(dresses, sort === 'price-asc' ? 1 : -1);
+    }
+
+    return dresses;
+  }
+
+  // Sorts by each dress's cheapest applicable size price. A dress with no
+  // sizes at all always sorts last, regardless of direction - mirrors
+  // getMinPrice/sortedDresses in app/page.tsx exactly, so moving this sort
+  // server-side later won't change what users see.
+  private sortByMinSizePrice<T extends { sizes: { price: number }[] }>(
+    dresses: T[],
+    direction: 1 | -1,
+  ): T[] {
+    const withMinPrice = dresses.map((dress) => ({
+      dress,
+      minPrice:
+        dress.sizes.length > 0 ? Math.min(...dress.sizes.map((s) => s.price)) : null,
+    }));
+
+    withMinPrice.sort((a, b) => {
+      if (a.minPrice === null && b.minPrice === null) return 0;
+      if (a.minPrice === null) return 1;
+      if (b.minPrice === null) return -1;
+
+      return (a.minPrice - b.minPrice) * direction;
+    });
+
+    return withMinPrice.map((entry) => entry.dress);
   }
 
   async create(data: {

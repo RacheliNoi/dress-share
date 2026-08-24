@@ -1,3 +1,5 @@
+import type { SortOption } from "@/components/CatalogFilters";
+
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -161,8 +163,41 @@ export function resetPassword(data: {
   });
 }
 
-export function getApprovedDresses() {
-  return request<Dress[]>("/dresses/approved");
+// Mirrors DressesService.FindApprovedParams on the backend (apps/api/src/
+// dresses/dresses.service.ts) field-for-field - all optional, all additive.
+// Calling getApprovedDresses() with no params (or all-undefined fields)
+// produces the exact same request as before this type existed.
+export type CatalogFilterParams = {
+  search?: string;
+  category?: string;
+  color?: string;
+  size?: string;
+  priceMin?: number;
+  priceMax?: number;
+  sort?: SortOption;
+};
+
+function buildCatalogQuery(params?: CatalogFilterParams): string {
+  if (!params) {
+    return "";
+  }
+
+  const searchParams = new URLSearchParams();
+
+  if (params.search) searchParams.set("search", params.search);
+  if (params.category) searchParams.set("category", params.category);
+  if (params.color) searchParams.set("color", params.color);
+  if (params.size) searchParams.set("size", params.size);
+  if (params.priceMin !== undefined) searchParams.set("priceMin", String(params.priceMin));
+  if (params.priceMax !== undefined) searchParams.set("priceMax", String(params.priceMax));
+  if (params.sort) searchParams.set("sort", params.sort);
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+export function getApprovedDresses(params?: CatalogFilterParams) {
+  return request<Dress[]>(`/dresses/approved${buildCatalogQuery(params)}`);
 }
 
 // There is no GET /dresses/:id endpoint on the backend, so a single

@@ -16,8 +16,25 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { DressesService } from './dresses.service';
+import type { CatalogSortOption } from './dresses.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+
+// Query params always arrive as strings (or are absent/omitted) - never
+// trusted as-is for a field that's an Int column in Postgres
+// (DressSize.price), since passing a non-integer to Prisma's gte/lte for an
+// Int field throws a validation error rather than just miscomparing. An
+// unparseable value is treated as "not provided" rather than failing the
+// whole public catalog request over one malformed query param.
+function parseOptionalIntQueryParam(value?: string): number | undefined {
+  if (value === undefined || value.trim() === '') {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) ? parsed : undefined;
+}
 
 @Controller('dresses')
 export class DressesController {
@@ -29,9 +46,29 @@ export class DressesController {
     return this.dressesService.findByOwner(user.sub);
   }
 
+  // Public, unauthenticated - unchanged. All params are optional; with none
+  // supplied this calls findApproved() with every field undefined, which
+  // produces byte-for-byte the same query as before this endpoint accepted
+  // any query params at all.
   @Get('approved')
-  findApproved() {
-    return this.dressesService.findApproved();
+  findApproved(
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+    @Query('color') color?: string,
+    @Query('size') size?: string,
+    @Query('priceMin') priceMin?: string,
+    @Query('priceMax') priceMax?: string,
+    @Query('sort') sort?: CatalogSortOption,
+  ) {
+    return this.dressesService.findApproved({
+      search,
+      category,
+      color,
+      size,
+      priceMin: parseOptionalIntQueryParam(priceMin),
+      priceMax: parseOptionalIntQueryParam(priceMax),
+      sort,
+    });
   }
 
   @UseGuards(JwtAuthGuard)

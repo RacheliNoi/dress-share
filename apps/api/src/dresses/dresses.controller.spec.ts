@@ -88,6 +88,121 @@ describe('DressesController', () => {
         }),
       );
     });
+
+    // 1. no query params
+    it('with no query params, adds no extra AND filters (existing default behavior preserved)', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer()).get('/dresses/approved').expect(200);
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({ status: DressStatus.APPROVED });
+      expect(call.orderBy).toEqual({ createdAt: 'desc' });
+    });
+
+    // 2. forwarding search/category/color/size
+    it('forwards search, category, color, and size query params to the service', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/dresses/approved')
+        .query({ search: 'ערב', category: 'קוקטייל', color: 'אדום', size: 'M' })
+        .expect(200);
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where.AND).toEqual([
+        {
+          OR: [
+            { name: { contains: 'ערב', mode: 'insensitive' } },
+            { category: { contains: 'ערב', mode: 'insensitive' } },
+            { color: { contains: 'ערב', mode: 'insensitive' } },
+            { description: { contains: 'ערב', mode: 'insensitive' } },
+          ],
+        },
+        { category: 'קוקטייל' },
+        { color: 'אדום' },
+        {
+          sizes: {
+            some: {
+              OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+              size: 'M',
+            },
+          },
+        },
+      ]);
+    });
+
+    // 3. forwarding priceMin/priceMax
+    it('parses and forwards priceMin/priceMax query params as integers', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/dresses/approved')
+        .query({ priceMin: '200', priceMax: '500' })
+        .expect(200);
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where.AND).toEqual([
+        {
+          sizes: {
+            some: {
+              OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }],
+              price: { gte: 200, lte: 500 },
+            },
+          },
+        },
+      ]);
+    });
+
+    it('treats a non-numeric priceMin/priceMax as not provided rather than erroring', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/dresses/approved')
+        .query({ priceMin: 'not-a-number', priceMax: '12.5' })
+        .expect(200);
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({ status: DressStatus.APPROVED });
+    });
+
+    // 4. forwarding sort
+    it('forwards sort=price-asc and returns dresses ordered by cheapest size price', async () => {
+      prisma.dress.findMany.mockResolvedValue([
+        { id: 1, sizes: [{ price: 500 }] },
+        { id: 2, sizes: [{ price: 100 }] },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/dresses/approved')
+        .query({ sort: 'price-asc' })
+        .expect(200);
+
+      expect(response.body.map((dress: { id: number }) => dress.id)).toEqual([2, 1]);
+    });
+
+    it('forwards sort=newest using the same createdAt-desc DB order', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/dresses/approved')
+        .query({ sort: 'newest' })
+        .expect(200);
+
+      expect(prisma.dress.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+      );
+    });
+
+    // 5. route remains publicly accessible
+    it('remains publicly accessible (no Authorization header) even with query params supplied', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/dresses/approved')
+        .query({ search: 'x', category: 'y', priceMin: '10' })
+        .expect(200);
+    });
   });
 
   describe('POST /dresses/:id/submit', () => {
