@@ -59,6 +59,8 @@ export class DressesController {
     @Query('priceMin') priceMin?: string,
     @Query('priceMax') priceMax?: string,
     @Query('sort') sort?: CatalogSortOption,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.dressesService.findApproved({
       search,
@@ -68,6 +70,8 @@ export class DressesController {
       priceMin: parseOptionalIntQueryParam(priceMin),
       priceMax: parseOptionalIntQueryParam(priceMax),
       sort,
+      page: parseOptionalIntQueryParam(page),
+      limit: parseOptionalIntQueryParam(limit),
     });
   }
 

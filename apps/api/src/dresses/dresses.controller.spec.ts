@@ -20,6 +20,7 @@ describe('DressesController', () => {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      count: jest.Mock;
     };
     dressPhoto: {
       findUnique: jest.Mock;
@@ -41,6 +42,7 @@ describe('DressesController', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       dressPhoto: {
         findUnique: jest.fn(),
@@ -70,18 +72,20 @@ describe('DressesController', () => {
   });
 
   describe('GET /dresses/approved', () => {
-    it('is publicly accessible and returns only APPROVED dresses', async () => {
+    it('is publicly accessible and returns only APPROVED dresses, plus a total count', async () => {
       prisma.dress.findMany.mockResolvedValue([
         { id: 1, status: DressStatus.APPROVED },
       ]);
+      prisma.dress.count.mockResolvedValue(1);
 
       const response = await request(app.getHttpServer())
         .get('/dresses/approved')
         .expect(200);
 
-      expect(response.body).toEqual([
-        { id: 1, status: DressStatus.APPROVED },
-      ]);
+      expect(response.body).toEqual({
+        dresses: [{ id: 1, status: DressStatus.APPROVED }],
+        total: 1,
+      });
       expect(prisma.dress.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { status: DressStatus.APPROVED },
@@ -178,7 +182,8 @@ describe('DressesController', () => {
         .query({ sort: 'price-asc' })
         .expect(200);
 
-      expect(response.body.map((dress: { id: number }) => dress.id)).toEqual([2, 1]);
+      expect(response.body.dresses.map((dress: { id: number }) => dress.id)).toEqual([2, 1]);
+      expect(response.body.total).toBe(2);
     });
 
     it('forwards sort=newest using the same createdAt-desc DB order', async () => {
@@ -202,6 +207,86 @@ describe('DressesController', () => {
         .get('/dresses/approved')
         .query({ search: 'x', category: 'y', priceMin: '10' })
         .expect(200);
+    });
+
+    describe('pagination', () => {
+      it('forwards page/limit as skip/take, and total reflects the full match count, not the page size', async () => {
+        prisma.dress.findMany.mockResolvedValue([{ id: 21 }, { id: 22 }]);
+        prisma.dress.count.mockResolvedValue(47);
+
+        const response = await request(app.getHttpServer())
+          .get('/dresses/approved')
+          .query({ page: '3', limit: '10' })
+          .expect(200);
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: 20, take: 10 }),
+        );
+        expect(response.body.dresses).toEqual([{ id: 21 }, { id: 22 }]);
+        expect(response.body.total).toBe(47);
+      });
+
+      it('page 1 and page 2 request different skip offsets (different pages of results)', async () => {
+        prisma.dress.count.mockResolvedValue(20);
+
+        prisma.dress.findMany.mockResolvedValueOnce([{ id: 1 }]);
+        await request(app.getHttpServer())
+          .get('/dresses/approved')
+          .query({ page: '1', limit: '5' })
+          .expect(200);
+
+        prisma.dress.findMany.mockResolvedValueOnce([{ id: 2 }]);
+        await request(app.getHttpServer())
+          .get('/dresses/approved')
+          .query({ page: '2', limit: '5' })
+          .expect(200);
+
+        const skips = prisma.dress.findMany.mock.calls.map((call) => call[0].skip);
+        expect(skips).toEqual([0, 5]);
+      });
+
+      it('with no page/limit, returns everything unpaginated (existing behavior preserved)', async () => {
+        prisma.dress.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+        prisma.dress.count.mockResolvedValue(3);
+
+        const response = await request(app.getHttpServer())
+          .get('/dresses/approved')
+          .expect(200);
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: undefined, take: undefined }),
+        );
+        expect(response.body.dresses).toHaveLength(3);
+        expect(response.body.total).toBe(3);
+      });
+
+      it('a non-numeric page/limit is treated as not provided (no pagination), matching priceMin/priceMax\'s existing safe-parsing behavior', async () => {
+        prisma.dress.findMany.mockResolvedValue([]);
+        prisma.dress.count.mockResolvedValue(0);
+
+        await request(app.getHttpServer())
+          .get('/dresses/approved')
+          .query({ page: 'abc', limit: 'xyz' })
+          .expect(200);
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: undefined, take: undefined }),
+        );
+      });
+
+      it('combines pagination with filters/sort in one request', async () => {
+        prisma.dress.findMany.mockResolvedValue([{ id: 5, sizes: [{ price: 200 }] }]);
+
+        const response = await request(app.getHttpServer())
+          .get('/dresses/approved')
+          .query({ category: 'ערב', sort: 'price-asc', page: '1', limit: '2' })
+          .expect(200);
+
+        const call = prisma.dress.findMany.mock.calls[0][0];
+        expect(call.where.AND).toEqual([{ category: 'ערב' }]);
+        expect(response.body.dresses).toEqual([{ id: 5, sizes: [{ price: 200 }] }]);
+        expect(response.body.total).toBe(1);
+      });
     });
   });
 

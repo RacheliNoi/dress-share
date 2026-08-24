@@ -43,6 +43,13 @@ export type FindApprovedParams = {
   priceMin?: number;
   priceMax?: number;
   sort?: CatalogSortOption;
+  // 1-based. Pagination only activates when `limit` is a positive integer -
+  // omitting it (or `page` alone with no `limit`) preserves the
+  // pre-pagination behavior of returning every matching dress in one
+  // response, exactly as findApproved() already behaved before this field
+  // existed.
+  page?: number;
+  limit?: number;
 };
 
 @Injectable()
@@ -93,17 +100,22 @@ export class DressesService {
   // never leak to the public before an admin approves it. sizes/photos are
   // filtered to LIVE_OR_PENDING_REMOVAL for the same reason.
   //
-  // All filter/sort params are optional and additive - calling this with no
-  // arguments (or an empty object) produces byte-for-byte the same query and
-  // ordering as before this method accepted any params at all.
+  // All filter/sort/pagination params are optional and additive - calling
+  // this with no arguments (or an empty object) produces byte-for-byte the
+  // same query and ordering as before this method accepted any params at
+  // all, and returns every matching dress in one response (no pagination).
   //
   // size/priceMin/priceMax are each evaluated independently against the
   // dress's applicable (LIVE_OR_PENDING_REMOVAL) sizes - matching a size
   // filter and a price filter doesn't require the same DressSize row to
   // satisfy both, mirroring how the existing client-side catalog filters in
   // app/page.tsx already treat them as independent conditions.
+  //
+  // Returns { dresses, total } - `total` is the count of ALL matching
+  // dresses for the current search/filter/sort query, before pagination
+  // slicing, so the caller can compute page count without a second request.
   async findApproved(params: FindApprovedParams = {}) {
-    const { search, category, color, size, priceMin, priceMax, sort } = params;
+    const { search, category, color, size, priceMin, priceMax, sort, page, limit } = params;
 
     const andConditions: Prisma.DressWhereInput[] = [];
 
@@ -152,36 +164,65 @@ export class DressesService {
       ...(andConditions.length > 0 ? { AND: andConditions } : {}),
     };
 
-    const dresses = await this.prisma.dress.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        category: true,
-        color: true,
-        status: true,
-        rejectionReason: true,
-        ownerId: true,
-        createdAt: true,
-        updatedAt: true,
-        sizes: { where: LIVE_OR_PENDING_REMOVAL },
-        photos: { where: LIVE_OR_PENDING_REMOVAL, orderBy: { sortOrder: 'asc' } },
-      },
-      // "recommended" (the default/unset case) and "newest" both use this
-      // same createdAt-desc order - price sorts are applied afterwards, in
-      // application code, since Prisma has no built-in way to order a
-      // findMany by an aggregate (min/max) of a to-many relation's field.
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    const select: Prisma.DressSelect = {
+      id: true,
+      name: true,
+      description: true,
+      category: true,
+      color: true,
+      status: true,
+      rejectionReason: true,
+      ownerId: true,
+      createdAt: true,
+      updatedAt: true,
+      sizes: { where: LIVE_OR_PENDING_REMOVAL },
+      photos: { where: LIVE_OR_PENDING_REMOVAL, orderBy: { sortOrder: 'asc' } },
+    };
+
+    // Pagination only activates when `limit` is a positive integer; `page`
+    // defaults to 1 if `limit` is given without it. Both stay undefined
+    // (Prisma's "no limit" shape) when `limit` is omitted, which is exactly
+    // how this query already behaved before pagination existed.
+    const take = limit !== undefined && limit > 0 ? limit : undefined;
+    const skip = take !== undefined ? (Math.max(1, page ?? 1) - 1) * take : undefined;
 
     if (sort === 'price-asc' || sort === 'price-desc') {
-      return this.sortByMinSizePrice(dresses, sort === 'price-asc' ? 1 : -1);
+      // Prisma has no built-in way to order - and therefore no way to
+      // paginate at the DB level - a findMany by an aggregate (min/max) of a
+      // to-many relation's field. Every matching dress is fetched and sorted
+      // in application code exactly as before pagination existed; only the
+      // requested page is then sliced off. `sorted.length` doubles as the
+      // total, so no separate count query is needed for this path.
+      const allMatching = await this.prisma.dress.findMany({
+        where,
+        select,
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const sorted = this.sortByMinSizePrice(allMatching, sort === 'price-asc' ? 1 : -1);
+      const total = sorted.length;
+      const dresses =
+        skip !== undefined && take !== undefined ? sorted.slice(skip, skip + take) : sorted;
+
+      return { dresses, total };
     }
 
-    return dresses;
+    // "recommended" (the default/unset case) and "newest" both use this same
+    // createdAt-desc order, which Prisma CAN paginate and count directly at
+    // the DB level - run together in one round trip rather than
+    // sequentially.
+    const [dresses, total] = await Promise.all([
+      this.prisma.dress.findMany({
+        where,
+        select,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.dress.count({ where }),
+    ]);
+
+    return { dresses, total };
   }
 
   // Sorts by each dress's cheapest applicable size price. A dress with no

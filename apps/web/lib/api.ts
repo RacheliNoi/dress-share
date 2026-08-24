@@ -166,7 +166,9 @@ export function resetPassword(data: {
 // Mirrors DressesService.FindApprovedParams on the backend (apps/api/src/
 // dresses/dresses.service.ts) field-for-field - all optional, all additive.
 // Calling getApprovedDresses() with no params (or all-undefined fields)
-// produces the exact same request as before this type existed.
+// produces the exact same request as before this type existed. Pagination
+// (page/limit) only activates when `limit` is provided - omitting it returns
+// every matching dress in one response, exactly as before pagination existed.
 export type CatalogFilterParams = {
   search?: string;
   category?: string;
@@ -175,6 +177,16 @@ export type CatalogFilterParams = {
   priceMin?: number;
   priceMax?: number;
   sort?: SortOption;
+  page?: number;
+  limit?: number;
+};
+
+// Matches DressesService.findApproved()'s return shape exactly - `total` is
+// the count of every matching dress for the current filters, before
+// pagination, so callers can compute page count without a second request.
+export type CatalogPage = {
+  dresses: Dress[];
+  total: number;
 };
 
 function buildCatalogQuery(params?: CatalogFilterParams): string {
@@ -191,19 +203,22 @@ function buildCatalogQuery(params?: CatalogFilterParams): string {
   if (params.priceMin !== undefined) searchParams.set("priceMin", String(params.priceMin));
   if (params.priceMax !== undefined) searchParams.set("priceMax", String(params.priceMax));
   if (params.sort) searchParams.set("sort", params.sort);
+  if (params.page !== undefined) searchParams.set("page", String(params.page));
+  if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
 
   const query = searchParams.toString();
   return query ? `?${query}` : "";
 }
 
 export function getApprovedDresses(params?: CatalogFilterParams) {
-  return request<Dress[]>(`/dresses/approved${buildCatalogQuery(params)}`);
+  return request<CatalogPage>(`/dresses/approved${buildCatalogQuery(params)}`);
 }
 
-// There is no GET /dresses/:id endpoint on the backend, so a single
-// dress is resolved by fetching the approved catalog and matching the id.
+// There is no GET /dresses/:id endpoint on the backend, so a single dress is
+// resolved by fetching the approved catalog (unpaginated, since no
+// page/limit is passed) and matching the id.
 export async function getApprovedDressById(id: number) {
-  const dresses = await getApprovedDresses();
+  const { dresses } = await getApprovedDresses();
   return dresses.find((dress) => dress.id === id);
 }
 

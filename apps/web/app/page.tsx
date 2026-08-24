@@ -20,6 +20,10 @@ import { getSizeUsageForDay } from "@/lib/availability";
 // discrete selects/inputs that don't fire nearly as often).
 const SEARCH_DEBOUNCE_MS = 350;
 
+// Dresses per page. Chosen to divide evenly across this grid's column counts
+// (2/3/4 at increasing breakpoints) so the last row is rarely left half-empty.
+const PAGE_SIZE = 12;
+
 function uniqueSorted(values: (string | null)[]): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort(
     (a, b) => a.localeCompare(b, "he"),
@@ -123,6 +127,14 @@ export default function CatalogPage() {
   const [priceMax, setPriceMax] = useState("");
   const [sort, setSort] = useState<SortOption>("recommended");
 
+  // 1-based. Reset to 1 whenever a server-side filter/sort changes (see the
+  // update* wrappers below) - never reset by changing the page itself.
+  const [page, setPage] = useState(1);
+  // Total matches for the CURRENT search/filter/sort query, before
+  // pagination - comes straight from the server's `total`, independent of
+  // how many results happen to be on the current page.
+  const [totalMatches, setTotalMatches] = useState(0);
+
   const [availabilityDate, setAvailabilityDate] = useState("");
   // Keyed by dressId - fetched lazily (only once a date is picked) and kept
   // for the rest of the session, so switching the date around never
@@ -137,11 +149,52 @@ export default function CatalogPage() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
+      // Batched into one re-render (React 18+ automatic batching applies
+      // inside setTimeout callbacks too) - loadDresses' effect below then
+      // fires exactly once with both the new search term and page 1,
+      // instead of once per state change.
       setDebouncedSearch(search);
+      setPage(1);
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timeout);
   }, [search]);
+
+  // Wrap each filter setter to also reset pagination to page 1, batched into
+  // the same render as the filter change itself (see the search debounce
+  // effect above for why batching matters here - the same reasoning applies
+  // to every server-side filter, not just search). Reused directly by both
+  // the filter dropdowns/inputs AND their matching chip's onRemove below, so
+  // "what happens when category changes" has exactly one implementation.
+  function updateCategory(value: string) {
+    setSelectedCategory(value);
+    setPage(1);
+  }
+
+  function updateColor(value: string) {
+    setSelectedColor(value);
+    setPage(1);
+  }
+
+  function updateSize(value: string) {
+    setSelectedSize(value);
+    setPage(1);
+  }
+
+  function updatePriceMin(value: string) {
+    setPriceMin(value);
+    setPage(1);
+  }
+
+  function updatePriceMax(value: string) {
+    setPriceMax(value);
+    setPage(1);
+  }
+
+  function updateSort(value: SortOption) {
+    setSort(value);
+    setPage(1);
+  }
 
   const priceMinValue = priceMin.trim() === "" ? null : Number(priceMin);
   const priceMaxValue = priceMax.trim() === "" ? null : Number(priceMax);
@@ -166,16 +219,19 @@ export default function CatalogPage() {
         // the very first load fires the exact same bare request as before
         // this endpoint accepted any query params at all.
         sort: sort === "recommended" ? undefined : sort,
+        page,
+        limit: PAGE_SIZE,
       };
 
-      const data = await getApprovedDresses(params);
+      const { dresses: data, total } = await getApprovedDresses(params);
       setDresses(data);
+      setTotalMatches(total);
     } catch {
       setError("לא הצלחנו לטעון את הקטלוג. נסי שוב.");
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedColor, selectedSize, priceMinValue, priceMaxValue, sort]);
+  }, [debouncedSearch, selectedCategory, selectedColor, selectedSize, priceMinValue, priceMaxValue, sort, page]);
 
   useEffect(() => {
     loadDresses();
@@ -190,7 +246,7 @@ export default function CatalogPage() {
     let cancelled = false;
 
     getApprovedDresses()
-      .then((data) => {
+      .then(({ dresses: data }) => {
         if (!cancelled) {
           setOptionsDresses(data);
         }
@@ -350,6 +406,8 @@ export default function CatalogPage() {
     return map;
   }, [availabilityDate, availabilityCache, dresses]);
 
+  const totalPages = Math.max(1, Math.ceil(totalMatches / PAGE_SIZE));
+
   const hasActiveFilters = Boolean(
     search.trim() ||
       selectedCategory ||
@@ -363,19 +421,22 @@ export default function CatalogPage() {
   // Clears both the input's live value and the debounced value it feeds -
   // without also resetting debouncedSearch directly, the refetch that
   // follows a reset would still wait out SEARCH_DEBOUNCE_MS instead of
-  // firing immediately, which would make "reset" feel laggy.
+  // firing immediately, which would make "reset" feel laggy. Also resets
+  // pagination, same as every other update* filter setter above.
   function clearSearch() {
     setSearch("");
     setDebouncedSearch("");
+    setPage(1);
   }
 
+  // sort is deliberately NOT reset here - existing behavior, unchanged.
   function resetFilters() {
     clearSearch();
-    setSelectedCategory("");
-    setSelectedColor("");
-    setSelectedSize("");
-    setPriceMin("");
-    setPriceMax("");
+    updateCategory("");
+    updateColor("");
+    updateSize("");
+    updatePriceMin("");
+    updatePriceMax("");
     setAvailabilityDate("");
   }
 
@@ -388,17 +449,17 @@ export default function CatalogPage() {
     selectedCategory && {
       key: "category",
       label: selectedCategory,
-      onRemove: () => setSelectedCategory(""),
+      onRemove: () => updateCategory(""),
     },
     selectedColor && {
       key: "color",
       label: selectedColor,
-      onRemove: () => setSelectedColor(""),
+      onRemove: () => updateColor(""),
     },
     selectedSize && {
       key: "size",
       label: `מידה ${selectedSize}`,
-      onRemove: () => setSelectedSize(""),
+      onRemove: () => updateSize(""),
     },
     (priceMinValue !== null || priceMaxValue !== null) && {
       key: "price",
@@ -415,8 +476,8 @@ export default function CatalogPage() {
             ? `מ־${priceMinValue} ₪`
             : `עד ${priceMaxValue} ₪`,
       onRemove: () => {
-        setPriceMin("");
-        setPriceMax("");
+        updatePriceMin("");
+        updatePriceMax("");
       },
     },
     availabilityDate && {
@@ -535,25 +596,25 @@ export default function CatalogPage() {
               onSearchChange={setSearch}
               categories={categories}
               selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
+              onCategoryChange={updateCategory}
               colors={colors}
               selectedColor={selectedColor}
-              onColorChange={setSelectedColor}
+              onColorChange={updateColor}
               sizes={sizes}
               selectedSize={selectedSize}
-              onSizeChange={setSelectedSize}
+              onSizeChange={updateSize}
               priceMin={priceMin}
               priceMax={priceMax}
-              onPriceMinChange={setPriceMin}
-              onPriceMaxChange={setPriceMax}
+              onPriceMinChange={updatePriceMin}
+              onPriceMaxChange={updatePriceMax}
               priceBounds={priceBounds}
               sort={sort}
-              onSortChange={setSort}
+              onSortChange={updateSort}
               availabilityDate={availabilityDate}
               onAvailabilityDateChange={setAvailabilityDate}
               availabilityLoading={availabilityLoading}
               resultCount={visibleDresses.length}
-              totalCount={optionsDresses.length}
+              totalCount={totalMatches}
               hasActiveFilters={hasActiveFilters}
               onReset={resetFilters}
               chips={chips}
@@ -640,18 +701,50 @@ export default function CatalogPage() {
               </button>
             </section>
           ) : (
-            /* Dress grid (kept visible even if a later refresh fails, so a
-               failed retry doesn't wipe out already-loaded results) */
-            <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
-              {visibleDresses.map((dress, index) => (
-                <DressCard
-                  key={dress.id}
-                  dress={dress}
-                  style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-                  sizeAvailability={sizeAvailabilityByDressId?.get(dress.id) ?? null}
-                />
-              ))}
-            </div>
+            <>
+              {/* Dress grid (kept visible even if a later refresh fails, so
+                  a failed retry doesn't wipe out already-loaded results) */}
+              <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
+                {visibleDresses.map((dress, index) => (
+                  <DressCard
+                    key={dress.id}
+                    dress={dress}
+                    style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+                    sizeAvailability={sizeAvailabilityByDressId?.get(dress.id) ?? null}
+                  />
+                ))}
+              </div>
+
+              {/* Smallest possible pagination control - reflects the
+                  server-side total for the current filters, independent of
+                  the client-only availability-date filter applied above.
+                  Hidden entirely when everything fits on one page. */}
+              {totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page <= 1}
+                    className="rounded-full border border-line-strong px-5 py-2.5 text-sm font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    → הקודם
+                  </button>
+
+                  <span className="text-sm font-medium text-zinc-500">
+                    עמוד {page} מתוך {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                    disabled={page >= totalPages}
+                    className="rounded-full border border-line-strong px-5 py-2.5 text-sm font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    הבא ←
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

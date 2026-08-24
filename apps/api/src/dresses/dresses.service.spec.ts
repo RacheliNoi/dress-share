@@ -21,6 +21,7 @@ describe('DressesService', () => {
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      count: jest.Mock;
     };
     dressPhoto: {
       findUnique: jest.Mock;
@@ -54,6 +55,7 @@ describe('DressesService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       dressPhoto: {
         findUnique: jest.fn(),
@@ -97,6 +99,7 @@ describe('DressesService', () => {
       prisma.dress.findMany.mockResolvedValue([
         { id: 1, status: DressStatus.APPROVED },
       ]);
+      prisma.dress.count.mockResolvedValue(1);
 
       const result = await service.findApproved();
 
@@ -105,7 +108,8 @@ describe('DressesService', () => {
           where: { status: DressStatus.APPROVED },
         }),
       );
-      expect(result).toEqual([{ id: 1, status: DressStatus.APPROVED }]);
+      expect(result.dresses).toEqual([{ id: 1, status: DressStatus.APPROVED }]);
+      expect(result.total).toBe(1);
     });
 
     it('never selects pendingDetails/pendingReviewSubmittedAt, and filters sizes/photos to live-or-pending-removal only', async () => {
@@ -317,7 +321,7 @@ describe('DressesService', () => {
 
       const result = await service.findApproved({ sort: 'recommended' });
 
-      expect(result).toBe(unsorted);
+      expect(result.dresses).toBe(unsorted);
       expect(prisma.dress.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
       );
@@ -342,7 +346,8 @@ describe('DressesService', () => {
 
       const result = await service.findApproved({ sort: 'price-asc' });
 
-      expect(result.map((dress: { id: number }) => dress.id)).toEqual([3, 1, 2]);
+      expect(result.dresses.map((dress: { id: number }) => dress.id)).toEqual([3, 1, 2]);
+      expect(result.total).toBe(3);
     });
 
     it('sort "price-desc" orders by each dress\'s cheapest size price, descending; dresses with no sizes still sort last', async () => {
@@ -354,7 +359,115 @@ describe('DressesService', () => {
 
       const result = await service.findApproved({ sort: 'price-desc' });
 
-      expect(result.map((dress: { id: number }) => dress.id)).toEqual([1, 3, 2]);
+      expect(result.dresses.map((dress: { id: number }) => dress.id)).toEqual([1, 3, 2]);
+      expect(result.total).toBe(3);
+    });
+
+    describe('pagination', () => {
+      it('with no page/limit, returns everything unpaginated (existing behavior preserved) for the recommended/newest path', async () => {
+        prisma.dress.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+        prisma.dress.count.mockResolvedValue(2);
+
+        const result = await service.findApproved();
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: undefined, take: undefined }),
+        );
+        expect(result.dresses).toEqual([{ id: 1 }, { id: 2 }]);
+        expect(result.total).toBe(2);
+      });
+
+      it('page/limit translate to skip/take for the recommended/newest path, and total comes from a separate count()', async () => {
+        prisma.dress.findMany.mockResolvedValue([{ id: 11 }, { id: 12 }]);
+        prisma.dress.count.mockResolvedValue(37);
+
+        const result = await service.findApproved({ page: 3, limit: 10 });
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: 20, take: 10 }),
+        );
+        expect(prisma.dress.count).toHaveBeenCalledWith({ where: { status: DressStatus.APPROVED } });
+        expect(result.dresses).toEqual([{ id: 11 }, { id: 12 }]);
+        expect(result.total).toBe(37);
+      });
+
+      it('page defaults to 1 when limit is given without page', async () => {
+        prisma.dress.findMany.mockResolvedValue([]);
+        prisma.dress.count.mockResolvedValue(0);
+
+        await service.findApproved({ limit: 5 });
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: 0, take: 5 }),
+        );
+      });
+
+      it('page is ignored (no pagination applied) when limit is omitted', async () => {
+        prisma.dress.findMany.mockResolvedValue([{ id: 1 }]);
+        prisma.dress.count.mockResolvedValue(1);
+
+        await service.findApproved({ page: 4 });
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: undefined, take: undefined }),
+        );
+      });
+
+      it('a non-positive limit is treated as no pagination', async () => {
+        prisma.dress.findMany.mockResolvedValue([]);
+        prisma.dress.count.mockResolvedValue(0);
+
+        await service.findApproved({ limit: 0 });
+
+        expect(prisma.dress.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: undefined, take: undefined }),
+        );
+      });
+
+      it('page 1 and page 2 (same limit) request different skip offsets, so they return different slices', async () => {
+        prisma.dress.findMany.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
+        prisma.dress.count.mockResolvedValueOnce(5);
+        const page1 = await service.findApproved({ page: 1, limit: 2 });
+
+        prisma.dress.findMany.mockResolvedValueOnce([{ id: 3 }, { id: 4 }]);
+        prisma.dress.count.mockResolvedValueOnce(5);
+        const page2 = await service.findApproved({ page: 2, limit: 2 });
+
+        expect(page1.dresses).toEqual([{ id: 1 }, { id: 2 }]);
+        expect(page2.dresses).toEqual([{ id: 3 }, { id: 4 }]);
+        expect(page1.total).toBe(5);
+        expect(page2.total).toBe(5);
+
+        const skips = prisma.dress.findMany.mock.calls.map((call) => call[0].skip);
+        expect(skips).toEqual([0, 2]);
+      });
+
+      it('for price-asc/price-desc, pagination slices the already-sorted array and total is its full length - no separate count() call', async () => {
+        prisma.dress.findMany.mockResolvedValue([
+          { id: 1, sizes: [{ price: 500 }] },
+          { id: 2, sizes: [{ price: 100 }] },
+          { id: 3, sizes: [{ price: 300 }] },
+          { id: 4, sizes: [{ price: 700 }] },
+        ]);
+
+        const result = await service.findApproved({ sort: 'price-asc', page: 2, limit: 2 });
+
+        // Full ascending order would be: 2(100), 3(300), 1(500), 4(700) -
+        // page 2 of size 2 is [1, 4].
+        expect(result.dresses.map((d: { id: number }) => d.id)).toEqual([1, 4]);
+        expect(result.total).toBe(4);
+        expect(prisma.dress.count).not.toHaveBeenCalled();
+      });
+
+      it('a page past the end returns an empty page with the correct (non-zero) total', async () => {
+        prisma.dress.findMany.mockResolvedValue([]);
+        prisma.dress.count.mockResolvedValue(5);
+
+        const result = await service.findApproved({ page: 99, limit: 10 });
+
+        expect(result.dresses).toEqual([]);
+        expect(result.total).toBe(5);
+      });
     });
   });
 
