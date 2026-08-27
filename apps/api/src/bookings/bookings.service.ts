@@ -20,6 +20,13 @@ const ACTIVE_BOOKING_STATUSES = [
   BookingStatus.RENTED,
 ];
 
+// How long an INTERESTED hold (fitting-coordination phase, not yet a
+// confirmed rental) is allowed to sit before it's treated as abandoned and
+// released back into the calendar. Same "plain tunable constant" pattern as
+// RESET_TOKEN_TTL_MINUTES/PASSWORD_MIN_LENGTH in auth.service.ts, not an env
+// var - this is a business rule, not per-environment config.
+export const INTERESTED_EXPIRY_DAYS = 7;
+
 function addUtcDay(date: Date): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + 1);
@@ -637,5 +644,29 @@ export class BookingsService {
     }
 
     return this.prisma.booking.delete({ where: { id: bookingId } });
+  }
+
+  // Releases abandoned INTERESTED holds back into the calendar - a renter
+  // who expressed interest and then went quiet (never converted to RENTED,
+  // never cancelled) would otherwise block that date/size forever, since
+  // ACTIVE_BOOKING_STATUSES counts INTERESTED toward capacity indefinitely.
+  // CANCELLED (not delete) so this reads the same as any other cancellation
+  // in findForOwner/findForDress history - only the *reason* is automatic.
+  // `now` is a parameter (not read internally) so this is testable without
+  // faking system time; the scheduled task (BookingExpiryTask) always calls
+  // it with no argument, defaulting to the real current time.
+  async expireStaleInterestedBookings(now: Date = new Date()): Promise<number> {
+    const cutoff = new Date(now);
+    cutoff.setUTCDate(cutoff.getUTCDate() - INTERESTED_EXPIRY_DAYS);
+
+    const result = await this.prisma.booking.updateMany({
+      where: {
+        status: BookingStatus.INTERESTED,
+        createdAt: { lt: cutoff },
+      },
+      data: { status: BookingStatus.CANCELLED },
+    });
+
+    return result.count;
   }
 }

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BookingsService } from './bookings.service';
+import { BookingsService, INTERESTED_EXPIRY_DAYS } from './bookings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DressStatus, BookingStatus } from '../../generated/prisma/enums';
 
@@ -21,6 +21,7 @@ describe('BookingsService', () => {
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       delete: jest.Mock;
     };
     $transaction: jest.Mock;
@@ -41,6 +42,7 @@ describe('BookingsService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         delete: jest.fn(),
       },
       // In tests, the "transaction client" is just the same mocked prisma
@@ -1340,6 +1342,64 @@ describe('BookingsService', () => {
       await expect(service.cancelOrRemove(999, 7)).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('expireStaleInterestedBookings', () => {
+    // Fixed reference point so the cutoff date math is exact and
+    // deterministic, instead of depending on the real system clock.
+    const fixedNow = new Date('2026-03-15T00:00:00.000Z');
+
+    it('only targets INTERESTED bookings - RENTED is never in the where clause, structurally', async () => {
+      prisma.booking.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.expireStaleInterestedBookings(fixedNow);
+
+      const call = prisma.booking.updateMany.mock.calls[0][0];
+      expect(call.where.status).toBe(BookingStatus.INTERESTED);
+    });
+
+    it(`filters to bookings created more than ${INTERESTED_EXPIRY_DAYS} days before "now"`, async () => {
+      prisma.booking.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.expireStaleInterestedBookings(fixedNow);
+
+      const expectedCutoff = new Date('2026-03-08T00:00:00.000Z'); // fixedNow - 7 days
+      const call = prisma.booking.updateMany.mock.calls[0][0];
+      expect(call.where.createdAt).toEqual({ lt: expectedCutoff });
+    });
+
+    it('updates matching bookings to CANCELLED (not deleted)', async () => {
+      prisma.booking.updateMany.mockResolvedValue({ count: 3 });
+
+      await service.expireStaleInterestedBookings(fixedNow);
+
+      const call = prisma.booking.updateMany.mock.calls[0][0];
+      expect(call.data).toEqual({ status: BookingStatus.CANCELLED });
+      expect(prisma.booking.delete).not.toHaveBeenCalled();
+    });
+
+    it('returns the number of bookings actually expired', async () => {
+      prisma.booking.updateMany.mockResolvedValue({ count: 5 });
+
+      const result = await service.expireStaleInterestedBookings(fixedNow);
+
+      expect(result).toBe(5);
+    });
+
+    it('defaults to the real current time when no "now" is provided', async () => {
+      prisma.booking.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.expireStaleInterestedBookings();
+
+      const call = prisma.booking.updateMany.mock.calls[0][0];
+      expect(call.where.createdAt.lt).toBeInstanceOf(Date);
+      // Loose sanity check only (exact test above already covers the exact
+      // math with a fixed "now") - just confirms it's in the right
+      // ballpark, not some obviously-wrong value like epoch 0.
+      const daysAgo = (Date.now() - call.where.createdAt.lt.getTime()) / 86400000;
+      expect(daysAgo).toBeGreaterThan(INTERESTED_EXPIRY_DAYS - 1);
+      expect(daysAgo).toBeLessThan(INTERESTED_EXPIRY_DAYS + 1);
     });
   });
 });
