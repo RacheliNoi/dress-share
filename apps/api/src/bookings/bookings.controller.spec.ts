@@ -19,6 +19,7 @@ describe('BookingsController', () => {
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       delete: jest.Mock;
     };
     $transaction: jest.Mock;
@@ -43,6 +44,11 @@ describe('BookingsController', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        // Called once per test by BookingExpiryTask.onModuleInit, which now
+        // runs for real whenever this suite boots the full BookingsModule -
+        // not exercised by any assertion here, just needs to resolve so
+        // app.init() doesn't throw.
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         delete: jest.fn(),
       },
       $transaction: jest.fn((operation: (tx: typeof prisma) => Promise<unknown>) =>
