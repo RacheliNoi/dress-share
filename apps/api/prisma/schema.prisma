@@ -40,6 +40,7 @@ model User {
   dresses             Dress[]
   bookings            Booking[]
   passwordResetTokens PasswordResetToken[]
+  bookingMessages     BookingMessage[]
 }
 
 // A password-reset request creates exactly one of these rows. Only a hash of
@@ -196,6 +197,8 @@ model Booking {
   dress  Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
   renter User? @relation(fields: [renterId], references: [id], onDelete: SetNull)
 
+  messages BookingMessage[]
+
   @@index([dressId, startDate, endDate])
   @@index([renterId])
 }
@@ -207,4 +210,22 @@ enum BookingStatus {
   COMPLETED
   INTERESTED
   RENTED
+}
+
+// In-app coordination thread for one Booking (e.g. arranging a fitting
+// before closing a rental) - kept inside the platform on purpose rather than
+// pushing renter/owner to an external channel. senderId is required (not
+// nullable), so onDelete: Cascade is the only valid choice for it - unlike
+// Booking.renter, there's no "keep the row with a null sender" option here.
+model BookingMessage {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  senderId  Int
+  body      String
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender  User    @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
 }
