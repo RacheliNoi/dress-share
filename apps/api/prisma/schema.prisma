@@ -106,9 +106,10 @@ model Dress {
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  photos   DressPhoto[]
-  sizes    DressSize[]
-  bookings Booking[]
+  photos             DressPhoto[]
+  sizes              DressSize[]
+  bookings           Booking[]
+  availabilityBlocks DressAvailabilityBlock[]
 
   @@index([ownerId])
   @@index([status])
@@ -228,4 +229,22 @@ model BookingMessage {
   sender  User    @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
+}
+
+// An owner-initiated hold on a date range for their own reasons (cleaning,
+// personal use) - deliberately NOT a Booking, since Booking now represents a
+// real renter transaction (see BookingMessage above). Keeping this as its
+// own model means "a customer rented this" and "the owner blocked this" can
+// never be confused with each other by anything that reads Booking.status.
+model DressAvailabilityBlock {
+  id        Int      @id @default(autoincrement())
+  dressId   Int
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
+
+  @@index([dressId])
 }
