@@ -26,12 +26,27 @@ export class BookingExpiryTask implements OnModuleInit {
     await this.runExpiry();
   }
 
+  // Swallows its own errors (logging instead of rethrowing) - this runs from
+  // OnModuleInit, which is part of the app's critical boot sequence in
+  // Nest: an uncaught rejection here doesn't just skip the cleanup, it
+  // crashes the ENTIRE app before it ever starts listening (confirmed
+  // directly - a transient DB-connection failure at boot took the whole
+  // server down, not just this task). A missed cleanup run is harmless
+  // (the next daily cron, or the next restart, catches up); a server that
+  // can't boot because a background cleanup failed is not.
   private async runExpiry(): Promise<void> {
-    const count = await this.bookingsService.expireStaleInterestedBookings();
+    try {
+      const count = await this.bookingsService.expireStaleInterestedBookings();
 
-    if (count > 0) {
-      this.logger.log(
-        `Expired ${count} INTERESTED booking(s) older than ${INTERESTED_EXPIRY_DAYS} days`,
+      if (count > 0) {
+        this.logger.log(
+          `Expired ${count} INTERESTED booking(s) older than ${INTERESTED_EXPIRY_DAYS} days`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to expire stale INTERESTED bookings - will retry on the next scheduled run',
+        error instanceof Error ? error.stack : String(error),
       );
     }
   }

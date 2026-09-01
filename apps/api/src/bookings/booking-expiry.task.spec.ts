@@ -42,4 +42,23 @@ describe('BookingExpiryTask', () => {
 
     await expect(task.onModuleInit()).resolves.not.toThrow();
   });
+
+  // Regression test: a real DB-connection failure at boot was observed to
+  // crash the entire app before it started listening, because this ran
+  // unguarded from OnModuleInit (part of Nest's critical boot sequence).
+  it('swallows errors from the expiry check instead of throwing (so a DB hiccup at boot never crashes the whole app)', async () => {
+    bookingsService.expireStaleInterestedBookings.mockRejectedValue(
+      new Error('DB connection refused'),
+    );
+
+    await expect(task.onModuleInit()).resolves.toBeUndefined();
+  });
+
+  it('swallows errors on the cron path too, not just at startup', async () => {
+    bookingsService.expireStaleInterestedBookings.mockRejectedValue(
+      new Error('DB connection refused'),
+    );
+
+    await expect(task.handleExpireStaleInterested()).resolves.toBeUndefined();
+  });
 });
