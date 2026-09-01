@@ -28,7 +28,7 @@ describe('PhotoProcessingService', () => {
   it('returns null immediately when no API key is configured - never calls fetch', async () => {
     delete process.env.PHOTOROOM_API_KEY_SANDBOX;
     const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const result = await service.enhance(Buffer.from('img'), 'a.jpg');
 
@@ -42,9 +42,9 @@ describe('PhotoProcessingService', () => {
       ok: true,
       status: 200,
       headers: { get: () => 'image/png' },
-      arrayBuffer: async () => enhancedBytes.buffer,
+      arrayBuffer: () => Promise.resolve(enhancedBytes.buffer),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const result = await service.enhance(Buffer.from('img'), 'a.jpg');
 
@@ -56,9 +56,9 @@ describe('PhotoProcessingService', () => {
       ok: true,
       status: 200,
       headers: { get: () => 'image/png' },
-      arrayBuffer: async () => new ArrayBuffer(0),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     await service.enhance(Buffer.from('img'), 'a.jpg');
 
@@ -76,9 +76,9 @@ describe('PhotoProcessingService', () => {
       ok: false,
       status: 400,
       headers: { get: () => 'application/json' },
-      text: async () => '{"detail":"bad image"}',
+      text: () => Promise.resolve('{"detail":"bad image"}'),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const result = await service.enhance(Buffer.from('img'), 'a.jpg');
 
@@ -90,9 +90,9 @@ describe('PhotoProcessingService', () => {
       ok: true,
       status: 200,
       headers: { get: () => 'application/json' },
-      text: async () => '{}',
+      text: () => Promise.resolve('{}'),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const result = await service.enhance(Buffer.from('img'), 'a.jpg');
 
@@ -101,8 +101,10 @@ describe('PhotoProcessingService', () => {
 
   it('returns null (never throws) when fetch itself rejects (network error)', async () => {
     const fetchMock = jest.fn().mockRejectedValue(new Error('ECONNREFUSED'));
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
-    await expect(service.enhance(Buffer.from('img'), 'a.jpg')).resolves.toBeNull();
+    await expect(
+      service.enhance(Buffer.from('img'), 'a.jpg'),
+    ).resolves.toBeNull();
   });
 });

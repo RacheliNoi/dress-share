@@ -36,7 +36,11 @@ export class PhotoProcessingService {
 
     try {
       const form = new FormData();
-      form.append('image_file', new Blob([new Uint8Array(imageBuffer)]), filename);
+      form.append(
+        'image_file',
+        new Blob([new Uint8Array(imageBuffer)]),
+        filename,
+      );
       form.append('bg_color', BACKGROUND_COLOR);
 
       const response = await fetch(PHOTOROOM_SEGMENT_URL, {

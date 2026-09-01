@@ -586,7 +586,10 @@ export class DressesService {
     const processed = await Promise.all(
       files.map(async (file) => {
         const buffer = await readFile(file.path);
-        const enhanced = await this.photoProcessing.enhance(buffer, file.filename);
+        const enhanced = await this.photoProcessing.enhance(
+          buffer,
+          file.filename,
+        );
 
         if (!enhanced) {
           return { file, processedFilename: null as string | null };
@@ -602,7 +605,9 @@ export class DressesService {
       data: processed.map(({ file, processedFilename }, index) => ({
         dressId,
         originalUrl: `/uploads/${file.filename}`,
-        processedUrl: processedFilename ? `/uploads/${processedFilename}` : undefined,
+        processedUrl: processedFilename
+          ? `/uploads/${processedFilename}`
+          : undefined,
         sortOrder: index,
         pendingAction: dress.status === DressStatus.APPROVED ? 'ADD' : undefined,
       })),
