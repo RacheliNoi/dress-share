@@ -26,6 +26,12 @@ describe('BookingsController', () => {
       findMany: jest.Mock;
       create: jest.Mock;
     };
+    dressAvailabilityBlock: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      delete: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -58,6 +64,12 @@ describe('BookingsController', () => {
       bookingMessage: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
+      },
+      dressAvailabilityBlock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        delete: jest.fn(),
       },
       $transaction: jest.fn((operation: (tx: typeof prisma) => Promise<unknown>) =>
         operation(prisma),
@@ -329,6 +341,89 @@ describe('BookingsController', () => {
         .set('Authorization', `Bearer ${tokenFor(3)}`)
         .send({ body: '   ' })
         .expect(400);
+    });
+  });
+
+  describe('GET/POST /bookings/dress/:dressId/blocks and DELETE /bookings/blocks/:id', () => {
+    it('GET rejects unauthenticated requests (401)', async () => {
+      await request(app.getHttpServer()).get('/bookings/dress/1/blocks').expect(401);
+    });
+
+    it('GET rejects a non-owner (403)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+
+      await request(app.getHttpServer())
+        .get('/bookings/dress/1/blocks')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .expect(403);
+    });
+
+    it('GET returns the blocks for the owner', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.dressAvailabilityBlock.findMany.mockResolvedValue([{ id: 1 }]);
+
+      const response = await request(app.getHttpServer())
+        .get('/bookings/dress/1/blocks')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+    });
+
+    it('POST creates a block for the owner (201)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.dressAvailabilityBlock.create.mockResolvedValue({
+        id: 1,
+        dressId: 1,
+        startDate: '2026-09-01T00:00:00.000Z',
+        endDate: '2026-09-02T00:00:00.000Z',
+        reason: null,
+      });
+
+      await request(app.getHttpServer())
+        .post('/bookings/dress/1/blocks')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .send({ startDate: '2026-09-01', endDate: '2026-09-02' })
+        .expect(201);
+    });
+
+    it('POST rejects a non-owner (403)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+
+      await request(app.getHttpServer())
+        .post('/bookings/dress/1/blocks')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .send({ startDate: '2026-09-01', endDate: '2026-09-02' })
+        .expect(403);
+
+      expect(prisma.dressAvailabilityBlock.create).not.toHaveBeenCalled();
+    });
+
+    it('DELETE removes the block for the owner (200)', async () => {
+      prisma.dressAvailabilityBlock.findUnique.mockResolvedValue({
+        id: 5,
+        dress: { ownerId: 7 },
+      });
+      prisma.dressAvailabilityBlock.delete.mockResolvedValue({ id: 5 });
+
+      await request(app.getHttpServer())
+        .delete('/bookings/blocks/5')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(200);
+    });
+
+    it('DELETE rejects a non-owner (403)', async () => {
+      prisma.dressAvailabilityBlock.findUnique.mockResolvedValue({
+        id: 5,
+        dress: { ownerId: 7 },
+      });
+
+      await request(app.getHttpServer())
+        .delete('/bookings/blocks/5')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .expect(403);
+
+      expect(prisma.dressAvailabilityBlock.delete).not.toHaveBeenCalled();
     });
   });
 

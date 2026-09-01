@@ -28,6 +28,12 @@ describe('BookingsService', () => {
       findMany: jest.Mock;
       create: jest.Mock;
     };
+    dressAvailabilityBlock: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      delete: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -52,6 +58,12 @@ describe('BookingsService', () => {
       bookingMessage: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
+      },
+      dressAvailabilityBlock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        delete: jest.fn(),
       },
       // In tests, the "transaction client" is just the same mocked prisma
       // object - real Postgres SERIALIZABLE isolation isn't something a
@@ -1148,6 +1160,148 @@ describe('BookingsService', () => {
         NotFoundException,
       );
       expect(prisma.booking.findMany).not.toHaveBeenCalled();
+    });
+
+    it('folds owner-set DressAvailabilityBlocks in as RENTED, size: null - not a Booking', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([]);
+      prisma.dressAvailabilityBlock.findMany.mockResolvedValue([
+        { startDate: new Date('2026-11-01'), endDate: new Date('2026-11-03') },
+      ]);
+
+      const result = await service.findAvailabilityForDress(1);
+
+      expect(result).toEqual([
+        {
+          startDate: new Date('2026-11-01'),
+          endDate: new Date('2026-11-03'),
+          status: BookingStatus.RENTED,
+          size: null,
+        },
+      ]);
+    });
+
+    it('merges bookings and blocks together, sorted by startDate', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findMany.mockResolvedValue([
+        {
+          startDate: new Date('2026-12-10'),
+          endDate: new Date('2026-12-12'),
+          status: BookingStatus.INTERESTED,
+          size: null,
+        },
+      ]);
+      prisma.dressAvailabilityBlock.findMany.mockResolvedValue([
+        { startDate: new Date('2026-12-01'), endDate: new Date('2026-12-02') },
+      ]);
+
+      const result = await service.findAvailabilityForDress(1);
+
+      expect(result.map((entry) => entry.startDate.toISOString())).toEqual([
+        new Date('2026-12-01').toISOString(),
+        new Date('2026-12-10').toISOString(),
+      ]);
+    });
+  });
+
+  describe('createAvailabilityBlock / listAvailabilityBlocks / deleteAvailabilityBlock', () => {
+    it('creates a block for the dress owner', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.dressAvailabilityBlock.create.mockResolvedValue({
+        id: 1,
+        dressId: 1,
+        startDate: new Date('2026-09-01'),
+        endDate: new Date('2026-09-02'),
+        reason: 'ניקוי',
+      });
+
+      await service.createAvailabilityBlock(1, 7, {
+        startDate: '2026-09-01',
+        endDate: '2026-09-02',
+        reason: 'ניקוי',
+      });
+
+      expect(prisma.dressAvailabilityBlock.create).toHaveBeenCalledWith({
+        data: {
+          dressId: 1,
+          startDate: new Date('2026-09-01'),
+          endDate: new Date('2026-09-02'),
+          reason: 'ניקוי',
+        },
+      });
+    });
+
+    it('rejects creating a block for a dress the caller does not own', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+
+      await expect(
+        service.createAvailabilityBlock(1, 3, {
+          startDate: '2026-09-01',
+          endDate: '2026-09-02',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.dressAvailabilityBlock.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an end date before the start date', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+
+      await expect(
+        service.createAvailabilityBlock(1, 7, {
+          startDate: '2026-09-05',
+          endDate: '2026-09-01',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lists blocks for the dress owner', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.dressAvailabilityBlock.findMany.mockResolvedValue([{ id: 1 }]);
+
+      const result = await service.listAvailabilityBlocks(1, 7);
+
+      expect(result).toEqual([{ id: 1 }]);
+    });
+
+    it('rejects listing blocks for a dress the caller does not own', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+
+      await expect(service.listAvailabilityBlocks(1, 3)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('deletes a block for the dress owner', async () => {
+      prisma.dressAvailabilityBlock.findUnique.mockResolvedValue({
+        id: 5,
+        dress: { ownerId: 7 },
+      });
+
+      await service.deleteAvailabilityBlock(5, 7);
+
+      expect(prisma.dressAvailabilityBlock.delete).toHaveBeenCalledWith({
+        where: { id: 5 },
+      });
+    });
+
+    it('rejects deleting a block belonging to a dress the caller does not own', async () => {
+      prisma.dressAvailabilityBlock.findUnique.mockResolvedValue({
+        id: 5,
+        dress: { ownerId: 7 },
+      });
+
+      await expect(service.deleteAvailabilityBlock(5, 3)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.dressAvailabilityBlock.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when deleting a block that does not exist', async () => {
+      prisma.dressAvailabilityBlock.findUnique.mockResolvedValue(null);
+
+      await expect(service.deleteAvailabilityBlock(999, 7)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

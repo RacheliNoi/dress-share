@@ -148,4 +148,38 @@ export class BookingsController {
   ) {
     return this.bookingsService.createMessage(Number(id), user.sub, body.body);
   }
+
+  // Owner-only "block a date" action, separate from the renter-initiated
+  // booking flow above - creates a DressAvailabilityBlock, never a Booking.
+  @UseGuards(JwtAuthGuard)
+  @Get('dress/:dressId/blocks')
+  listAvailabilityBlocks(
+    @Param('dressId') dressId: string,
+    @CurrentUser() user: { sub: number },
+  ) {
+    return this.bookingsService.listAvailabilityBlocks(Number(dressId), user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('dress/:dressId/blocks')
+  createAvailabilityBlock(
+    @Param('dressId') dressId: string,
+    @Body() body: { startDate: string; endDate: string; reason?: string },
+    @CurrentUser() user: { sub: number },
+  ) {
+    return this.bookingsService.createAvailabilityBlock(Number(dressId), user.sub, {
+      startDate: body.startDate,
+      endDate: body.endDate,
+      reason: body.reason,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('blocks/:id')
+  deleteAvailabilityBlock(
+    @Param('id') id: string,
+    @CurrentUser() user: { sub: number },
+  ) {
+    return this.bookingsService.deleteAvailabilityBlock(Number(id), user.sub);
+  }
 }

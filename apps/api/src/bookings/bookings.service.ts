@@ -463,19 +463,90 @@ export class BookingsService {
       throw new NotFoundException('השמלה לא נמצאה');
     }
 
-    return this.prisma.booking.findMany({
-      where: {
-        dressId,
-        status: { in: ACTIVE_BOOKING_STATUSES },
-      },
-      select: {
-        startDate: true,
-        endDate: true,
-        status: true,
-        size: true,
-      },
+    const [bookings, blocks] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: {
+          dressId,
+          status: { in: ACTIVE_BOOKING_STATUSES },
+        },
+        select: {
+          startDate: true,
+          endDate: true,
+          status: true,
+          size: true,
+        },
+        orderBy: { startDate: 'asc' },
+      }),
+      this.prisma.dressAvailabilityBlock.findMany({
+        where: { dressId },
+        select: { startDate: true, endDate: true },
+        orderBy: { startDate: 'asc' },
+      }),
+    ]);
+
+    // An owner-initiated block isn't a Booking and carries no size/renter -
+    // it blocks every size on the days it covers, so it's folded into the
+    // same public shape as a whole-dress booking (size: null, the existing
+    // "unknown size blocks everything" convention). Mapped to RENTED rather
+    // than INTERESTED so DressAvailabilityCalendar (unmodified) renders it
+    // as fully taken, not "someone's interested" - which is exactly what an
+    // owner's block means.
+    const blockEntries = blocks.map((block) => ({
+      startDate: block.startDate,
+      endDate: block.endDate,
+      status: BookingStatus.RENTED,
+      size: null,
+    }));
+
+    return [...bookings, ...blockEntries].sort(
+      (a, b) => a.startDate.getTime() - b.startDate.getTime(),
+    );
+  }
+
+  // Owner-only: blocks a date range for reasons of their own (cleaning,
+  // personal use) - deliberately not a Booking (no renter, no capacity
+  // semantics), so this reuses loadOwnedDress/parseDate/assertValidRange but
+  // never touches assertCapacityAvailable or any Booking table logic.
+  async createAvailabilityBlock(
+    dressId: number,
+    ownerId: number,
+    data: { startDate: string | Date; endDate: string | Date; reason?: string },
+  ) {
+    await this.loadOwnedDress(dressId, ownerId);
+
+    const startDate = this.parseDate(data.startDate, 'תאריך התחלה');
+    const endDate = this.parseDate(data.endDate, 'תאריך סיום');
+    this.assertValidRange(startDate, endDate);
+
+    return this.prisma.dressAvailabilityBlock.create({
+      data: { dressId, startDate, endDate, reason: data.reason || null },
+    });
+  }
+
+  async listAvailabilityBlocks(dressId: number, ownerId: number) {
+    await this.loadOwnedDress(dressId, ownerId);
+
+    return this.prisma.dressAvailabilityBlock.findMany({
+      where: { dressId },
       orderBy: { startDate: 'asc' },
     });
+  }
+
+  async deleteAvailabilityBlock(blockId: number, ownerId: number) {
+    const block = await this.prisma.dressAvailabilityBlock.findUnique({
+      where: { id: blockId },
+      include: { dress: { select: { ownerId: true } } },
+    });
+
+    if (!block) {
+      throw new NotFoundException('החסימה לא נמצאה');
+    }
+
+    if (block.dress.ownerId !== ownerId) {
+      throw new ForbiddenException('אין הרשאה למחוק חסימה זו');
+    }
+
+    return this.prisma.dressAvailabilityBlock.delete({ where: { id: blockId } });
   }
 
   async findForOwner(ownerId: number) {
