@@ -4,9 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { unlink } from 'fs/promises';
+import { readFile, unlink, writeFile } from 'fs/promises';
 import { basename, join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
+import { PhotoProcessingService } from '../photo-processing/photo-processing.service';
 import { DressStatus, BookingStatus } from '../../generated/prisma/enums';
 import { Prisma } from '../../generated/prisma/client';
 
@@ -54,7 +55,10 @@ export type FindApprovedParams = {
 
 @Injectable()
 export class DressesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly photoProcessing: PhotoProcessingService,
+  ) {}
 
   async findAll() {
     return this.prisma.dress.findMany({
@@ -572,10 +576,33 @@ export class DressesService {
 
     this.assertEditable(dress);
 
+    // Runs per file in parallel. A failed/unavailable enhancement (network
+    // error, no API key configured, Photoroom down) never blocks the
+    // upload itself - that photo just keeps originalUrl only, exactly like
+    // before this feature existed. originalUrl is always the untouched
+    // upload; processedUrl (already read everywhere via getDressImageUrl,
+    // preferred over originalUrl when present) only gets a value once
+    // enhancement actually succeeds.
+    const processed = await Promise.all(
+      files.map(async (file) => {
+        const buffer = await readFile(file.path);
+        const enhanced = await this.photoProcessing.enhance(buffer, file.filename);
+
+        if (!enhanced) {
+          return { file, processedFilename: null as string | null };
+        }
+
+        const processedFilename = `${file.filename}-enhanced.png`;
+        await writeFile(join(UPLOADS_DIR, processedFilename), enhanced);
+        return { file, processedFilename };
+      }),
+    );
+
     return this.prisma.dressPhoto.createMany({
-      data: files.map((file, index) => ({
+      data: processed.map(({ file, processedFilename }, index) => ({
         dressId,
         originalUrl: `/uploads/${file.filename}`,
+        processedUrl: processedFilename ? `/uploads/${processedFilename}` : undefined,
         sortOrder: index,
         pendingAction: dress.status === DressStatus.APPROVED ? 'ADD' : undefined,
       })),

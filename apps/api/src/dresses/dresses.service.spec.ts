@@ -4,13 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { unlink } from 'fs/promises';
+import { readFile, unlink, writeFile } from 'fs/promises';
 import { DressesService } from './dresses.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PhotoProcessingService } from '../photo-processing/photo-processing.service';
 import { DressStatus } from '../../generated/prisma/enums';
 
 jest.mock('fs/promises', () => ({
   unlink: jest.fn().mockResolvedValue(undefined),
+  readFile: jest.fn().mockResolvedValue(Buffer.from('fake-image-bytes')),
+  writeFile: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('DressesService', () => {
@@ -45,9 +48,17 @@ describe('DressesService', () => {
     };
     $transaction: jest.Mock;
   };
+  let photoProcessing: { enhance: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    photoProcessing = {
+      // Defaults to "enhancement unavailable" - individual tests opt in to
+      // a successful enhancement, matching the "must never block the
+      // upload" behavior being the safe default here too.
+      enhance: jest.fn().mockResolvedValue(null),
+    };
 
     prisma = {
       dress: {
@@ -84,6 +95,7 @@ describe('DressesService', () => {
       providers: [
         DressesService,
         { provide: PrismaService, useValue: prisma },
+        { provide: PhotoProcessingService, useValue: photoProcessing },
       ],
     }).compile();
 
@@ -1441,7 +1453,7 @@ describe('DressesService', () => {
       prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
 
       await service.addPhotos(1, 7, [
-        { filename: 'a.jpg' } as Express.Multer.File,
+        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
       ]);
 
       expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
@@ -1463,6 +1475,105 @@ describe('DressesService', () => {
         service.addPhotos(1, 7, []),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.dressPhoto.createMany).not.toHaveBeenCalled();
+    });
+
+    it('sets originalUrl only when enhancement is unavailable (the default mock behavior)', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
+
+      await service.addPhotos(1, 7, [
+        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+      ]);
+
+      expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            originalUrl: '/uploads/a.jpg',
+            processedUrl: undefined,
+          }),
+        ],
+      });
+    });
+
+    it('sets processedUrl once enhancement succeeds, writing the enhanced file alongside the original', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
+      photoProcessing.enhance.mockResolvedValue(Buffer.from('enhanced-bytes'));
+
+      await service.addPhotos(1, 7, [
+        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+      ]);
+
+      expect(writeFile).toHaveBeenCalledWith(
+        expect.stringContaining('a.jpg-enhanced.png'),
+        Buffer.from('enhanced-bytes'),
+      );
+      expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            originalUrl: '/uploads/a.jpg',
+            processedUrl: '/uploads/a.jpg-enhanced.png',
+          }),
+        ],
+      });
+    });
+
+    it('passes each uploaded file to the enhancer by its own file buffer and filename', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
+      (readFile as jest.Mock).mockResolvedValue(Buffer.from('raw-bytes'));
+
+      await service.addPhotos(1, 7, [
+        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+      ]);
+
+      expect(readFile).toHaveBeenCalledWith('/uploads/a.jpg');
+      expect(photoProcessing.enhance).toHaveBeenCalledWith(
+        Buffer.from('raw-bytes'),
+        'a.jpg',
+      );
+    });
+
+    it('one photo failing to enhance never blocks the others in the same upload', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dressPhoto.createMany.mockResolvedValue({ count: 2 });
+      photoProcessing.enhance
+        .mockResolvedValueOnce(Buffer.from('enhanced-bytes'))
+        .mockResolvedValueOnce(null);
+
+      await service.addPhotos(1, 7, [
+        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+        { filename: 'b.jpg', path: '/uploads/b.jpg' } as Express.Multer.File,
+      ]);
+
+      expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            originalUrl: '/uploads/a.jpg',
+            processedUrl: '/uploads/a.jpg-enhanced.png',
+          }),
+          expect.objectContaining({
+            originalUrl: '/uploads/b.jpg',
+            processedUrl: undefined,
+          }),
+        ],
+      });
     });
   });
 
