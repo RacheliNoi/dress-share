@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import Header from "@/components/Header";
 import DressCard from "@/components/DressCard";
 import CatalogFilters, { SortOption } from "@/components/CatalogFilters";
@@ -573,16 +574,27 @@ export default function CatalogPage() {
 
         <div id="catalog" className="scroll-mt-24">
           {/* Catalog heading */}
-          <section className="mb-5">
-            <p className="mb-2 text-sm font-medium text-accent">הקטלוג שלנו</p>
+          <section className="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="mb-2 text-sm font-medium text-accent">הקטלוג שלנו</p>
 
-            <h2 className="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">
-              שמלות זמינות להשכרה
-            </h2>
+              <h2 className="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">
+                שמלות זמינות להשכרה
+              </h2>
 
-            <p className="mt-2 text-sm text-zinc-500">
-              כל השמלות שאושרו ומוכנות להשכרה.
-            </p>
+              <p className="mt-2 text-sm text-zinc-500">
+                כל השמלות שאושרו ומוכנות להשכרה.
+              </p>
+            </div>
+
+            <Link
+              href="/catalog-pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-line-strong px-4 py-2 text-sm font-bold text-zinc-700 transition hover:border-accent hover:text-accent"
+            >
+              הורדת קטלוג כ-PDF
+            </Link>
           </section>
 
           {/* dresses.length > 0 covers the normal case; hasActiveFilters
