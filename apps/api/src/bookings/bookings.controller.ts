@@ -23,6 +23,14 @@ export class BookingsController {
     return this.bookingsService.findForOwner(user.sub);
   }
 
+  // "My requests/rentals" as a renter - distinct from /mine above, which is
+  // bookings ON dresses this user owns.
+  @UseGuards(JwtAuthGuard)
+  @Get('as-renter')
+  findAsRenter(@CurrentUser() user: { sub: number }) {
+    return this.bookingsService.findForRenter(user.sub);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('dress/:dressId')
   findForDress(

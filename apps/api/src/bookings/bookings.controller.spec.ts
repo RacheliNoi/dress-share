@@ -207,6 +207,39 @@ describe('BookingsController', () => {
     });
   });
 
+  describe('GET /bookings/as-renter', () => {
+    it('rejects unauthenticated requests (401)', async () => {
+      await request(app.getHttpServer()).get('/bookings/as-renter').expect(401);
+    });
+
+    it('returns only the bookings this user created as a renter, scoped by their own JWT', async () => {
+      prisma.booking.findMany.mockResolvedValue([{ id: 1, renterId: 3 }]);
+
+      const response = await request(app.getHttpServer())
+        .get('/bookings/as-renter')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { renterId: 3 } }),
+      );
+    });
+
+    it("a different user's token scopes to their own id, not someone else's bookings", async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/bookings/as-renter')
+        .set('Authorization', `Bearer ${tokenFor(42)}`)
+        .expect(200);
+
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { renterId: 42 } }),
+      );
+    });
+  });
+
   describe('GET /bookings/dress/:dressId', () => {
     it('rejects a non-owner (403)', async () => {
       prisma.dress.findUnique.mockResolvedValue({

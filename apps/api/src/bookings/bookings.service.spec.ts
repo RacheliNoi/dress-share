@@ -1180,6 +1180,41 @@ describe('BookingsService', () => {
     });
   });
 
+  describe('findForRenter', () => {
+    it('scopes the query to bookings created by this specific renter', async () => {
+      prisma.booking.findMany.mockResolvedValue([{ id: 1, renterId: 3 }]);
+
+      const result = await service.findForRenter(3);
+
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { renterId: 3 } }),
+      );
+      expect(result).toEqual([{ id: 1, renterId: 3 }]);
+    });
+
+    it("never scopes by dress ownership - this is the renter's own interests/rentals, not bookings on dresses they own", async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.findForRenter(3);
+
+      const call = prisma.booking.findMany.mock.calls[0][0];
+      expect(call.where).not.toHaveProperty('dress');
+    });
+
+    it('includes exactly one live/public photo per dress for a thumbnail, not the full gallery', async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.findForRenter(3);
+
+      const call = prisma.booking.findMany.mock.calls[0][0];
+      expect(call.include.dress.select.photos).toEqual({
+        where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] },
+        orderBy: { sortOrder: 'asc' },
+        take: 1,
+      });
+    });
+  });
+
   describe('markAsRented', () => {
     it('transitions an INTERESTED booking to RENTED', async () => {
       prisma.booking.findUnique.mockResolvedValue({

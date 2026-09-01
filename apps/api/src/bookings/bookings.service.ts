@@ -484,6 +484,31 @@ export class BookingsService {
     });
   }
 
+  // The renter-side equivalent of findForOwner - "my interests/rentals",
+  // not "bookings on dresses I own". Includes one photo per dress (the
+  // live/public-visible one, same OR filter used for sizes/photos
+  // elsewhere in this file) so a "my requests" list can show a thumbnail
+  // without a second request per booking.
+  async findForRenter(renterId: number) {
+    return this.prisma.booking.findMany({
+      where: { renterId },
+      include: {
+        dress: {
+          select: {
+            id: true,
+            name: true,
+            photos: {
+              where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] },
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { startDate: 'asc' },
+    });
+  }
+
   private async loadOwnedBooking(bookingId: number, ownerId: number) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
