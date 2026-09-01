@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { BookingStatus, DressStatus } from '../../generated/prisma/enums';
 import { Prisma } from '../../generated/prisma/client';
 
@@ -35,7 +36,10 @@ function addUtcDay(date: Date): Date {
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private parseDate(value: unknown, label: string): Date {
     if (value === undefined || value === null || value === '') {
@@ -95,6 +99,9 @@ export class BookingsService {
       where: { id: dressId },
       include: {
         sizes: { where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] } },
+        // Only ever read for the new-interest notification below - never
+        // exposed on any response shape from this method's other callers.
+        owner: { select: { email: true } },
       },
     });
 
@@ -349,7 +356,7 @@ export class BookingsService {
       ? dress.sizes.find((candidate) => candidate.size === data.size)
       : undefined;
 
-    return this.runSerializable(async (tx) => {
+    const booking = await this.runSerializable(async (tx) => {
       await this.assertCapacityAvailable(
         tx,
         data.dressId,
@@ -371,6 +378,18 @@ export class BookingsService {
         },
       });
     });
+
+    // Fire-and-forget from the caller's perspective: notification delivery
+    // is not part of this transaction and a delivery failure must never
+    // fail (or roll back) an otherwise-successful booking creation.
+    this.notifications.notifyNewInterest(
+      dress.owner.email,
+      dress.name,
+      startDate,
+      endDate,
+    );
+
+    return booking;
   }
 
   // TODO(auth-3): once payments (Phase 5) land, this must stop being callable
@@ -812,7 +831,12 @@ export class BookingsService {
   private async loadAccessibleBooking(bookingId: number, userId: number) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { dress: { select: { ownerId: true } } },
+      include: {
+        dress: { select: { ownerId: true, name: true, owner: { select: { email: true } } } },
+        // Only read for the new-chat-message notification below - the
+        // renter isn't otherwise exposed on this internal lookup's callers.
+        renter: { select: { email: true } },
+      },
     });
 
     if (!booking) {
@@ -836,7 +860,7 @@ export class BookingsService {
   }
 
   async createMessage(bookingId: number, userId: number, body: string) {
-    await this.loadAccessibleBooking(bookingId, userId);
+    const booking = await this.loadAccessibleBooking(bookingId, userId);
 
     const trimmed = body?.trim();
 
@@ -844,8 +868,23 @@ export class BookingsService {
       throw new BadRequestException('לא ניתן לשלוח הודעה ריקה');
     }
 
-    return this.prisma.bookingMessage.create({
+    const message = await this.prisma.bookingMessage.create({
       data: { bookingId, senderId: userId, body: trimmed },
     });
+
+    // Notify whichever participant did NOT send this message. A legacy
+    // booking with no renterId (predates auth-1, see loadAccessibleBooking)
+    // has no renter to notify when the owner writes - silently skipped
+    // rather than notifying no one or throwing.
+    const recipientEmail =
+      userId === booking.dress.ownerId
+        ? booking.renter?.email
+        : booking.dress.owner.email;
+
+    if (recipientEmail) {
+      this.notifications.notifyNewChatMessage(recipientEmail, booking.dress.name);
+    }
+
+    return message;
   }
 }

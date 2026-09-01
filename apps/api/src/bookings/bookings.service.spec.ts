@@ -7,6 +7,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { BookingsService, INTERESTED_EXPIRY_DAYS } from './bookings.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { DressStatus, BookingStatus } from '../../generated/prisma/enums';
 
 describe('BookingsService', () => {
@@ -36,8 +37,19 @@ describe('BookingsService', () => {
     };
     $transaction: jest.Mock;
   };
+  let notifications: {
+    notifyNewInterest: jest.Mock;
+    notifyNewChatMessage: jest.Mock;
+    notifyInterestExpiringSoon: jest.Mock;
+  };
 
-  const approvedDress = { id: 1, ownerId: 7, status: DressStatus.APPROVED };
+  const approvedDress = {
+    id: 1,
+    ownerId: 7,
+    status: DressStatus.APPROVED,
+    name: 'שמלת בדיקה',
+    owner: { email: 'owner7@test.com' },
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -74,8 +86,18 @@ describe('BookingsService', () => {
       ),
     };
 
+    notifications = {
+      notifyNewInterest: jest.fn(),
+      notifyNewChatMessage: jest.fn(),
+      notifyInterestExpiringSoon: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [BookingsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        BookingsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
+      ],
     }).compile();
 
     service = module.get<BookingsService>(BookingsService);
@@ -117,6 +139,12 @@ describe('BookingsService', () => {
         }),
       });
       expect(result.status).toBe(BookingStatus.INTERESTED);
+      expect(notifications.notifyNewInterest).toHaveBeenCalledWith(
+        'owner7@test.com',
+        expect.any(String),
+        expect.any(Date),
+        expect.any(Date),
+      );
     });
 
     it("rejects the dress owner creating INTERESTED on their own dress", async () => {
@@ -131,6 +159,7 @@ describe('BookingsService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
+      expect(notifications.notifyNewInterest).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for a missing dress', async () => {
@@ -378,6 +407,8 @@ describe('BookingsService', () => {
       id: 1,
       ownerId: 7,
       status: DressStatus.APPROVED,
+      name: 'שמלת בדיקה',
+      owner: { email: 'owner7@test.com' },
       sizes: [
         { id: 1, size: 'S' },
         { id: 2, size: 'M' },
@@ -667,6 +698,8 @@ describe('BookingsService', () => {
       id: 1,
       ownerId: 7,
       status: DressStatus.APPROVED,
+      name: 'שמלת בדיקה',
+      owner: { email: 'owner7@test.com' },
       sizes: [
         { id: 1, size: 'S', price: 100, quantity: 1 },
         { id: 2, size: 'M', price: 150, quantity: 3 },
@@ -1380,7 +1413,12 @@ describe('BookingsService', () => {
   describe('getMessages / createMessage', () => {
     // Booking 1: renterId 3 on a dress owned by 7 - matches the
     // renterId: 3 / ownerId: 7 convention used throughout this file.
-    const booking = { id: 1, renterId: 3, dress: { ownerId: 7 } };
+    const booking = {
+      id: 1,
+      renterId: 3,
+      dress: { ownerId: 7, name: 'שמלת בדיקה', owner: { email: 'owner7@test.com' } },
+      renter: { email: 'renter3@test.com' },
+    };
 
     it("getMessages returns the thread for the booking's renter", async () => {
       prisma.booking.findUnique.mockResolvedValue(booking);
@@ -1432,6 +1470,11 @@ describe('BookingsService', () => {
         data: { bookingId: 1, senderId: 3, body: 'hello' },
       });
       expect(result.body).toBe('hello');
+      // Sender is the renter (3) - the owner gets notified.
+      expect(notifications.notifyNewChatMessage).toHaveBeenCalledWith(
+        'owner7@test.com',
+        'שמלת בדיקה',
+      );
     });
 
     it('createMessage stores a message from the dress owner', async () => {
@@ -1448,6 +1491,29 @@ describe('BookingsService', () => {
       expect(prisma.bookingMessage.create).toHaveBeenCalledWith({
         data: { bookingId: 1, senderId: 7, body: 'sure!' },
       });
+      // Sender is the owner (7) - the renter gets notified.
+      expect(notifications.notifyNewChatMessage).toHaveBeenCalledWith(
+        'renter3@test.com',
+        'שמלת בדיקה',
+      );
+    });
+
+    it('createMessage skips notifying when the booking has no renter (legacy, predates auth-1)', async () => {
+      prisma.booking.findUnique.mockResolvedValue({
+        ...booking,
+        renterId: null,
+        renter: null,
+      });
+      prisma.bookingMessage.create.mockResolvedValue({
+        id: 4,
+        bookingId: 1,
+        senderId: 7,
+        body: 'hi',
+      });
+
+      await service.createMessage(1, 7, 'hi');
+
+      expect(notifications.notifyNewChatMessage).not.toHaveBeenCalled();
     });
 
     it('createMessage rejects an empty/whitespace-only body', async () => {

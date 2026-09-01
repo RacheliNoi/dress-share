@@ -35,7 +35,13 @@ describe('BookingsController', () => {
     $transaction: jest.Mock;
   };
 
-  const approvedDress = { id: 1, ownerId: 7, status: DressStatus.APPROVED };
+  const approvedDress = {
+    id: 1,
+    ownerId: 7,
+    status: DressStatus.APPROVED,
+    name: 'שמלת בדיקה',
+    owner: { email: 'owner7@test.com' },
+  };
 
   function tokenFor(userId: number) {
     return jwtService.sign({
@@ -263,7 +269,12 @@ describe('BookingsController', () => {
   describe('GET/POST /bookings/:id/messages', () => {
     // renterId 3 on approvedDress (owner 7) - same convention as the rest
     // of this file.
-    const booking = { id: 1, renterId: 3, dress: { ownerId: 7 } };
+    const booking = {
+      id: 1,
+      renterId: 3,
+      dress: { ownerId: 7, name: 'שמלת בדיקה', owner: { email: 'owner7@test.com' } },
+      renter: { email: 'renter3@test.com' },
+    };
 
     it('GET rejects unauthenticated requests (401)', async () => {
       await request(app.getHttpServer()).get('/bookings/1/messages').expect(401);
