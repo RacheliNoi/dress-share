@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
+import InterestedBookingButton from "@/components/InterestedBookingButton";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import { Dress, getApprovedDressById, getDressImageUrl } from "@/lib/api";
 
@@ -195,6 +196,12 @@ export default function DressDetailsPage() {
                   </p>
                 )}
               </div>
+
+              <InterestedBookingButton
+                dressId={dress.id}
+                ownerId={dress.ownerId}
+                sizes={dress.sizes}
+              />
 
               <DressAvailabilityCalendar dressId={dress.id} sizes={dress.sizes} />
             </div>
