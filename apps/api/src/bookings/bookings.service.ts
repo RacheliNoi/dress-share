@@ -733,4 +733,48 @@ export class BookingsService {
 
     return result.count;
   }
+
+  // Only the two participants of a booking - the renter who made it, and the
+  // owner of the dress it's on - may read or post into its message thread.
+  // Mirrors loadOwnedBooking's not-found-vs-forbidden split, but checks
+  // renterId OR dress.ownerId instead of ownerId alone.
+  private async loadAccessibleBooking(bookingId: number, userId: number) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { dress: { select: { ownerId: true } } },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('ההזמנה לא נמצאה');
+    }
+
+    if (booking.renterId !== userId && booking.dress.ownerId !== userId) {
+      throw new ForbiddenException('אין הרשאה לצפות בהזמנה הזו');
+    }
+
+    return booking;
+  }
+
+  async getMessages(bookingId: number, userId: number) {
+    await this.loadAccessibleBooking(bookingId, userId);
+
+    return this.prisma.bookingMessage.findMany({
+      where: { bookingId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async createMessage(bookingId: number, userId: number, body: string) {
+    await this.loadAccessibleBooking(bookingId, userId);
+
+    const trimmed = body?.trim();
+
+    if (!trimmed) {
+      throw new BadRequestException('לא ניתן לשלוח הודעה ריקה');
+    }
+
+    return this.prisma.bookingMessage.create({
+      data: { bookingId, senderId: userId, body: trimmed },
+    });
+  }
 }

@@ -22,6 +22,10 @@ describe('BookingsController', () => {
       updateMany: jest.Mock;
       delete: jest.Mock;
     };
+    bookingMessage: {
+      findMany: jest.Mock;
+      create: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -50,6 +54,10 @@ describe('BookingsController', () => {
         // app.init() doesn't throw.
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         delete: jest.fn(),
+      },
+      bookingMessage: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
       },
       $transaction: jest.fn((operation: (tx: typeof prisma) => Promise<unknown>) =>
         operation(prisma),
@@ -237,6 +245,90 @@ describe('BookingsController', () => {
       expect(prisma.booking.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { renterId: 42 } }),
       );
+    });
+  });
+
+  describe('GET/POST /bookings/:id/messages', () => {
+    // renterId 3 on approvedDress (owner 7) - same convention as the rest
+    // of this file.
+    const booking = { id: 1, renterId: 3, dress: { ownerId: 7 } };
+
+    it('GET rejects unauthenticated requests (401)', async () => {
+      await request(app.getHttpServer()).get('/bookings/1/messages').expect(401);
+    });
+
+    it("GET returns the thread for the booking's renter", async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+      prisma.bookingMessage.findMany.mockResolvedValue([
+        { id: 1, bookingId: 1, senderId: 3, body: 'hi' },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/bookings/1/messages')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+    });
+
+    it("GET returns the thread for the dress's owner", async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await request(app.getHttpServer())
+        .get('/bookings/1/messages')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(200);
+    });
+
+    it('GET rejects a user who is neither participant (403)', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await request(app.getHttpServer())
+        .get('/bookings/1/messages')
+        .set('Authorization', `Bearer ${tokenFor(99)}`)
+        .expect(403);
+    });
+
+    it('POST stores a message from the renter, with senderId forced from the JWT', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+      prisma.bookingMessage.create.mockResolvedValue({
+        id: 2,
+        bookingId: 1,
+        senderId: 3,
+        body: 'hello',
+      });
+
+      await request(app.getHttpServer())
+        .post('/bookings/1/messages')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .send({ body: 'hello' })
+        .expect(201);
+
+      expect(prisma.bookingMessage.create).toHaveBeenCalledWith({
+        data: { bookingId: 1, senderId: 3, body: 'hello' },
+      });
+    });
+
+    it('POST rejects a user who is neither participant (403)', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await request(app.getHttpServer())
+        .post('/bookings/1/messages')
+        .set('Authorization', `Bearer ${tokenFor(99)}`)
+        .send({ body: 'hi' })
+        .expect(403);
+
+      expect(prisma.bookingMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('POST rejects an empty body (400)', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await request(app.getHttpServer())
+        .post('/bookings/1/messages')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .send({ body: '   ' })
+        .expect(400);
     });
   });
 

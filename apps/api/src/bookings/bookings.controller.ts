@@ -130,4 +130,22 @@ export class BookingsController {
   remove(@Param('id') id: string, @CurrentUser() user: { sub: number }) {
     return this.bookingsService.cancelOrRemove(Number(id), user.sub);
   }
+
+  // Thread is scoped to exactly the two participants of this booking (the
+  // renter and the dress's owner) - enforced in the service, not here.
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/messages')
+  getMessages(@Param('id') id: string, @CurrentUser() user: { sub: number }) {
+    return this.bookingsService.getMessages(Number(id), user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/messages')
+  createMessage(
+    @Param('id') id: string,
+    @Body() body: { body: string },
+    @CurrentUser() user: { sub: number },
+  ) {
+    return this.bookingsService.createMessage(Number(id), user.sub, body.body);
+  }
 }

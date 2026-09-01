@@ -24,6 +24,10 @@ describe('BookingsService', () => {
       updateMany: jest.Mock;
       delete: jest.Mock;
     };
+    bookingMessage: {
+      findMany: jest.Mock;
+      create: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -44,6 +48,10 @@ describe('BookingsService', () => {
         update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         delete: jest.fn(),
+      },
+      bookingMessage: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
       },
       // In tests, the "transaction client" is just the same mocked prisma
       // object - real Postgres SERIALIZABLE isolation isn't something a
@@ -1212,6 +1220,94 @@ describe('BookingsService', () => {
         orderBy: { sortOrder: 'asc' },
         take: 1,
       });
+    });
+  });
+
+  describe('getMessages / createMessage', () => {
+    // Booking 1: renterId 3 on a dress owned by 7 - matches the
+    // renterId: 3 / ownerId: 7 convention used throughout this file.
+    const booking = { id: 1, renterId: 3, dress: { ownerId: 7 } };
+
+    it("getMessages returns the thread for the booking's renter", async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+      prisma.bookingMessage.findMany.mockResolvedValue([
+        { id: 1, bookingId: 1, senderId: 3, body: 'hi' },
+      ]);
+
+      const result = await service.getMessages(1, 3);
+
+      expect(prisma.bookingMessage.findMany).toHaveBeenCalledWith({
+        where: { bookingId: 1 },
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(result).toEqual([{ id: 1, bookingId: 1, senderId: 3, body: 'hi' }]);
+    });
+
+    it("getMessages returns the thread for the booking's dress owner", async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await service.getMessages(1, 7);
+
+      expect(prisma.bookingMessage.findMany).toHaveBeenCalled();
+    });
+
+    it('getMessages rejects a user who is neither the renter nor the dress owner', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await expect(service.getMessages(1, 99)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('getMessages rejects when the booking does not exist', async () => {
+      prisma.booking.findUnique.mockResolvedValue(null);
+
+      await expect(service.getMessages(1, 3)).rejects.toThrow(NotFoundException);
+    });
+
+    it('createMessage stores a message from the renter, trimmed', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+      prisma.bookingMessage.create.mockResolvedValue({
+        id: 2,
+        bookingId: 1,
+        senderId: 3,
+        body: 'hello',
+      });
+
+      const result = await service.createMessage(1, 3, '  hello  ');
+
+      expect(prisma.bookingMessage.create).toHaveBeenCalledWith({
+        data: { bookingId: 1, senderId: 3, body: 'hello' },
+      });
+      expect(result.body).toBe('hello');
+    });
+
+    it('createMessage stores a message from the dress owner', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+      prisma.bookingMessage.create.mockResolvedValue({
+        id: 3,
+        bookingId: 1,
+        senderId: 7,
+        body: 'sure!',
+      });
+
+      await service.createMessage(1, 7, 'sure!');
+
+      expect(prisma.bookingMessage.create).toHaveBeenCalledWith({
+        data: { bookingId: 1, senderId: 7, body: 'sure!' },
+      });
+    });
+
+    it('createMessage rejects an empty/whitespace-only body', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await expect(service.createMessage(1, 3, '   ')).rejects.toThrow(BadRequestException);
+      expect(prisma.bookingMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('createMessage rejects a user who is neither participant', async () => {
+      prisma.booking.findUnique.mockResolvedValue(booking);
+
+      await expect(service.createMessage(1, 99, 'hi')).rejects.toThrow(ForbiddenException);
+      expect(prisma.bookingMessage.create).not.toHaveBeenCalled();
     });
   });
 
