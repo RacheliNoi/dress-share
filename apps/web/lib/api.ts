@@ -530,6 +530,21 @@ export function cancelPendingPhotoChange(
   });
 }
 
+// Re-runs the AI enhancement on ONE photo's original upload - for when the
+// owner doesn't like how the automatic pass came out. Unlike a normal
+// upload, a failure here throws (surfaced to the owner as an error), rather
+// than silently keeping the old result.
+export function reprocessDressPhoto(
+  token: string,
+  dressId: number,
+  photoId: number,
+) {
+  return request<DressPhoto>(`/dresses/${dressId}/photos/${photoId}/reprocess`, {
+    method: "POST",
+    token,
+  });
+}
+
 // Submits an in-progress edit to an already-APPROVED dress for admin
 // review. Unlike submitDressForApproval (brand-new dresses), the dress's
 // own `status` never changes - it stays APPROVED throughout, which is why

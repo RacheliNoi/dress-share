@@ -16,6 +16,7 @@ import {
   deleteDressSize,
   getDressImageUrl,
   getMyDresses,
+  reprocessDressPhoto,
   submitDressEditForApproval,
   submitDressForApproval,
   updateDress,
@@ -66,6 +67,7 @@ export default function EditDressPage() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [photoError, setPhotoError] = useState("");
   const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
+  const [reprocessingPhotoId, setReprocessingPhotoId] = useState<number | null>(null);
 
   const [resubmitting, setResubmitting] = useState(false);
   const [resubmitError, setResubmitError] = useState("");
@@ -439,6 +441,28 @@ export default function EditDressPage() {
     } finally {
       setDeletingPhotoId(null);
       setPendingConfirm(null);
+    }
+  }
+
+  async function handleReprocessPhoto(photoId: number) {
+    const token = getToken();
+
+    if (!token || !dress) {
+      return;
+    }
+
+    setReprocessingPhotoId(photoId);
+    setPhotoError("");
+
+    try {
+      await reprocessDressPhoto(token, dress.id, photoId);
+      await refreshDressAndSizeDrafts(token, dress.id);
+    } catch (err) {
+      setPhotoError(
+        err instanceof ApiError ? err.message : "שגיאה בעריכה מחדש של התמונה",
+      );
+    } finally {
+      setReprocessingPhotoId(null);
     }
   }
 
@@ -928,6 +952,23 @@ export default function EditDressPage() {
                         <span className="absolute bottom-2 right-2 rounded-full bg-error-soft/95 px-2 py-0.5 text-[10px] font-bold text-error shadow-sm backdrop-blur">
                           מסומן להסרה
                         </span>
+                      )}
+
+                      {photo.pendingAction !== "REMOVE" && (
+                        <button
+                          type="button"
+                          onClick={() => handleReprocessPhoto(photo.id)}
+                          disabled={reprocessingPhotoId === photo.id}
+                          title="עריכה מחדש ע״י AI"
+                          aria-label="עריכה מחדש ע״י AI"
+                          className="absolute bottom-2 left-2 flex h-7 items-center justify-center gap-1 rounded-full bg-zinc-900/70 px-2.5 text-[10px] font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {reprocessingPhotoId === photo.id ? (
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          ) : (
+                            "↻ עריכה מחדש"
+                          )}
+                        </button>
                       )}
 
                       {photo.pendingAction === "REMOVE" ? (

@@ -224,6 +224,20 @@ cancelPendingPhotoChange(
 }
 
 @UseGuards(JwtAuthGuard)
+@Post(':id/photos/:photoId/reprocess')
+reprocessPhoto(
+  @Param('id') id: string,
+  @Param('photoId') photoId: string,
+  @CurrentUser() user: { sub: number },
+) {
+  return this.dressesService.reprocessPhoto(
+    Number(id),
+    Number(photoId),
+    user.sub,
+  );
+}
+
+@UseGuards(JwtAuthGuard)
 @Post(':id/submit')
 submitForApproval(
   @Param('id') id: string,

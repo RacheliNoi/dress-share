@@ -1577,6 +1577,90 @@ describe('DressesService', () => {
     });
   });
 
+  describe('reprocessPhoto', () => {
+    const photo = {
+      id: 5,
+      dressId: 1,
+      originalUrl: '/uploads/a.jpg',
+      processedUrl: null as string | null,
+      dress: { id: 1, ownerId: 7, status: DressStatus.DRAFT },
+    };
+
+    it('re-enhances the ORIGINAL upload (never a previous processedUrl) and sets a fresh processedUrl', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue(photo);
+      (readFile as jest.Mock).mockResolvedValue(Buffer.from('raw-bytes'));
+      photoProcessing.enhance.mockResolvedValue(Buffer.from('enhanced-again'));
+      prisma.dressPhoto.update.mockResolvedValue({
+        ...photo,
+        processedUrl: '/uploads/a.jpg-enhanced-123.png',
+      });
+
+      await service.reprocessPhoto(1, 5, 7);
+
+      expect(readFile).toHaveBeenCalledWith(expect.stringContaining('a.jpg'));
+      expect(photoProcessing.enhance).toHaveBeenCalledWith(
+        Buffer.from('raw-bytes'),
+        'a.jpg',
+      );
+      expect(prisma.dressPhoto.update).toHaveBeenCalledWith({
+        where: { id: 5 },
+        data: { processedUrl: expect.stringMatching(/^\/uploads\/a\.jpg-enhanced-\d+\.png$/) },
+      });
+    });
+
+    it('deletes the previous processed file once a new one replaces it', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue({
+        ...photo,
+        processedUrl: '/uploads/a.jpg-enhanced-old.png',
+      });
+      (readFile as jest.Mock).mockResolvedValue(Buffer.from('raw-bytes'));
+      photoProcessing.enhance.mockResolvedValue(Buffer.from('enhanced-again'));
+      prisma.dressPhoto.update.mockResolvedValue(photo);
+
+      await service.reprocessPhoto(1, 5, 7);
+
+      expect(unlink).toHaveBeenCalledWith(
+        expect.stringContaining('a.jpg-enhanced-old.png'),
+      );
+    });
+
+    it('throws (does not silently succeed) when enhancement fails - unlike addPhotos, this is an explicit user action', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue(photo);
+      (readFile as jest.Mock).mockResolvedValue(Buffer.from('raw-bytes'));
+      photoProcessing.enhance.mockResolvedValue(null);
+
+      await expect(service.reprocessPhoto(1, 5, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.dressPhoto.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-owner (403)', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue(photo);
+
+      await expect(service.reprocessPhoto(1, 5, 3)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(photoProcessing.enhance).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a photo that does not exist', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue(null);
+
+      await expect(service.reprocessPhoto(1, 999, 7)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws NotFoundException when the photo belongs to a different dress', async () => {
+      prisma.dressPhoto.findUnique.mockResolvedValue({ ...photo, dressId: 2 });
+
+      await expect(service.reprocessPhoto(1, 5, 7)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('submitEditForApproval', () => {
     it('locks in the pending edit by setting pendingReviewSubmittedAt (status stays APPROVED)', async () => {
       prisma.dress.findUnique.mockResolvedValue({

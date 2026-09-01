@@ -614,6 +614,64 @@ export class DressesService {
     });
   }
 
+  // Manual, explicit re-run of the AI enhancement on ONE photo's original
+  // upload - for when the owner doesn't like how the automatic pass (from
+  // addPhotos) came out. Unlike addPhotos, a failure here is NOT swallowed:
+  // this is a deliberate user action expecting a visible result, so a
+  // failed attempt must tell the owner to try again rather than silently
+  // doing nothing. Always re-processes originalUrl (never a previous
+  // processedUrl), so repeated attempts never compound quality loss from
+  // re-enhancing an already-enhanced image.
+  async reprocessPhoto(dressId: number, photoId: number, ownerId: number) {
+    const photo = await this.prisma.dressPhoto.findUnique({
+      where: { id: photoId },
+      include: { dress: true },
+    });
+
+    if (!photo || photo.dressId !== dressId) {
+      throw new NotFoundException('התמונה לא נמצאה');
+    }
+
+    if (photo.dress.ownerId !== ownerId) {
+      throw new ForbiddenException('אין הרשאה לערוך את התמונה הזו');
+    }
+
+    this.assertEditable(photo.dress);
+
+    const originalBuffer = await readFile(
+      join(UPLOADS_DIR, basename(photo.originalUrl)),
+    );
+    const enhanced = await this.photoProcessing.enhance(
+      originalBuffer,
+      basename(photo.originalUrl),
+    );
+
+    if (!enhanced) {
+      throw new BadRequestException(
+        'השיפור נכשל, נסי שוב בעוד רגע',
+      );
+    }
+
+    // A fresh, unique filename each time (not the same "-enhanced.png"
+    // suffix addPhotos uses) so the browser/CDN never serves a stale
+    // cached copy from a previous attempt at the same URL.
+    const processedFilename = `${basename(photo.originalUrl)}-enhanced-${Date.now()}.png`;
+    await writeFile(join(UPLOADS_DIR, processedFilename), enhanced);
+
+    const previousProcessedUrl = photo.processedUrl;
+
+    const updated = await this.prisma.dressPhoto.update({
+      where: { id: photoId },
+      data: { processedUrl: `/uploads/${processedFilename}` },
+    });
+
+    if (previousProcessedUrl) {
+      await this.deleteUploadedFile(previousProcessedUrl);
+    }
+
+    return updated;
+  }
+
   async removePhoto(dressId: number, photoId: number, ownerId: number) {
     const photo = await this.prisma.dressPhoto.findUnique({
       where: {

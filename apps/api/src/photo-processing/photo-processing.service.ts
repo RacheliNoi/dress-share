@@ -4,9 +4,13 @@ const PHOTOROOM_SEGMENT_URL = 'https://sdk.photoroom.com/v1/segment';
 
 // v1/segment's bg_color only accepts named CSS-style colors, not hex -
 // verified live against the real API ("FFFFFF" is rejected as invalid,
-// "white" works) - so this is deliberately a named color, not one of the
-// app's own hex design tokens.
-const BACKGROUND_COLOR = 'white';
+// named colors work) - so this is deliberately a named color, not one of
+// the app's own hex design tokens. "linen" (a warm, soft off-white) was
+// picked over "white" after comparing several live results side by side -
+// a flat white backdrop read as clinical/product-catalog, linen reads
+// closer to a boutique studio shot while staying a safe, neutral choice
+// that doesn't compete with any dress color.
+const BACKGROUND_COLOR = 'linen';
 
 // Single choke point for the Photoroom integration - mirrors
 // NotificationsService.send()'s "one place to swap later" shape.
