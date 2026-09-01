@@ -39,7 +39,8 @@ UI is in Hebrew with full RTL support.
 
 **Notifications**
 - Owner gets notified when someone expresses interest in their dress; whichever side of a chat didn't just write gets notified of a new message; a renter gets warned once before their `INTERESTED` hold is about to auto-expire
-- Routed through a single `NotificationsService.send()` choke point, currently logging to the console in dev (same pattern already used for password-reset emails) — swapping in a real provider (Resend/SendGrid) touches that one method, not each trigger site
+- Real email delivery via Resend. Until a sending domain is verified in the Resend dashboard, real recipient addresses are rejected by Resend itself (their anti-spam safeguard) and every send falls back to the same `[dev-only]` console log used before — nothing breaks, emails just aren't delivered to real inboxes yet
+- Routed through a single `NotificationsService.send()` choke point — the eventual domain-verified `from` address change, or any future provider swap, touches one method, not each trigger site
 
 **Auth & authorization**
 - JWT-based authentication, role-based access control (`USER` / `ADMIN`)
@@ -99,6 +100,7 @@ npm run dev             # http://localhost:3000
 | `apps/api` | `PORT` | Optional, defaults to `3001` |
 | `apps/api` | `PHOTOROOM_API_KEY_SANDBOX` | Optional. Photo enhancement on upload — free tier, output is watermarked. Uploads work fine without it (skips enhancement, keeps the original photo only) |
 | `apps/api` | `PHOTOROOM_API_KEY_LIVE` | Optional, not currently wired to any code path — reserved for switching off the sandbox watermark before shipping |
+| `apps/api` | `RESEND_API_KEY` | Optional. Real email delivery. Without a verified sending domain, real recipients get rejected by Resend and notifications fall back to a console log |
 | `apps/web` | `NEXT_PUBLIC_API_URL` | Optional, defaults to `http://localhost:3001` |
 
 ### Default seeded admin (local dev only)
@@ -123,4 +125,4 @@ npm run test:cov    # with coverage
 - **Approve-in-place editing.** Rather than a separate "draft" table, an approved listing's proposed edits live on the same row (`pendingDetails` JSON + `pendingAction` on child rows), so the public read path never has to branch on edit state — it simply never selects the pending fields.
 - **Price sort vs. pagination.** Prisma can't order a query by an aggregate (min price) across a to-many relation, so `recommended`/`newest` paginate at the database level, while price-sorted queries fetch all matches, sort in application code, and slice — trading one code path's efficiency for correctness rather than reaching for raw SQL.
 - **Renter-initiated bookings, not owner self-report.** Earlier in the project's life, only the dress's owner could create a booking record (including marking it `INTERESTED`), which meant nothing stopped an owner from just arranging a rental off-platform and never touching the app at all. The fix wasn't a policy — it was making the renter the one who creates the `INTERESTED` row, with the owner responding rather than reporting, so the interaction actually has to happen on the platform to exist at all.
-- **One notification choke point.** Every outbound email goes through a single `NotificationsService.send()`, currently backed by a console log (mirroring the existing password-reset placeholder) until a real provider (Resend/SendGrid) is wired in. Every trigger site calls a named method on that service, never `console.log` directly, so the eventual swap to a real provider is a one-file change.
+- **One notification choke point.** Every outbound email goes through a single `NotificationsService.send()`, which calls the real Resend API and falls back to a console log if that call fails or isn't configured (mirroring the existing password-reset placeholder). Every trigger site calls a named method on that service, never a provider directly, so the eventual "real domain verified, remove the fallback" change is one-file.
