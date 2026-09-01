@@ -66,12 +66,19 @@ describe('BookingsService', () => {
   });
 
   describe('createInterested', () => {
-    it('creates an INTERESTED booking for the owner of an APPROVED dress', async () => {
+    // approvedDress.ownerId is 7 throughout this file - every test below
+    // that isn't specifically about the self-interest rule uses renterId: 3
+    // (a distinct, non-owner id), matching the renterId: 3 convention
+    // already used for createRented tests further down. Using 7 here by
+    // accident would silently trip the new self-interest guard instead of
+    // exercising whatever the test actually means to check.
+    it('creates an INTERESTED booking for a user who does NOT own the dress, with renterId set from the caller', async () => {
       prisma.dress.findUnique.mockResolvedValue(approvedDress);
       prisma.booking.findFirst.mockResolvedValue(null);
       prisma.booking.create.mockResolvedValue({
         id: 1,
         dressId: 1,
+        renterId: 3,
         status: BookingStatus.INTERESTED,
       });
 
@@ -79,33 +86,30 @@ describe('BookingsService', () => {
         dressId: 1,
         startDate: '2026-09-01',
         endDate: '2026-09-05',
-        ownerId: 7,
+        renterId: 3,
       });
 
       expect(prisma.booking.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           dressId: 1,
+          renterId: 3,
           status: BookingStatus.INTERESTED,
         }),
       });
       expect(result.status).toBe(BookingStatus.INTERESTED);
     });
 
-    it('rejects for a user who does not own the dress (403)', async () => {
-      prisma.dress.findUnique.mockResolvedValue({
-        id: 1,
-        ownerId: 999,
-        status: DressStatus.APPROVED,
-      });
+    it("rejects the dress owner creating INTERESTED on their own dress", async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress); // ownerId: 7
 
       await expect(
         service.createInterested({
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 7, // same as approvedDress.ownerId - deliberately testing this exact case
         }),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
@@ -117,7 +121,7 @@ describe('BookingsService', () => {
           dressId: 999,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -131,7 +135,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-10',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -145,7 +149,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: 'not-a-date',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -161,7 +165,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-05',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).resolves.toBeDefined();
       expect(prisma.booking.create).toHaveBeenCalled();
@@ -179,7 +183,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -197,7 +201,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -212,7 +216,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -369,7 +373,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -384,7 +388,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-01',
           endDate: '2026-09-05',
           size: 'XL',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.booking.create).not.toHaveBeenCalled();
@@ -400,7 +404,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).resolves.toBeDefined();
     });
@@ -415,7 +419,7 @@ describe('BookingsService', () => {
         startDate: '2026-09-01',
         endDate: '2026-09-05',
         size: 'M',
-        ownerId: 7,
+        renterId: 3,
       });
 
       expect(prisma.booking.findMany).toHaveBeenCalledWith({
@@ -445,7 +449,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-01',
           endDate: '2026-09-05',
           size: 'L',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).resolves.toBeDefined();
     });
@@ -462,7 +466,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-01',
           endDate: '2026-09-05',
           size: 'M',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -499,7 +503,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-01',
           endDate: '2026-09-05',
           size: 'M',
-          ownerId: 7,
+          renterId: 3,
         });
 
         expect(prisma.booking.create).toHaveBeenCalledWith({
@@ -664,7 +668,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-10',
           endDate: '2026-09-12',
           size: 'M',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).resolves.toBeDefined();
     });
@@ -683,7 +687,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-10',
           endDate: '2026-09-12',
           size: 'M',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -709,7 +713,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-02',
           endDate: '2026-09-11',
           size: 'L',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -738,7 +742,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-04',
           endDate: '2026-09-11',
           size: 'M',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).resolves.toBeDefined();
     });
@@ -755,7 +759,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-10',
           endDate: '2026-09-12',
           size: 'M',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -773,7 +777,7 @@ describe('BookingsService', () => {
           startDate: '2026-09-10',
           endDate: '2026-09-12',
           size: 'L',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).resolves.toBeDefined();
 
@@ -821,7 +825,7 @@ describe('BookingsService', () => {
         dressId: 1,
         startDate: '2026-09-01',
         endDate: '2026-09-05',
-        ownerId: 7,
+        renterId: 3,
       });
 
       expect(prisma.$transaction).toHaveBeenCalledWith(
@@ -850,7 +854,7 @@ describe('BookingsService', () => {
         dressId: 1,
         startDate: '2026-09-01',
         endDate: '2026-09-05',
-        ownerId: 7,
+        renterId: 3,
       });
 
       expect(call).toBe(2);
@@ -877,7 +881,7 @@ describe('BookingsService', () => {
         dressId: 1,
         startDate: '2026-09-01',
         endDate: '2026-09-05',
-        ownerId: 7,
+        renterId: 3,
       });
 
       expect(call).toBe(2);
@@ -893,7 +897,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(ConflictException);
       expect(prisma.$transaction).toHaveBeenCalledTimes(2);
@@ -908,7 +912,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(ConflictException);
       expect(prisma.$transaction).toHaveBeenCalledTimes(2);
@@ -923,7 +927,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow('some other db error');
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -943,7 +947,7 @@ describe('BookingsService', () => {
         dressId: 1,
         startDate: '2026-09-01',
         endDate: '2026-09-05',
-        ownerId: 7,
+        renterId: 3,
       });
 
       expect(prisma.booking.findFirst).toHaveBeenCalledWith({
@@ -968,7 +972,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -982,7 +986,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -996,7 +1000,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -1010,7 +1014,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-05',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -1024,7 +1028,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-09-01',
           endDate: '2026-09-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -1039,7 +1043,7 @@ describe('BookingsService', () => {
           dressId: 1,
           startDate: '2026-11-01',
           endDate: '2026-11-05',
-          ownerId: 7,
+          renterId: 3,
         }),
       ).resolves.toBeDefined();
     });

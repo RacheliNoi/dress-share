@@ -40,6 +40,9 @@ export class BookingsController {
     return this.bookingsService.findAvailabilityForDress(Number(dressId));
   }
 
+  // Any authenticated user (not just the dress's owner) can express
+  // interest - renterId is forced from the caller's own JWT, never from the
+  // request body, so it can't be spoofed to claim someone else's interest.
   @UseGuards(JwtAuthGuard)
   @Post('interested')
   createInterested(
@@ -57,7 +60,7 @@ export class BookingsController {
       startDate: body.startDate,
       endDate: body.endDate,
       size: body.size,
-      ownerId: user.sub,
+      renterId: user.sub,
     });
   }
 

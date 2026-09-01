@@ -84,6 +84,27 @@ export class BookingsService {
     return dress;
   }
 
+  // Same lookup as loadOwnedDress, minus the ownership check - used by
+  // createInterested, which any authenticated renter (not just the dress's
+  // owner) can now call. Kept as a separate method rather than adding a
+  // "skip the check" flag to loadOwnedDress, so every other caller of
+  // loadOwnedDress keeps its ownership guarantee with zero risk of it being
+  // accidentally bypassed.
+  private async loadBookableDress(dressId: number) {
+    const dress = await this.prisma.dress.findUnique({
+      where: { id: dressId },
+      include: {
+        sizes: { where: { OR: [{ pendingAction: null }, { pendingAction: 'REMOVE' }] } },
+      },
+    });
+
+    if (!dress) {
+      throw new NotFoundException('השמלה לא נמצאה');
+    }
+
+    return dress;
+  }
+
   // A dress with zero DressSize rows keeps the original, size-blind
   // behavior entirely untouched (no size required, no validation against a
   // size list that doesn't exist, whole-dress overlap blocking) - see the
@@ -294,15 +315,23 @@ export class BookingsService {
     return error;
   }
 
+  // Unlike every other booking-mutating method here, the caller is the
+  // RENTER, not the dress's owner - loadBookableDress performs no ownership
+  // check, and renterId is trusted as-is (the controller forces it from the
+  // caller's own JWT, never from the request body).
   async createInterested(data: {
     dressId: number;
     startDate: string | Date;
     endDate: string | Date;
     size?: string;
-    ownerId: number;
+    renterId: number;
   }) {
-    const dress = await this.loadOwnedDress(data.dressId, data.ownerId);
+    const dress = await this.loadBookableDress(data.dressId);
     this.assertDressBookable(dress);
+
+    if (dress.ownerId === data.renterId) {
+      throw new BadRequestException('לא ניתן לסמן עניין בשמלה שלך');
+    }
 
     const startDate = this.parseDate(data.startDate, 'תאריך התחלה');
     const endDate = this.parseDate(data.endDate, 'תאריך סיום');
@@ -333,6 +362,7 @@ export class BookingsService {
       return tx.booking.create({
         data: {
           dressId: data.dressId,
+          renterId: data.renterId,
           startDate,
           endDate,
           status: BookingStatus.INTERESTED,

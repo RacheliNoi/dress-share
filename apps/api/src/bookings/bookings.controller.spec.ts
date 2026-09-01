@@ -85,38 +85,59 @@ describe('BookingsController', () => {
         .expect(401);
     });
 
-    it('rejects a user who does not own the dress (403)', async () => {
-      prisma.dress.findUnique.mockResolvedValue({
-        id: 1,
-        ownerId: 999,
-        status: DressStatus.APPROVED,
-      });
-
-      await request(app.getHttpServer())
-        .post('/bookings/interested')
-        .set('Authorization', `Bearer ${tokenFor(7)}`)
-        .send({ dressId: 1, startDate: '2026-09-01', endDate: '2026-09-05' })
-        .expect(403);
-
-      expect(prisma.booking.create).not.toHaveBeenCalled();
-    });
-
-    it('allows the owner to create an INTERESTED booking', async () => {
-      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+    it('allows a user who does NOT own the dress to create an INTERESTED booking, with renterId set from their own JWT', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress); // ownerId: 7
       prisma.booking.findFirst.mockResolvedValue(null);
       prisma.booking.create.mockResolvedValue({
         id: 1,
         dressId: 1,
+        renterId: 3,
         status: BookingStatus.INTERESTED,
       });
 
       const response = await request(app.getHttpServer())
         .post('/bookings/interested')
-        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .set('Authorization', `Bearer ${tokenFor(3)}`) // user 3, not the owner (7)
         .send({ dressId: 1, startDate: '2026-09-01', endDate: '2026-09-05' })
         .expect(201);
 
       expect(response.body.status).toBe(BookingStatus.INTERESTED);
+      expect(prisma.booking.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ renterId: 3 }),
+      });
+    });
+
+    it('ignores a renterId in the request body - it always comes from the JWT', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({ id: 1, status: BookingStatus.INTERESTED });
+
+      await request(app.getHttpServer())
+        .post('/bookings/interested')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .send({
+          dressId: 1,
+          startDate: '2026-09-01',
+          endDate: '2026-09-05',
+          renterId: 999, // attempted spoof - must be ignored
+        })
+        .expect(201);
+
+      expect(prisma.booking.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ renterId: 3 }),
+      });
+    });
+
+    it('rejects the dress owner creating INTERESTED on their own dress (400)', async () => {
+      prisma.dress.findUnique.mockResolvedValue(approvedDress); // ownerId: 7
+
+      await request(app.getHttpServer())
+        .post('/bookings/interested')
+        .set('Authorization', `Bearer ${tokenFor(7)}`) // the owner themselves
+        .send({ dressId: 1, startDate: '2026-09-01', endDate: '2026-09-05' })
+        .expect(400);
+
+      expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
     it('rejects an invalid date range (400)', async () => {
@@ -124,7 +145,7 @@ describe('BookingsController', () => {
 
       await request(app.getHttpServer())
         .post('/bookings/interested')
-        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
         .send({ dressId: 1, startDate: '2026-09-10', endDate: '2026-09-01' })
         .expect(400);
 
