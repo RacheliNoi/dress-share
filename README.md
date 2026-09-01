@@ -19,9 +19,25 @@ UI is in Hebrew with full RTL support.
 - Per-size inventory (multiple physical units per size), photo management
 
 **Bookings**
+- Renter-initiated: any logged-in user (not the dress's owner) can mark interest in a dress from its public page — the owner responds and confirms, rather than self-reporting a rental, which closes off the obvious way to dodge commission by arranging a deal outside the platform
 - Per-size, quantity-aware capacity tracking (not just whole-dress blocking)
 - Overlapping date-range validation
 - Concurrency-safe: capacity checks and inserts run inside a Postgres `SERIALIZABLE` transaction with automatic retry, so two simultaneous requests for the last unit of a size can't both succeed
+- Stale `INTERESTED` holds that never convert to a confirmed rental auto-expire after 7 days (scheduled job, also runs once on startup so a restart doesn't wait for the next midnight run) and release their date/size back into the calendar
+- Owners can block off date ranges for their own reasons (cleaning, personal use) without creating a fake booking — a separate `DressAvailabilityBlock`, folded into the same public availability feed the calendar reads
+- In-app chat per booking (simple polling, not WebSockets), shared by one component on both the renter's and owner's screens, so fitting/logistics coordination stays on-platform instead of pushing people to WhatsApp before a booking is real
+
+**Renter-facing UI**
+- "מעוניינת בהשכרה" (interested in renting) action on the public dress page, gated to logged-in non-owners
+- "הבקשות שלי" (my requests) page listing everything the current user has booked as a renter, with the same chat thread as the owner sees
+
+**Owner-facing UI**
+- Incoming-requests panel (real renter-initiated bookings only — no manual "create a booking for a customer" form, which would bypass the same-platform requirement above) with reply/chat and rent-confirmation
+- Separate date-blocking panel, independent of the booking flow
+
+**Notifications**
+- Owner gets notified when someone expresses interest in their dress; whichever side of a chat didn't just write gets notified of a new message; a renter gets warned once before their `INTERESTED` hold is about to auto-expire
+- Routed through a single `NotificationsService.send()` choke point, currently logging to the console in dev (same pattern already used for password-reset emails) — swapping in a real provider (Resend/SendGrid) touches that one method, not each trigger site
 
 **Auth & authorization**
 - JWT-based authentication, role-based access control (`USER` / `ADMIN`)
@@ -102,3 +118,5 @@ npm run test:cov    # with coverage
 - **Ownership enforced in the service layer, not just guarded routes.** Every mutation re-fetches the resource and checks `ownerId` before writing — a missing route guard alone would never be enough to leak data.
 - **Approve-in-place editing.** Rather than a separate "draft" table, an approved listing's proposed edits live on the same row (`pendingDetails` JSON + `pendingAction` on child rows), so the public read path never has to branch on edit state — it simply never selects the pending fields.
 - **Price sort vs. pagination.** Prisma can't order a query by an aggregate (min price) across a to-many relation, so `recommended`/`newest` paginate at the database level, while price-sorted queries fetch all matches, sort in application code, and slice — trading one code path's efficiency for correctness rather than reaching for raw SQL.
+- **Renter-initiated bookings, not owner self-report.** Earlier in the project's life, only the dress's owner could create a booking record (including marking it `INTERESTED`), which meant nothing stopped an owner from just arranging a rental off-platform and never touching the app at all. The fix wasn't a policy — it was making the renter the one who creates the `INTERESTED` row, with the owner responding rather than reporting, so the interaction actually has to happen on the platform to exist at all.
+- **One notification choke point.** Every outbound email goes through a single `NotificationsService.send()`, currently backed by a console log (mirroring the existing password-reset placeholder) until a real provider (Resend/SendGrid) is wired in. Every trigger site calls a named method on that service, never `console.log` directly, so the eventual swap to a real provider is a one-file change.
