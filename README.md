@@ -14,12 +14,11 @@ UI is in Hebrew with full RTL support.
 - Availability-by-date filtering, layered on top of the paginated results
 - Downloadable PDF catalog (`/catalog-pdf`) via the browser's own print-to-PDF, listing every approved dress with a real clickable link to its page — for anyone who can browse the images offline but can't reach the live site to click through directly
 
-
-
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
 - Editing an already-approved listing doesn't affect what's publicly visible until an admin approves the edit — proposed changes are held in a separate "pending" shadow (`pendingDetails`, `pendingAction: ADD/REMOVE` on sizes/photos) rather than mutating the live row
-- Per-size inventory (multiple physical units per size), photo management
+- Per-size inventory (multiple physical units per size)
+- Every uploaded photo is automatically enhanced via the Photoroom API (clean white studio background, subject never altered) — falls back to the original upload untouched if the enhancement call fails or isn't configured
 
 **Bookings**
 - Renter-initiated: any logged-in user (not the dress's owner) can mark interest in a dress from its public page — the owner responds and confirms, rather than self-reporting a rental, which closes off the obvious way to dodge commission by arranging a deal outside the platform
@@ -98,6 +97,8 @@ npm run dev             # http://localhost:3000
 | `apps/api` | `DATABASE_URL` | PostgreSQL connection string |
 | `apps/api` | `JWT_SECRET` | Secret used to sign auth tokens |
 | `apps/api` | `PORT` | Optional, defaults to `3001` |
+| `apps/api` | `PHOTOROOM_API_KEY_SANDBOX` | Optional. Photo enhancement on upload — free tier, output is watermarked. Uploads work fine without it (skips enhancement, keeps the original photo only) |
+| `apps/api` | `PHOTOROOM_API_KEY_LIVE` | Optional, not currently wired to any code path — reserved for switching off the sandbox watermark before shipping |
 | `apps/web` | `NEXT_PUBLIC_API_URL` | Optional, defaults to `http://localhost:3001` |
 
 ### Default seeded admin (local dev only)
