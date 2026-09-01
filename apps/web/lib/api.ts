@@ -294,6 +294,42 @@ export function getMyBookingsAsRenter(token: string) {
   return request<BookingWithDress[]>("/bookings/as-renter", { token });
 }
 
+// Owner-only date hold, deliberately not a Booking - no renter, no size,
+// blocks the whole dress for its date range (cleaning, personal use, etc).
+export type DressAvailabilityBlock = {
+  id: number;
+  dressId: number;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  createdAt: string;
+};
+
+export function getDressAvailabilityBlocks(token: string, dressId: number) {
+  return request<DressAvailabilityBlock[]>(`/bookings/dress/${dressId}/blocks`, {
+    token,
+  });
+}
+
+export function createAvailabilityBlock(
+  token: string,
+  dressId: number,
+  data: { startDate: string; endDate: string; reason?: string },
+) {
+  return request<DressAvailabilityBlock>(`/bookings/dress/${dressId}/blocks`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteAvailabilityBlock(token: string, blockId: number) {
+  return request<DressAvailabilityBlock>(`/bookings/blocks/${blockId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export type BookingMessage = {
   id: number;
   bookingId: number;

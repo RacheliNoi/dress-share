@@ -5,16 +5,17 @@ import { getToken } from "@/lib/auth";
 import {
   ApiError,
   Booking,
+  DressAvailabilityBlock,
   DressSize,
   cancelBooking,
-  createInterestedBooking,
-  createRentedBooking,
+  createAvailabilityBlock,
+  deleteAvailabilityBlock,
+  getDressAvailabilityBlocks,
   getDressBookings,
   markBookingAsRented,
 } from "@/lib/api";
 import DressAvailabilityCalendar from "./DressAvailabilityCalendar";
 import BookingChat from "./BookingChat";
-import { getPeakUsageForRange } from "@/lib/availability";
 import ConfirmDialog from "./ui/ConfirmDialog";
 
 const STATUS_BADGES: Partial<Record<Booking["status"], { label: string; className: string }>> = {
@@ -35,7 +36,10 @@ function formatDate(iso: string) {
 // Reuses DressAvailabilityCalendar exactly as-is (unmodified) for the
 // read-only visual grid - remounting it via `key` after every mutation is
 // the whole refresh mechanism, so the public calendar component itself
-// never needs to know an "owner mode" exists.
+// never needs to know an "owner mode" exists. It also renders
+// DressAvailabilityBlocks automatically - the backend folds them into the
+// same availability feed this calendar already reads, so no change was
+// needed here to make blocked dates show as taken.
 export default function DressAvailabilityManager({
   dressId,
   sizes,
@@ -50,92 +54,27 @@ export default function DressAvailabilityManager({
 
   const hasSizes = sizes.length > 0;
 
-  const [newStatus, setNewStatus] = useState<"INTERESTED" | "RENTED">(
-    "INTERESTED",
-  );
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  // Booking happens per-size, and the owner can hold several units in one
-  // action - selectedSizeIds is an ordered MULTISET (duplicates allowed) of
-  // DressSize ids: each entry represents exactly one intended physical
-  // unit/Booking. quantity is inventory/capacity only - it is never treated
-  // as "how many can be picked in one go" by itself, and a single Booking
-  // never represents more than one unit (see handleCreate below, which
-  // creates one request per entry here, never a Booking with a quantity).
-  const [selectedSizeIds, setSelectedSizeIds] = useState<string[]>([]);
-  const [sizeToAdd, setSizeToAdd] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
-
-  const selectedSizes = selectedSizeIds
-    .map((id) => sizes.find((candidate) => String(candidate.id) === id))
-    .filter((size): size is DressSize => Boolean(size));
-
-  // Active (INTERESTED/RENTED) bookings for THIS dress, used to compute how
-  // many units of each size are actually still free for the chosen date
-  // range - mirrors the backend's day-by-day capacity check exactly (see
-  // lib/availability.ts). This is UX only: the backend's SERIALIZABLE
-  // capacity check on every submit is still the sole protection against
-  // overselling, regardless of what this form shows.
-  const activeBookings = bookings.filter(
-    (booking) => booking.status === "INTERESTED" || booking.status === "RENTED",
-  );
-  const datesSelected = Boolean(startDate && endDate && endDate >= startDate);
-
-  function selectedCountFor(sizeId: string) {
-    return selectedSizeIds.filter((id) => id === sizeId).length;
-  }
-
-  // Units not already committed to an existing active booking - deliberately
-  // ignores whatever the user has provisionally picked in this same form,
-  // since that's not "occupied", just already claimed by this form. Used
-  // only to drive the "already fully booked elsewhere" warning below.
-  function existingRemainingUnits(size: DressSize): number {
-    if (!datesSelected) {
-      return size.quantity;
-    }
-
-    const { peakUsage, wholeDressBlocked } = getPeakUsageForRange(
-      startDate,
-      endDate,
-      activeBookings,
-      size.size,
-    );
-
-    if (wholeDressBlocked) {
-      return 0;
-    }
-
-    return size.quantity - peakUsage;
-  }
-
-  // What actually drives the "add size" dropdown: existing bookings AND
-  // this form's own already-selected units both count against quantity - a
-  // size with quantity=3 and no existing bookings can be picked up to 3
-  // times, but only once more if 2 units are already actively booked.
-  // Recomputed from selectedSizeIds on every render (never cached), so
-  // removing a selection immediately makes that unit pickable again.
-  function remainingUnitsForSelection(size: DressSize): number {
-    return existingRemainingUnits(size) - selectedCountFor(String(size.id));
-  }
-
-  const sizesAvailableToAdd = sizes.filter((size) => remainingUnitsForSelection(size) > 0);
-  const sizesUnavailableForRange = datesSelected
-    ? sizes.filter((size) => existingRemainingUnits(size) <= 0)
-    : [];
-
   const [actioningId, setActioningId] = useState<number | null>(null);
   const [actionError, setActionError] = useState("");
   const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
 
   // Which INTERESTED row (if any) is currently showing its rent-confirmation
-  // panel. The size itself is no longer picked here - it was already fixed
-  // when the booking was created as INTERESTED (see the create-form below),
-  // so confirming a rental just displays that locked-in size/price.
+  // panel. The size was already fixed when the booking was created as
+  // INTERESTED (by the renter, on the public dress page), so confirming a
+  // rental just displays that locked-in size/price.
   const [rentingBookingId, setRentingBookingId] = useState<number | null>(
     null,
   );
   const [openChatId, setOpenChatId] = useState<number | null>(null);
+
+  const [blocks, setBlocks] = useState<DressAvailabilityBlock[]>([]);
+  const [blocksLoading, setBlocksLoading] = useState(true);
+  const [blockStartDate, setBlockStartDate] = useState("");
+  const [blockEndDate, setBlockEndDate] = useState("");
+  const [blockReason, setBlockReason] = useState("");
+  const [creatingBlock, setCreatingBlock] = useState(false);
+  const [blockError, setBlockError] = useState("");
+  const [deletingBlockId, setDeletingBlockId] = useState<number | null>(null);
 
   async function loadBookings() {
     const token = getToken();
@@ -161,114 +100,35 @@ export default function DressAvailabilityManager({
     }
   }
 
+  async function loadBlocks() {
+    const token = getToken();
+
+    if (!token) {
+      return;
+    }
+
+    try {
+      setBlocksLoading(true);
+      const data = await getDressAvailabilityBlocks(token, dressId);
+      setBlocks(data);
+    } catch {
+      // Non-critical read (the blocks list itself, not the calendar) - a
+      // failure here just means the management list below stays empty;
+      // the calendar's own availability fetch is independent of this call.
+    } finally {
+      setBlocksLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadBookings();
+    loadBlocks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dressId]);
 
   function refreshAfterMutation() {
     loadBookings();
     setCalendarKey((key) => key + 1);
-  }
-
-  function addSizeToSelection(id: string) {
-    // Intentionally no "already selected" guard - the same size can be
-    // picked again as long as a unit remains (the dropdown itself only
-    // offers a size while remainingUnitsForSelection > 0, so reaching here
-    // with a maxed-out size shouldn't normally happen, but this stays
-    // permissive rather than silently dropping a legitimate pick).
-    if (!id) {
-      return;
-    }
-
-    setSelectedSizeIds((current) => [...current, id]);
-    setSizeToAdd("");
-  }
-
-  // Removes exactly ONE selected unit at the given index - not "all
-  // selections of this size" - since the same size can now appear multiple
-  // times in selectedSizeIds (once per unit).
-  function removeSizeFromSelection(index: number) {
-    setSelectedSizeIds((current) => current.filter((_, current_) => current_ !== index));
-  }
-
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const token = getToken();
-
-    if (!token || !startDate || !endDate) {
-      return;
-    }
-
-    if (endDate < startDate) {
-      setCreateError("תאריך הסיום לא יכול להיות לפני תאריך ההתחלה");
-      return;
-    }
-
-    if (hasSizes && selectedSizes.length === 0) {
-      setCreateError("יש לבחור לפחות מידה אחת");
-      return;
-    }
-
-    setCreating(true);
-    setCreateError("");
-
-    try {
-      if (!hasSizes) {
-        // No DressSize rows for this dress - single, size-less booking,
-        // exactly like before per-size tracking existed.
-        await createInterestedBooking(token, { dressId, startDate, endDate });
-      } else {
-        // One booking per selected size, submitted together. Independent
-        // sizes never conflict with each other, so these can run in
-        // parallel; a per-size failure (e.g. one size already taken for
-        // this range) doesn't block the others from being created.
-        const outcomes = await Promise.allSettled(
-          selectedSizes.map((size) =>
-            newStatus === "INTERESTED"
-              ? createInterestedBooking(token, {
-                  dressId,
-                  startDate,
-                  endDate,
-                  size: size.size,
-                })
-              : createRentedBooking(token, {
-                  dressId,
-                  startDate,
-                  endDate,
-                  // price is always the exact DressSize price - never a
-                  // free-typed number.
-                  size: size.size,
-                  price: size.price,
-                }),
-          ),
-        );
-
-        const failedSizes = outcomes
-          .map((outcome, index) => ({ outcome, size: selectedSizes[index] }))
-          .filter(({ outcome }) => outcome.status === "rejected");
-
-        if (failedSizes.length > 0) {
-          setCreateError(
-            `לא נוצרה הזמנה עבור מידות: ${failedSizes
-              .map(({ size }) => size.size)
-              .join(", ")}`,
-          );
-        }
-      }
-
-      setStartDate("");
-      setEndDate("");
-      setSelectedSizeIds([]);
-      refreshAfterMutation();
-    } catch (err) {
-      setCreateError(
-        err instanceof ApiError ? err.message : "שגיאה ביצירת ההזמנה",
-      );
-    } finally {
-      setCreating(false);
-    }
   }
 
   function openRentForm(bookingId: number) {
@@ -335,162 +195,75 @@ export default function DressAvailabilityManager({
     }
   }
 
+  async function handleCreateBlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const token = getToken();
+
+    if (!token || !blockStartDate || !blockEndDate) {
+      return;
+    }
+
+    if (blockEndDate < blockStartDate) {
+      setBlockError("תאריך הסיום לא יכול להיות לפני תאריך ההתחלה");
+      return;
+    }
+
+    setCreatingBlock(true);
+    setBlockError("");
+
+    try {
+      await createAvailabilityBlock(token, dressId, {
+        startDate: blockStartDate,
+        endDate: blockEndDate,
+        reason: blockReason.trim() || undefined,
+      });
+      setBlockStartDate("");
+      setBlockEndDate("");
+      setBlockReason("");
+      loadBlocks();
+      setCalendarKey((key) => key + 1);
+    } catch (err) {
+      setBlockError(
+        err instanceof ApiError ? err.message : "שגיאה בחסימת התאריך",
+      );
+    } finally {
+      setCreatingBlock(false);
+    }
+  }
+
+  async function handleDeleteBlock(blockId: number) {
+    const token = getToken();
+
+    if (!token) {
+      return;
+    }
+
+    setDeletingBlockId(blockId);
+
+    try {
+      await deleteAvailabilityBlock(token, blockId);
+      loadBlocks();
+      setCalendarKey((key) => key + 1);
+    } catch (err) {
+      setBlockError(
+        err instanceof ApiError ? err.message : "שגיאה בהסרת החסימה",
+      );
+    } finally {
+      setDeletingBlockId(null);
+    }
+  }
+
   return (
     <section className="mt-8 space-y-6">
       <DressAvailabilityCalendar dressId={dressId} sizes={sizes} key={calendarKey} />
 
       <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-line sm:p-6">
-        <h2 className="font-display text-lg font-semibold text-zinc-900">ניהול זמינות</h2>
+        <h2 className="font-display text-lg font-semibold text-zinc-900">בקשות נכנסות</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          {hasSizes
-            ? 'סמני טווח תאריכים כ"מישהו מתעניין" או כ"מושכר" - אפשר לבחור כמה מידות בבת אחת.'
-            : 'סמני טווח תאריכים כ"מישהו מתעניין" או כ"מושכר".'}
+          שוכרות שסימנו עניין בשמלה שלך מופיעות כאן - אפשר לענות לצ&apos;אט
+          שלהן ולאשר השכרה.
         </p>
-
-        <form onSubmit={handleCreate} className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="flex gap-2 sm:col-span-2">
-            <button
-              type="button"
-              onClick={() => setNewStatus("INTERESTED")}
-              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
-                newStatus === "INTERESTED"
-                  ? "bg-warning text-white"
-                  : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              מישהו מתעניין
-            </button>
-            <button
-              type="button"
-              onClick={() => setNewStatus("RENTED")}
-              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
-                newStatus === "RENTED"
-                  ? "bg-accent text-white"
-                  : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              מושכר
-            </button>
-          </div>
-
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            required
-            aria-label="תאריך התחלה"
-            className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-          />
-
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-            required
-            aria-label="תאריך סיום"
-            className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-          />
-
-          {hasSizes ? (
-            <div className="sm:col-span-2">
-                <select
-                  value={sizeToAdd}
-                  onChange={(event) => addSizeToSelection(event.target.value)}
-                  aria-label="הוספת מידה"
-                  disabled={sizesAvailableToAdd.length === 0}
-                  className="w-full rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
-                  <option value="">
-                    {sizesAvailableToAdd.length === 0
-                      ? datesSelected && sizesUnavailableForRange.length > 0
-                        ? "אין מידות פנויות בטווח שנבחר"
-                        : "כל היחידות הזמינות כבר נבחרו"
-                      : "הוספת מידה..."}
-                  </option>
-                  {sizesAvailableToAdd.map((size) => {
-                    const remaining = remainingUnitsForSelection(size);
-
-                    return (
-                      <option key={size.id} value={size.id}>
-                        מידה {size.size} · {size.price} ₪
-                        {remaining < size.quantity ? ` · נותרו ${remaining}` : ` · ${size.quantity} יחידות`}
-                      </option>
-                    );
-                  })}
-                </select>
-
-                {sizesUnavailableForRange.length > 0 && (
-                  <p className="mt-2 text-xs text-warning">
-                    תפוסות בטווח שנבחר:{" "}
-                    {sizesUnavailableForRange.map((size) => size.size).join(", ")}
-                  </p>
-                )}
-
-                {selectedSizes.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedSizes.map((size, index) => (
-                      <span
-                        key={`${size.id}-${index}`}
-                        className="flex items-center gap-2 rounded-full bg-zinc-100 py-1.5 ps-3.5 pe-2 text-sm font-semibold text-zinc-700"
-                      >
-                        מידה {size.size}
-                        {newStatus === "RENTED" && ` · ${size.price} ₪`}
-                        <button
-                          type="button"
-                          onClick={() => removeSizeFromSelection(index)}
-                          aria-label={`הסרת מידה ${size.size} (בחירה ${index + 1})`}
-                          className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-900"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {newStatus === "RENTED" && (
-                  <p className="mt-2 text-xs text-zinc-400">
-                    המחיר לכל מידה נקבע אוטומטית לפי המחיר שהוגדר לה.
-                  </p>
-                )}
-            </div>
-          ) : (
-            newStatus === "RENTED" && (
-              <div className="rounded-2xl bg-warning-soft p-4 text-sm text-warning sm:col-span-2">
-                לא ניתן לסמן את השמלה כמושכרת לפני שמוגדרות לה מידות
-                ומחירים. הוסיפי מידות בעמוד העריכה של השמלה.
-              </div>
-            )
-          )}
-
-          {createError && (
-            <div className="rounded-2xl bg-error-soft p-4 text-sm text-error sm:col-span-2">
-              {createError}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={
-              creating ||
-              !startDate ||
-              !endDate ||
-              (newStatus === "RENTED" && !hasSizes) ||
-              (hasSizes && selectedSizes.length === 0)
-            }
-            className="rounded-xl bg-zinc-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
-          >
-            {creating
-              ? "שומרת..."
-              : selectedSizes.length > 1
-                ? `הוספת ${selectedSizes.length} הזמנות`
-                : "הוספת הזמנה"}
-          </button>
-        </form>
-      </div>
-
-      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-line sm:p-6">
-        <h2 className="font-display text-lg font-semibold text-zinc-900">הזמנות זמינות</h2>
 
         {actionError && (
           <div className="mt-3 rounded-2xl bg-error-soft p-4 text-sm text-error">
@@ -520,7 +293,7 @@ export default function DressAvailabilityManager({
           </div>
         ) : bookings.length === 0 ? (
           <p className="mt-4 text-sm text-zinc-400">
-            עדיין אין הזמנות זמינות לשמלה זו.
+            עדיין לא הגיעו בקשות לשמלה זו.
           </p>
         ) : (
           <ul className="mt-4 divide-y divide-zinc-100">
@@ -680,6 +453,85 @@ export default function DressAvailabilityManager({
             })}
           </ul>
         )}
+      </div>
+
+      <div className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-line sm:p-6">
+        <h2 className="font-display text-lg font-semibold text-zinc-900">חסימת תאריכים</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          יש לך את השמלה בניקוי או בשימוש אישי? חסמי טווח תאריכים כדי שלא
+          יופיע כפנוי בלוח.
+        </p>
+
+        <form onSubmit={handleCreateBlock} className="mt-5 grid gap-3 sm:grid-cols-2">
+          <input
+            type="date"
+            value={blockStartDate}
+            onChange={(event) => setBlockStartDate(event.target.value)}
+            required
+            aria-label="תאריך התחלה לחסימה"
+            className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+          />
+
+          <input
+            type="date"
+            value={blockEndDate}
+            onChange={(event) => setBlockEndDate(event.target.value)}
+            required
+            aria-label="תאריך סיום לחסימה"
+            className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+          />
+
+          <input
+            type="text"
+            value={blockReason}
+            onChange={(event) => setBlockReason(event.target.value)}
+            placeholder="סיבה (לא חובה)"
+            aria-label="סיבת החסימה"
+            className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft sm:col-span-2"
+          />
+
+          {blockError && (
+            <div className="rounded-2xl bg-error-soft p-4 text-sm text-error sm:col-span-2">
+              {blockError}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={creatingBlock || !blockStartDate || !blockEndDate}
+            className="rounded-xl bg-zinc-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+          >
+            {creatingBlock ? "חוסמת..." : "חסימת התאריכים"}
+          </button>
+        </form>
+
+        {blocksLoading ? (
+          <div className="mt-4 h-10 animate-pulse rounded-xl bg-zinc-100" />
+        ) : blocks.length > 0 ? (
+          <ul className="mt-5 divide-y divide-zinc-100">
+            {blocks.map((block) => (
+              <li key={block.id} className="flex items-center justify-between gap-3 py-3">
+                <div>
+                  <p dir="ltr" className="text-right text-sm font-semibold text-ink">
+                    {formatDate(block.startDate)} – {formatDate(block.endDate)}
+                  </p>
+                  {block.reason && (
+                    <p className="mt-0.5 text-xs text-zinc-500">{block.reason}</p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteBlock(block.id)}
+                  disabled={deletingBlockId === block.id}
+                  className="rounded-xl border border-error-soft px-4 py-2 text-xs font-bold text-error transition hover:bg-error-soft disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  הסרת חסימה
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <ConfirmDialog
