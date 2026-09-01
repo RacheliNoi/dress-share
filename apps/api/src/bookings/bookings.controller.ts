@@ -72,6 +72,11 @@ export class BookingsController {
     });
   }
 
+  // TODO(auth-3): once payments (Phase 5) land, these two owner-facing
+  // endpoints (this one and PATCH /:id/rent below) must stop being the way a
+  // booking becomes RENTED - that will happen only via the payment
+  // confirmation webhook. Kept callable for now; the behavior change itself
+  // is deliberately deferred until the webhook exists to replace it.
   @UseGuards(JwtAuthGuard)
   @Post('rented')
   createRented(

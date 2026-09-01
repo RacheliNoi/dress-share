@@ -373,6 +373,12 @@ export class BookingsService {
     });
   }
 
+  // TODO(auth-3): once payments (Phase 5) land, this must stop being callable
+  // directly by the owner. The only path that may turn a booking RENTED will
+  // be the payment-confirmation webhook - not a manual owner action - so the
+  // leakage loophole (owner marks RENTED for a deal made off-platform) is
+  // actually closed. Left as-is for now so the existing owner flow keeps
+  // working until the webhook exists to replace it.
   async createRented(data: {
     dressId: number;
     startDate: string | Date;
@@ -532,6 +538,9 @@ export class BookingsService {
     return booking;
   }
 
+  // TODO(auth-3): same as createRented above - after Phase 5, this must stop
+  // being callable directly from the owner UI. Once the payment webhook
+  // exists, it becomes the only caller allowed to move a booking to RENTED.
   async markAsRented(
     bookingId: number,
     ownerId: number,
