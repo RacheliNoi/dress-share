@@ -13,6 +13,7 @@ import {
   markBookingAsRented,
 } from "@/lib/api";
 import DressAvailabilityCalendar from "./DressAvailabilityCalendar";
+import BookingChat from "./BookingChat";
 import { getPeakUsageForRange } from "@/lib/availability";
 import ConfirmDialog from "./ui/ConfirmDialog";
 
@@ -134,6 +135,7 @@ export default function DressAvailabilityManager({
   const [rentingBookingId, setRentingBookingId] = useState<number | null>(
     null,
   );
+  const [openChatId, setOpenChatId] = useState<number | null>(null);
 
   async function loadBookings() {
     const token = getToken();
@@ -569,6 +571,18 @@ export default function DressAvailabilityManager({
                         <p dir="ltr" className="mt-1.5 text-right text-sm font-semibold text-ink">
                           {formatDate(booking.startDate)} – {formatDate(booking.endDate)}
                         </p>
+
+                        {booking.renterId !== null && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenChatId((current) => (current === booking.id ? null : booking.id))
+                            }
+                            className="mt-1.5 text-xs font-bold text-accent underline underline-offset-4"
+                          >
+                            {openChatId === booking.id ? "סגירת הצ'אט" : "צ'אט עם השוכרת"}
+                          </button>
+                        )}
                       </div>
 
                       {booking.status === "INTERESTED" && !isRentingThis && (
@@ -652,6 +666,12 @@ export default function DressAvailabilityManager({
                             </div>
                           </>
                         )}
+                      </div>
+                    )}
+
+                    {openChatId === booking.id && (
+                      <div className="mt-3">
+                        <BookingChat bookingId={booking.id} />
                       </div>
                     )}
                   </div>

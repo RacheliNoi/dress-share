@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import Header from "@/components/Header";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import BookingChat from "@/components/BookingChat";
 
 const STATUS_BADGES: Partial<Record<BookingStatus, { label: string; className: string }>> = {
   INTERESTED: { label: "מישהו מתעניין", className: "bg-warning-soft text-warning" },
@@ -37,6 +38,7 @@ export default function MyRequestsPage() {
   const [error, setError] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [failedImageIds, setFailedImageIds] = useState<Set<number>>(new Set());
+  const [openChatId, setOpenChatId] = useState<number | null>(null);
 
   async function loadBookings() {
     const token = getToken();
@@ -157,13 +159,18 @@ export default function MyRequestsPage() {
                 className: "bg-zinc-100 text-zinc-500",
               };
 
+              const isChatOpen = openChatId === booking.id;
+
               return (
-                <li key={booking.id}>
-                  <Link
-                    href={`/dress/${booking.dress.id}`}
-                    className="flex gap-4 overflow-hidden rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-zinc-200/60 transition hover:-translate-y-0.5 hover:shadow-lg"
-                  >
-                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-zinc-100">
+                <li
+                  key={booking.id}
+                  className="overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60"
+                >
+                  <div className="flex gap-4 p-4">
+                    <Link
+                      href={`/dress/${booking.dress.id}`}
+                      className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-zinc-100 transition hover:opacity-90"
+                    >
                       {showImage && photo ? (
                         <img
                           src={getDressImageUrl(photo)}
@@ -176,7 +183,7 @@ export default function MyRequestsPage() {
                       ) : (
                         <DressPlaceholder size="md" />
                       )}
-                    </div>
+                    </Link>
 
                     <div className="min-w-0 flex-1 py-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -192,17 +199,33 @@ export default function MyRequestsPage() {
                         )}
                       </div>
 
-                      <h3 className="font-display mt-2 text-lg font-semibold text-zinc-900">
-                        {booking.dress.name}
-                      </h3>
+                      <Link href={`/dress/${booking.dress.id}`}>
+                        <h3 className="font-display mt-2 text-lg font-semibold text-zinc-900 transition hover:text-accent">
+                          {booking.dress.name}
+                        </h3>
+                      </Link>
 
                       {/* dir="ltr" pins the digit order - see the same
                           note on DressAvailabilityManager's date range. */}
                       <p dir="ltr" className="mt-1 text-right text-sm font-semibold text-zinc-500">
                         {formatDate(booking.startDate)} – {formatDate(booking.endDate)}
                       </p>
+
+                      <button
+                        type="button"
+                        onClick={() => setOpenChatId(isChatOpen ? null : booking.id)}
+                        className="mt-2 text-xs font-bold text-accent underline underline-offset-4"
+                      >
+                        {isChatOpen ? "סגירת הצ'אט" : "צ'אט עם בעלת השמלה"}
+                      </button>
                     </div>
-                  </Link>
+                  </div>
+
+                  {isChatOpen && (
+                    <div className="border-t border-zinc-100 p-4">
+                      <BookingChat bookingId={booking.id} />
+                    </div>
+                  )}
                 </li>
               );
             })}

@@ -294,6 +294,26 @@ export function getMyBookingsAsRenter(token: string) {
   return request<BookingWithDress[]>("/bookings/as-renter", { token });
 }
 
+export type BookingMessage = {
+  id: number;
+  bookingId: number;
+  senderId: number;
+  body: string;
+  createdAt: string;
+};
+
+export function getBookingMessages(token: string, bookingId: number) {
+  return request<BookingMessage[]>(`/bookings/${bookingId}/messages`, { token });
+}
+
+export function sendBookingMessage(token: string, bookingId: number, body: string) {
+  return request<BookingMessage>(`/bookings/${bookingId}/messages`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ body }),
+  });
+}
+
 export function createInterestedBooking(
   token: string,
   data: { dressId: number; startDate: string; endDate: string; size?: string },
