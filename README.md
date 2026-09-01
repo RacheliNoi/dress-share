@@ -12,6 +12,9 @@ UI is in Hebrew with full RTL support.
 - Server-side search, filtering (category, color, size, price range) and sorting
 - Server-side pagination (`page`/`limit`, with total match count)
 - Availability-by-date filtering, layered on top of the paginated results
+- Downloadable PDF catalog (`/catalog-pdf`) via the browser's own print-to-PDF, listing every approved dress with a real clickable link to its page — for anyone who can browse the images offline but can't reach the live site to click through directly
+
+
 
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
