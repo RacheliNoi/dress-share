@@ -86,6 +86,9 @@ export default function Header() {
                 <Link href="/dresses" className={navLinkClass}>
                   השמלות שלי
                 </Link>
+                <Link href="/my-requests" className={navLinkClass}>
+                  הבקשות שלי
+                </Link>
               </>
             )}
 
@@ -160,6 +163,9 @@ export default function Header() {
               )}
               <Link href="/dresses" className="rounded-xl px-3 py-2.5 transition hover:bg-surface-sunken hover:text-accent">
                 השמלות שלי
+              </Link>
+              <Link href="/my-requests" className="rounded-xl px-3 py-2.5 transition hover:bg-surface-sunken hover:text-accent">
+                הבקשות שלי
               </Link>
             </>
           )}

@@ -278,6 +278,22 @@ export function getDressBookings(token: string, dressId: number) {
   return request<Booking[]>(`/bookings/dress/${dressId}`, { token });
 }
 
+// The renter-facing counterpart to getMyDresses - a booking made BY the
+// caller, with just enough of the related dress (name + lead photo) to
+// render a card. dress is always present (GET /bookings/as-renter always
+// includes it), never optional here.
+export type BookingWithDress = Booking & {
+  dress: {
+    id: number;
+    name: string;
+    photos: DressPhoto[];
+  };
+};
+
+export function getMyBookingsAsRenter(token: string) {
+  return request<BookingWithDress[]>("/bookings/as-renter", { token });
+}
+
 export function createInterestedBooking(
   token: string,
   data: { dressId: number; startDate: string; endDate: string; size?: string },
