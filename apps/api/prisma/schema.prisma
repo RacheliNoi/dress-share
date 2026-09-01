@@ -194,6 +194,11 @@ model Booking {
   status    BookingStatus @default(INTERESTED)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+  // Set once the "your interest is about to expire" email has gone out, so
+  // the daily warning job never emails the same renter twice for the same
+  // INTERESTED hold. Unrelated to expiresAt itself (there's no stored
+  // expiry - INTERESTED_EXPIRY_DAYS is always computed from createdAt).
+  expiryWarningSentAt DateTime?
 
   dress  Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
   renter User? @relation(fields: [renterId], references: [id], onDelete: SetNull)

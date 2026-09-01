@@ -2,9 +2,9 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { BookingsService, INTERESTED_EXPIRY_DAYS } from './bookings.service';
 
-// Wiring only - the actual rule (which bookings, what counts as "stale")
-// lives in BookingsService.expireStaleInterestedBookings, so it can be unit
-// tested without needing @nestjs/schedule's clock at all.
+// Wiring only - the actual rules (which bookings are stale, which are due a
+// warning) live in BookingsService, so they can be unit tested without
+// needing @nestjs/schedule's clock at all.
 //
 // Runs both on a daily schedule AND once on app startup (OnModuleInit).
 // EVERY_DAY_AT_MIDNIGHT alone would leave stale bookings blocking their
@@ -19,11 +19,13 @@ export class BookingExpiryTask implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.runExpiry();
+    await this.runExpiryWarnings();
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleExpireStaleInterested(): Promise<void> {
     await this.runExpiry();
+    await this.runExpiryWarnings();
   }
 
   // Swallows its own errors (logging instead of rethrowing) - this runs from
@@ -46,6 +48,24 @@ export class BookingExpiryTask implements OnModuleInit {
     } catch (error) {
       this.logger.error(
         'Failed to expire stale INTERESTED bookings - will retry on the next scheduled run',
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  // Same crash-safety reasoning as runExpiry above - kept as a separate
+  // try/catch (not folded into runExpiry) so a failure in one never
+  // suppresses the other from running on the same tick.
+  private async runExpiryWarnings(): Promise<void> {
+    try {
+      const count = await this.bookingsService.sendExpiryWarnings();
+
+      if (count > 0) {
+        this.logger.log(`Sent ${count} interest-expiring-soon warning(s)`);
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to send expiry warnings - will retry on the next scheduled run',
         error instanceof Error ? error.stack : String(error),
       );
     }

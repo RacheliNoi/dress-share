@@ -28,6 +28,12 @@ const ACTIVE_BOOKING_STATUSES = [
 // var - this is a business rule, not per-environment config.
 export const INTERESTED_EXPIRY_DAYS = 7;
 
+// How long before the actual expiry (above) to send a single "your interest
+// is about to expire" warning email - e.g. 1 means the warning goes out
+// once the hold is (INTERESTED_EXPIRY_DAYS - 1) days old, a day before
+// expireStaleInterestedBookings would otherwise release it.
+export const EXPIRY_WARNING_DAYS_BEFORE = 1;
+
 function addUtcDay(date: Date): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + 1);
@@ -822,6 +828,59 @@ export class BookingsService {
     });
 
     return result.count;
+  }
+
+  // Sends a one-time "your interest is about to expire" email to the renter,
+  // EXPIRY_WARNING_DAYS_BEFORE days before expireStaleInterestedBookings
+  // would otherwise cancel the hold. expiryWarningSentAt guards against
+  // re-warning the same booking on every subsequent daily run. Legacy
+  // bookings with no renterId (predate auth-1) are excluded - there's no one
+  // to email.
+  async sendExpiryWarnings(now: Date = new Date()): Promise<number> {
+    const warningCutoff = new Date(now);
+    warningCutoff.setUTCDate(
+      warningCutoff.getUTCDate() - (INTERESTED_EXPIRY_DAYS - EXPIRY_WARNING_DAYS_BEFORE),
+    );
+
+    const expiryCutoff = new Date(now);
+    expiryCutoff.setUTCDate(expiryCutoff.getUTCDate() - INTERESTED_EXPIRY_DAYS);
+
+    const candidates = await this.prisma.booking.findMany({
+      where: {
+        status: BookingStatus.INTERESTED,
+        createdAt: { lte: warningCutoff, gt: expiryCutoff },
+        expiryWarningSentAt: null,
+        renterId: { not: null },
+      },
+      include: {
+        dress: { select: { name: true } },
+        renter: { select: { email: true } },
+      },
+    });
+
+    for (const booking of candidates) {
+      if (!booking.renter) {
+        continue;
+      }
+
+      const expiresAt = new Date(booking.createdAt);
+      expiresAt.setUTCDate(expiresAt.getUTCDate() + INTERESTED_EXPIRY_DAYS);
+
+      this.notifications.notifyInterestExpiringSoon(
+        booking.renter.email,
+        booking.dress.name,
+        expiresAt,
+      );
+    }
+
+    if (candidates.length > 0) {
+      await this.prisma.booking.updateMany({
+        where: { id: { in: candidates.map((booking) => booking.id) } },
+        data: { expiryWarningSentAt: now },
+      });
+    }
+
+    return candidates.length;
   }
 
   // Only the two participants of a booking - the renter who made it, and the

@@ -4,11 +4,15 @@ import { BookingsService } from './bookings.service';
 
 describe('BookingExpiryTask', () => {
   let task: BookingExpiryTask;
-  let bookingsService: { expireStaleInterestedBookings: jest.Mock };
+  let bookingsService: {
+    expireStaleInterestedBookings: jest.Mock;
+    sendExpiryWarnings: jest.Mock;
+  };
 
   beforeEach(async () => {
     bookingsService = {
       expireStaleInterestedBookings: jest.fn().mockResolvedValue(0),
+      sendExpiryWarnings: jest.fn().mockResolvedValue(0),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -37,6 +41,18 @@ describe('BookingExpiryTask', () => {
     expect(bookingsService.expireStaleInterestedBookings).toHaveBeenCalledTimes(1);
   });
 
+  it('runs the expiry-warning check on module init too', async () => {
+    await task.onModuleInit();
+
+    expect(bookingsService.sendExpiryWarnings).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the expiry-warning check on the scheduled cron handler too', async () => {
+    await task.handleExpireStaleInterested();
+
+    expect(bookingsService.sendExpiryWarnings).toHaveBeenCalledTimes(1);
+  });
+
   it('does not throw when there is nothing to expire', async () => {
     bookingsService.expireStaleInterestedBookings.mockResolvedValue(0);
 
@@ -60,5 +76,23 @@ describe('BookingExpiryTask', () => {
     );
 
     await expect(task.handleExpireStaleInterested()).resolves.toBeUndefined();
+  });
+
+  it('swallows errors from the expiry-warning check independently - a failure there must not crash boot either', async () => {
+    bookingsService.sendExpiryWarnings.mockRejectedValue(
+      new Error('DB connection refused'),
+    );
+
+    await expect(task.onModuleInit()).resolves.toBeUndefined();
+  });
+
+  it('a failure in the expiry check does not prevent the expiry-warning check from still running on the same tick', async () => {
+    bookingsService.expireStaleInterestedBookings.mockRejectedValue(
+      new Error('DB connection refused'),
+    );
+
+    await task.onModuleInit();
+
+    expect(bookingsService.sendExpiryWarnings).toHaveBeenCalledTimes(1);
   });
 });

@@ -1757,4 +1757,81 @@ describe('BookingsService', () => {
       expect(daysAgo).toBeLessThan(INTERESTED_EXPIRY_DAYS + 1);
     });
   });
+
+  describe('sendExpiryWarnings', () => {
+    const fixedNow = new Date('2026-03-15T00:00:00.000Z');
+    const dueBooking = {
+      id: 1,
+      renterId: 3,
+      createdAt: new Date('2026-03-09T00:00:00.000Z'), // 6 days old
+      dress: { name: 'שמלת בדיקה' },
+      renter: { email: 'renter3@test.com' },
+    };
+
+    it('warns a renter whose INTERESTED hold is due for a warning', async () => {
+      prisma.booking.findMany.mockResolvedValue([dueBooking]);
+
+      const result = await service.sendExpiryWarnings(fixedNow);
+
+      expect(notifications.notifyInterestExpiringSoon).toHaveBeenCalledWith(
+        'renter3@test.com',
+        'שמלת בדיקה',
+        expect.any(Date),
+      );
+      expect(result).toBe(1);
+    });
+
+    it('marks warned bookings with expiryWarningSentAt so they are never warned twice', async () => {
+      prisma.booking.findMany.mockResolvedValue([dueBooking]);
+
+      await service.sendExpiryWarnings(fixedNow);
+
+      expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [1] } },
+        data: { expiryWarningSentAt: fixedNow },
+      });
+    });
+
+    it('only queries bookings with expiryWarningSentAt: null - never re-selects already-warned ones', async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.sendExpiryWarnings(fixedNow);
+
+      const call = prisma.booking.findMany.mock.calls[0][0];
+      expect(call.where.expiryWarningSentAt).toBeNull();
+    });
+
+    it('only queries INTERESTED bookings with a real renterId', async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.sendExpiryWarnings(fixedNow);
+
+      const call = prisma.booking.findMany.mock.calls[0][0];
+      expect(call.where.status).toBe(BookingStatus.INTERESTED);
+      expect(call.where.renterId).toEqual({ not: null });
+    });
+
+    it('does not call updateMany when nothing is due for a warning', async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      const result = await service.sendExpiryWarnings(fixedNow);
+
+      expect(prisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(result).toBe(0);
+    });
+
+    it('computes the warning window as (INTERESTED_EXPIRY_DAYS - EXPIRY_WARNING_DAYS_BEFORE) to INTERESTED_EXPIRY_DAYS days old', async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      await service.sendExpiryWarnings(fixedNow);
+
+      const call = prisma.booking.findMany.mock.calls[0][0];
+      // 6 days old (due for warning) up to, but not including, 7 days old
+      // (already handled by expireStaleInterestedBookings instead).
+      expect(call.where.createdAt).toEqual({
+        lte: new Date('2026-03-09T00:00:00.000Z'),
+        gt: new Date('2026-03-08T00:00:00.000Z'),
+      });
+    });
+  });
 });
