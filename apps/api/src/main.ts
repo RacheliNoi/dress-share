@@ -11,8 +11,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // Defaults to the local dev frontend so `npm run start:dev` keeps working
+  // out of the box - a real deployment sets FRONTEND_URL to the actual
+  // production frontend origin instead of hardcoding it here (deploy-4).
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
   });
 
   await app.listen(process.env.PORT ?? 3001);
