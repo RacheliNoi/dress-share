@@ -99,6 +99,7 @@ npm run dev             # http://localhost:3000
 | `apps/api` | `DATABASE_URL` | PostgreSQL connection string |
 | `apps/api` | `JWT_SECRET` | Secret used to sign auth tokens |
 | `apps/api` | `PORT` | Optional, defaults to `3001` |
+| `apps/api` | `FRONTEND_URL` | Optional. Allowed CORS origin, defaults to `http://localhost:3000` — set to the real frontend URL on deploy |
 | `apps/api` | `PHOTOROOM_API_KEY_SANDBOX` | Optional. Photo enhancement on upload — free tier, output is watermarked. Uploads work fine without it (skips enhancement, keeps the original photo only) |
 | `apps/api` | `PHOTOROOM_API_KEY_LIVE` | Optional, not currently wired to any code path — reserved for switching off the sandbox watermark before shipping |
 | `apps/api` | `RESEND_API_KEY` | Optional. Real email delivery. Without a verified sending domain, real recipients get rejected by Resend and notifications fall back to a console log |
