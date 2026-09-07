@@ -8,9 +8,11 @@ import { JwtModule } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('AuthService', () => {
   let service: AuthService;
+  let notifications: { notifyPasswordReset: jest.Mock };
   let prisma: {
     user: {
       findUnique: jest.Mock;
@@ -40,9 +42,15 @@ describe('AuthService', () => {
       $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
 
+    notifications = { notifyPasswordReset: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [JwtModule.register({ secret: 'test-secret' })],
-      providers: [AuthService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        AuthService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
+      ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
@@ -201,6 +209,31 @@ describe('AuthService', () => {
         prisma.passwordResetToken.create.mock.calls[0][0].data.tokenHash;
       expect(storedHash).toMatch(/^[a-f0-9]{64}$/);
     });
+
+    // Regression test: this flow used to only console.log the token, never
+    // actually send anything - a real user had no way to receive it at all.
+    it('actually sends the reset email via NotificationsService, with a working link', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        email: 'user@example.com',
+      });
+      prisma.passwordResetToken.create.mockResolvedValue({});
+
+      await service.requestPasswordReset('user@example.com');
+
+      expect(notifications.notifyPasswordReset).toHaveBeenCalledTimes(1);
+      const [emailArg, urlArg] = notifications.notifyPasswordReset.mock.calls[0];
+      expect(emailArg).toBe('user@example.com');
+      expect(urlArg).toMatch(/^https?:\/\/.+\/reset-password\?token=[a-f0-9]{64}$/);
+    });
+
+    it('does not send an email when the address is unknown (no enumeration)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await service.requestPasswordReset('unknown@example.com');
+
+      expect(notifications.notifyPasswordReset).not.toHaveBeenCalled();
+    });
   });
 
   describe('resetPassword', () => {
@@ -316,6 +349,10 @@ describe('AuthService', () => {
       expect(result).toEqual({ message: expect.any(String) });
       expect(result).not.toHaveProperty('token');
       expect(result).not.toHaveProperty('resetToken');
+      expect(notifications.notifyPasswordReset).toHaveBeenCalledWith(
+        'target@example.com',
+        expect.stringContaining('/reset-password?token='),
+      );
     });
 
     it('throws NotFoundException for a missing user', async () => {

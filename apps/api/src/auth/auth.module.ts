@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { AuthService } from './auth.service';
         expiresIn: '7d',
       },
     }),
+    NotificationsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService],

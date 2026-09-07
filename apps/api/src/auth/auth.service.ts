@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const RESET_TOKEN_BYTES = 32;
 const RESET_TOKEN_TTL_MINUTES = 30;
@@ -20,6 +21,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async register(data: {
@@ -234,14 +236,16 @@ export class AuthService {
       data: { userId, tokenHash, expiresAt },
     });
 
-    // TODO(email): plug in a real email provider here (e.g. SES/SendGrid/Resend)
-    // and send `rawToken` to `email` as a link, e.g.
-    // `${FRONTEND_URL}/reset-password?token=${rawToken}`.
     // The raw token is never persisted (only its hash is) and is never
-    // returned from any API response - until a real email integration exists,
-    // this console line is the only way to retrieve it for local development.
-    console.log(
-      `[dev-only] Password reset token for ${email}: ${rawToken} (expires ${expiresAt.toISOString()})`,
+    // returned from any API response - this email is the only way to
+    // actually get it. NotificationsService.notifyPasswordReset falls back
+    // to its own [dev-only] console log automatically if Resend isn't
+    // configured or rejects the send, so local development stays observable
+    // either way without a separate console.log here.
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    this.notifications.notifyPasswordReset(
+      email,
+      `${frontendUrl}/reset-password?token=${rawToken}`,
     );
 
     return rawToken;

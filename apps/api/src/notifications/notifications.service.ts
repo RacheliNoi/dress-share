@@ -109,4 +109,19 @@ export class NotificationsService {
       `ההתעניינות שלך בשמלה "${dressName}" תפוג ב-${formatDateHe(expiresAt)} אם לא תאושר השכרה עד אז.`,
     );
   }
+
+  // The reset link itself is the entire point of this email - unlike the
+  // other triggers here, there is no other way for the user to get it (the
+  // raw token is never returned from any API response, by design). Still
+  // fire-and-forget like the others: the caller's response is a generic
+  // "if that email exists, a link was sent" regardless of delivery outcome,
+  // on purpose, so this endpoint can never be used to check which emails
+  // are registered.
+  notifyPasswordReset(email: string, resetUrl: string): void {
+    void this.send(
+      email,
+      'איפוס סיסמה ל-DressShare',
+      `קיבלנו בקשה לאיפוס הסיסמה שלך. לאיפוס, לחצי על הקישור הבא (בתוקף ל-30 דקות):\n${resetUrl}\n\nאם לא ביקשת לאפס את הסיסמה שלך, אפשר להתעלם מההודעה הזו.`,
+    );
+  }
 }
