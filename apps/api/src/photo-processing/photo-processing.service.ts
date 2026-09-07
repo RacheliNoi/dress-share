@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import sharp from 'sharp';
 
 const PHOTOROOM_SEGMENT_URL = 'https://sdk.photoroom.com/v1/segment';
 
@@ -63,13 +64,40 @@ export class PhotoProcessingService {
         return null;
       }
 
-      return Buffer.from(await response.arrayBuffer());
+      const segmented = Buffer.from(await response.arrayBuffer());
+      return await this.applyLocalTouchUp(segmented);
     } catch (error) {
       this.logger.warn(
         'Photoroom enhancement request failed - keeping the original photo only',
         error instanceof Error ? error.stack : String(error),
       );
       return null;
+    }
+  }
+
+  // Photoroom's v1/segment endpoint only swaps the background - it has no
+  // color grading, contrast, or sharpening of its own (verified live: a
+  // shadow/lighting parameter it doesn't actually support was silently
+  // ignored, output was byte-identical in composition). This local pass -
+  // saturation/brightness lift, a touch of contrast, light sharpening - is
+  // what actually makes the photo read as "styled" rather than "background
+  // deleted." Runs entirely locally via sharp, no extra network call, so a
+  // failure here (corrupt image data, unsupported format) degrades to the
+  // plain segmented result rather than losing the enhancement altogether.
+  private async applyLocalTouchUp(imageBuffer: Buffer): Promise<Buffer> {
+    try {
+      return await sharp(imageBuffer)
+        .modulate({ saturation: 1.18, brightness: 1.03 })
+        .linear(1.06, -6)
+        .sharpen({ sigma: 1.0 })
+        .png()
+        .toBuffer();
+    } catch (error) {
+      this.logger.warn(
+        'Local touch-up pass failed - using the plain segmented image',
+        error instanceof Error ? error.stack : String(error),
+      );
+      return imageBuffer;
     }
   }
 }
