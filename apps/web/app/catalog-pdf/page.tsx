@@ -95,8 +95,12 @@ export default function CatalogPdfPage() {
             קטלוג להדפסה / שמירה כ-PDF
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            לחצי על הכפתור ובחלון ההדפסה בחרי &quot;שמירה כ-PDF&quot;
-            (Save as PDF) כדי להוריד את הקטלוג כקובץ.
+            לחצי על הכפתור, ובתפריט &quot;יעד&quot; (Destination) של חלון
+            ההדפסה בחרי בדיוק <strong>&quot;שמירה כ-PDF&quot; (Save as
+            PDF)</strong> — לא &quot;Microsoft Print to PDF&quot;. אלו שתי
+            אפשרויות שונות שנראות דומות: רק הראשונה שומרת את הקישורים
+            הלחיצים בתוך הקובץ, השנייה יוצרת עותק כמו הדפסה על נייר בלי
+            קישורים פעילים.
           </p>
         </div>
 

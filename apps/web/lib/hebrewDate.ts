@@ -37,6 +37,38 @@ export function toHebrewNumeral(num: number): string {
   return letters.slice(0, -1) + "״" + letters.slice(-1);
 }
 
+const HUNDREDS = ["", "ק", "ר", "ש", "ת", "תק", "תר", "תש", "תת", "תתק"];
+const TENS = ["", "י", "כ", "ל", "מ", "נ", "ס", "ע", "פ", "צ"];
+const ONES = ["", "א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט"];
+
+// A full Hebrew year (e.g. 5786) uses different conventions than a bare
+// day-of-month: it's always written without the thousands digit (5786 ->
+// תשפ״ו, not ה׳תשפ״ו - the millennium is assumed from context, same as
+// civil use in Israel today), and can need a hundreds letter toHebrewNumeral
+// was never built to produce (it only ever needs to cover 1-30).
+export function toHebrewYearNumeral(year: number): string {
+  const remainder = year % 1000;
+  const hundreds = Math.floor(remainder / 100);
+  const lastTwo = remainder % 100;
+
+  // Same ט״ו/ט״ז special case as toHebrewNumeral, to avoid spelling God's
+  // name - only applies to the tens+ones pair, not hundreds.
+  const tail =
+    lastTwo === 15
+      ? "טו"
+      : lastTwo === 16
+        ? "טז"
+        : TENS[Math.floor(lastTwo / 10)] + ONES[lastTwo % 10];
+
+  const letters = HUNDREDS[hundreds] + tail;
+
+  if (letters.length <= 1) {
+    return letters + "׳";
+  }
+
+  return letters.slice(0, -1) + "״" + letters.slice(-1);
+}
+
 export function getHebrewDateParts(date: Date): {
   day: number;
   month: string;

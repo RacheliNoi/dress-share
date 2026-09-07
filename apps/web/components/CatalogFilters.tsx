@@ -6,6 +6,7 @@ import {
   getHebrewDateParts,
   hebrewToGregorian,
   toHebrewNumeral,
+  toHebrewYearNumeral,
 } from "@/lib/hebrewDate";
 
 export type SortOption = "recommended" | "price-asc" | "price-desc" | "newest";
@@ -260,7 +261,7 @@ export default function CatalogFilters({
             >
               {hebrewYearOptions.map((year) => (
                 <option key={year} value={year}>
-                  {year}
+                  {toHebrewYearNumeral(year)}
                 </option>
               ))}
             </select>
@@ -298,7 +299,7 @@ export default function CatalogFilters({
           {availabilityDate && (
             <span className="text-xs font-medium text-zinc-500 sm:ms-auto">
               נבחר: {new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${availabilityDate}T00:00:00.000Z`))}
-              {hebrewMonthName && hebrewDay && ` · ${toHebrewNumeral(Number(hebrewDay))} ב${hebrewMonthName} ${hebrewYear}`}
+              {hebrewMonthName && hebrewDay && ` · ${toHebrewNumeral(Number(hebrewDay))} ב${hebrewMonthName} ${toHebrewYearNumeral(hebrewYear)}`}
             </span>
           )}
         </div>
