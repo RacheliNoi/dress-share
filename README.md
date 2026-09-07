@@ -19,7 +19,7 @@ UI is in Hebrew with full RTL support.
 - Editing an already-approved listing doesn't affect what's publicly visible until an admin approves the edit — proposed changes are held in a separate "pending" shadow (`pendingDetails`, `pendingAction: ADD/REMOVE` on sizes/photos) rather than mutating the live row
 - Per-size inventory (multiple physical units per size)
 - Every uploaded photo is automatically enhanced: background swap via the Photoroom API (clean warm-neutral studio background, subject never altered), then a local color/contrast/sharpen touch-up — falls back to the original upload untouched if either step fails or isn't configured
-- Owners can manually re-run the enhancement on any one photo if they don't like the automatic result, without losing the original upload
+- Owners can click any photo to open a large preview with a before/after toggle and re-run the AI enhancement as many times as they want, without losing the original upload
 
 **Bookings**
 - Renter-initiated: any logged-in user (not the dress's owner) can mark interest in a dress from its public page — the owner responds and confirms, rather than self-reporting a rental, which closes off the obvious way to dodge commission by arranging a deal outside the platform
