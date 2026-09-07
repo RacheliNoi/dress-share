@@ -31,7 +31,7 @@ UI is in Hebrew with full RTL support.
 - In-app chat per booking (simple polling, not WebSockets), shared by one component on both the renter's and owner's screens, so fitting/logistics coordination stays on-platform instead of pushing people to WhatsApp before a booking is real
 
 **Renter-facing UI**
-- "מעוניינת בהשכרה" (interested in renting) action on the public dress page, gated to logged-in non-owners
+- "מעוניינת בהשכרה" (interested in renting) action on the public dress page, gated to logged-in non-owners — supports picking multiple sizes and multiple units of the same size in one request, respecting each size's real remaining capacity
 - "הבקשות שלי" (my requests) page listing everything the current user has booked as a renter, with the same chat thread as the owner sees
 
 **Owner-facing UI**
