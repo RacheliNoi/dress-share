@@ -11,6 +11,27 @@ const RESEND_API_URL = 'https://api.resend.com/emails';
 // breaks; notifications just aren't actually delivered to real inboxes yet.
 const FROM_ADDRESS = 'DressShare <onboarding@resend.dev>';
 
+// Turns a plain-text body (the shape every trigger method below builds) into
+// safe HTML: escapes the text first, then linkifies any bare URL, so a link
+// dropped into a message (e.g. a dress URL, a reset link) always renders as
+// a real clickable <a> in the email client - not just visible plain text
+// that happens to look like a URL and relies on the recipient's mail client
+// guessing that. Applied once here, centrally, so every trigger method gets
+// it automatically instead of building its own HTML.
+function toHtmlBody(text: string): string {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const linkified = escaped.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    (url) => `<a href="${url}">${url}</a>`,
+  );
+
+  return `<p>${linkified.replace(/\n/g, '<br>')}</p>`;
+}
+
 function formatDateHe(date: Date): string {
   return new Intl.DateTimeFormat('he-IL', {
     day: '2-digit',
@@ -57,7 +78,7 @@ export class NotificationsService {
           from: FROM_ADDRESS,
           to,
           subject,
-          html: `<p>${body.replace(/\n/g, '<br>')}</p>`,
+          html: toHtmlBody(body),
         }),
       });
 
@@ -82,11 +103,12 @@ export class NotificationsService {
     dressName: string,
     startDate: Date,
     endDate: Date,
+    dressUrl: string,
   ): void {
     void this.send(
       ownerEmail,
       `מישהי מתעניינת ב${dressName}`,
-      `יש התעניינות חדשה בשמלה "${dressName}" לתאריכים ${formatDateHe(startDate)}–${formatDateHe(endDate)}.`,
+      `יש התעניינות חדשה בשמלה "${dressName}" לתאריכים ${formatDateHe(startDate)}–${formatDateHe(endDate)}.\n\nלצפייה בבקשה ובשמלה: ${dressUrl}`,
     );
   }
 

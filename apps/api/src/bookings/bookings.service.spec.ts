@@ -144,6 +144,7 @@ describe('BookingsService', () => {
         expect.any(String),
         expect.any(Date),
         expect.any(Date),
+        expect.stringContaining('/dresses/1'),
       );
     });
 

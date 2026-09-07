@@ -23,18 +23,22 @@ describe('NotificationsService', () => {
     expect(service).toBeDefined();
   });
 
-  it('notifyNewInterest logs the owner email and dress name', () => {
+  it('notifyNewInterest logs the owner email, dress name, and a link to the dress', () => {
     service.notifyNewInterest(
       'owner@test.com',
       'שמלת ערב',
       new Date('2026-09-10'),
       new Date('2026-09-11'),
+      'http://localhost:3000/dresses/42',
     );
 
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('owner@test.com'),
     );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('שמלת ערב'));
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('http://localhost:3000/dresses/42'),
+    );
   });
 
   it('notifyNewChatMessage logs the recipient email and dress name', () => {
@@ -57,6 +61,22 @@ describe('NotificationsService', () => {
       expect.stringContaining('renter@test.com'),
     );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('שמלת ערב'));
+  });
+
+  it('notifyPasswordReset logs the recipient email and the reset link', () => {
+    service.notifyPasswordReset(
+      'user@test.com',
+      'http://localhost:3000/reset-password?token=abc123',
+    );
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('user@test.com'),
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'http://localhost:3000/reset-password?token=abc123',
+      ),
+    );
   });
 
   describe('with RESEND_API_KEY configured', () => {
@@ -90,6 +110,7 @@ describe('NotificationsService', () => {
         'שמלת ערב',
         new Date('2026-09-10'),
         new Date('2026-09-11'),
+        'http://localhost:3000/dresses/42',
       );
       await flush();
 
@@ -106,6 +127,29 @@ describe('NotificationsService', () => {
       const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
       expect(body.to).toBe('owner@test.com');
       expect(body.subject).toContain('שמלת ערב');
+      // The dress link must render as a real clickable <a>, not just
+      // visible plain-text that happens to look like a URL.
+      expect(body.html).toContain(
+        '<a href="http://localhost:3000/dresses/42">http://localhost:3000/dresses/42</a>',
+      );
+    });
+
+    it('renders the password reset link as a real clickable <a>, HTML-escaping the query string safely', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve('') });
+      global.fetch = fetchMock;
+
+      service.notifyPasswordReset(
+        'user@test.com',
+        'http://localhost:3000/reset-password?token=abc123',
+      );
+      await flush();
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+      expect(body.html).toContain(
+        '<a href="http://localhost:3000/reset-password?token=abc123">http://localhost:3000/reset-password?token=abc123</a>',
+      );
     });
 
     it('does not fall back to the console log when Resend accepts the send', async () => {
@@ -119,6 +163,7 @@ describe('NotificationsService', () => {
         'שמלת ערב',
         new Date('2026-09-10'),
         new Date('2026-09-11'),
+        'http://localhost:3000/dresses/42',
       );
       await flush();
 

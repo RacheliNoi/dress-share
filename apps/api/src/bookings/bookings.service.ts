@@ -388,11 +388,13 @@ export class BookingsService {
     // Fire-and-forget from the caller's perspective: notification delivery
     // is not part of this transaction and a delivery failure must never
     // fail (or roll back) an otherwise-successful booking creation.
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     this.notifications.notifyNewInterest(
       dress.owner.email,
       dress.name,
       startDate,
       endDate,
+      `${frontendUrl}/dresses/${data.dressId}`,
     );
 
     return booking;
