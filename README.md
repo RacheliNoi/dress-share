@@ -31,7 +31,7 @@ UI is in Hebrew with full RTL support.
 - In-app chat per booking (simple polling, not WebSockets), shared by one component on both the renter's and owner's screens, so fitting/logistics coordination stays on-platform instead of pushing people to WhatsApp before a booking is real
 
 **Renter-facing UI**
-- "מעוניינת בהשכרה" (interested in renting) action on the public dress page, gated to logged-in non-owners — supports picking multiple sizes and multiple units of the same size in one request, respecting each size's real remaining capacity
+- "מעוניינת בהשכרה" (interested in renting) action on the public dress page, gated to logged-in non-owners — supports picking multiple sizes and multiple units of the same size in one request, respecting each size's real remaining capacity. Size picking is gated behind choosing dates first (capacity is meaningless without a date range), and availability re-fetches on every date change and after a successful submission
 - "הבקשות שלי" (my requests) page listing everything the current user has booked as a renter, with the same chat thread as the owner sees
 
 **Owner-facing UI**
@@ -40,7 +40,7 @@ UI is in Hebrew with full RTL support.
 
 **Notifications**
 - Owner gets notified when someone expresses interest in their dress; whichever side of a chat didn't just write gets notified of a new message; a renter gets warned once before their `INTERESTED` hold is about to auto-expire
-- Real email delivery via Resend. Until a sending domain is verified in the Resend dashboard, real recipient addresses are rejected by Resend itself (their anti-spam safeguard) and every send falls back to the same `[dev-only]` console log used before — nothing breaks, emails just aren't delivered to real inboxes yet
+- Real email delivery via Resend, rendered through a branded HTML template matching the site's own colors/RTL layout with real button-style links. Until a sending domain is verified in the Resend dashboard, real recipient addresses are rejected by Resend itself (their anti-spam safeguard) and every send falls back to the same `[dev-only]` console log used before — nothing breaks, emails just aren't delivered to real inboxes yet
 - Routed through a single `NotificationsService.send()` choke point — the eventual domain-verified `from` address change, or any future provider swap, touches one method, not each trigger site
 
 **Auth & authorization**
