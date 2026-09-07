@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import { getPeakUsageForRange } from "@/lib/availability";
 import { buttonClassName } from "./ui/Button";
+import SizeFacts from "./ui/SizeFacts";
 
 // Same multi-size/multi-unit selection logic as the owner's old booking-
 // creation form (DressAvailabilityManager, before owner-1's redesign moved
@@ -27,10 +28,15 @@ export default function InterestedBookingButton({
   dressId,
   ownerId,
   sizes,
+  onSuccess,
 }: {
   dressId: number;
   ownerId: number;
   sizes: DressSize[];
+  // Lets the page remount its (otherwise never-refreshing) availability
+  // calendar after a successful submission, so a just-created request shows
+  // up immediately instead of only after a manual reload.
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -47,11 +53,54 @@ export default function InterestedBookingButton({
   const [successCount, setSuccessCount] = useState(0);
 
   const hasSizes = sizes.length > 0;
+  const datesSelected = Boolean(startDate && endDate && endDate >= startDate);
 
   useEffect(() => {
     setUser(getUser());
     setMounted(true);
   }, []);
+
+  // Availability can only mean anything once a date range is actually
+  // chosen (remaining units depend entirely on which dates are being
+  // asked about) - so this fetches (and re-fetches on every date change,
+  // not just once on open) only once both dates are set, and the size grid
+  // below stays hidden until then. Any sizes already picked against a now-
+  // stale date range are cleared, rather than silently carried over against
+  // numbers that may no longer be correct. Declared before the "not
+  // mounted yet" early return below (with every other hook) - React
+  // requires every hook to run in the same order on every render,
+  // regardless of what the component ends up rendering.
+  useEffect(() => {
+    if (!open || !hasSizes || !datesSelected) {
+      return;
+    }
+
+    let cancelled = false;
+    setSelectedSizeIds([]);
+    setAvailabilityLoading(true);
+
+    getDressAvailability(dressId)
+      .then((data) => {
+        if (!cancelled) {
+          setAvailability(data);
+        }
+      })
+      .catch(() => {
+        // Fails open - same as everywhere else this endpoint is read: an
+        // unknown remaining count just shows full capacity, the backend's
+        // own SERIALIZABLE check on submit is still the real protection
+        // against overselling.
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setAvailabilityLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, hasSizes, datesSelected, startDate, endDate, dressId]);
 
   if (!mounted || (user && user.id === ownerId)) {
     return null;
@@ -60,8 +109,6 @@ export default function InterestedBookingButton({
   const selectedSizes = selectedSizeIds
     .map((id) => sizes.find((candidate) => String(candidate.id) === id))
     .filter((size): size is DressSize => Boolean(size));
-
-  const datesSelected = Boolean(startDate && endDate && endDate >= startDate);
 
   function selectedCountFor(sizeId: string) {
     return selectedSizeIds.filter((id) => id === sizeId).length;
@@ -98,7 +145,7 @@ export default function InterestedBookingButton({
 
   const totalPrice = selectedSizes.reduce((sum, size) => sum + size.price, 0);
 
-  async function openModal() {
+  function openModal() {
     if (!user) {
       router.push("/login");
       return;
@@ -111,21 +158,6 @@ export default function InterestedBookingButton({
     setEndDate("");
     setSelectedSizeIds([]);
     setOpen(true);
-
-    if (hasSizes) {
-      setAvailabilityLoading(true);
-      try {
-        const data = await getDressAvailability(dressId);
-        setAvailability(data);
-      } catch {
-        // Fails open - same as everywhere else this endpoint is read: an
-        // unknown remaining count just shows full capacity, the backend's
-        // own SERIALIZABLE check on submit is still the real protection
-        // against overselling.
-      } finally {
-        setAvailabilityLoading(false);
-      }
-    }
   }
 
   function closeModal() {
@@ -169,6 +201,7 @@ export default function InterestedBookingButton({
         await createInterestedBooking(token, { dressId, startDate, endDate });
         setSuccessCount(1);
         setSuccess(true);
+        onSuccess?.();
         return;
       }
 
@@ -195,6 +228,7 @@ export default function InterestedBookingButton({
       if (successCountNow > 0) {
         setSuccessCount(successCountNow);
         setSuccess(true);
+        onSuccess?.();
       }
 
       if (failedSizes.length > 0) {
@@ -284,7 +318,13 @@ export default function InterestedBookingButton({
                     className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                   />
 
-                  {hasSizes && (
+                  {hasSizes && !datesSelected && (
+                    <p className="rounded-xl bg-surface-sunken px-4 py-3 text-sm text-ink-faint">
+                      נא למלא תאריכי השכרה כדי לראות אילו מידות פנויות
+                    </p>
+                  )}
+
+                  {hasSizes && datesSelected && (
                     <div>
                       <p className="mb-2 text-xs font-bold text-ink-soft">
                         בחירת מידה (אפשר לבחור כמה מידות, וכמה יחידות מאותה
@@ -346,7 +386,7 @@ export default function InterestedBookingButton({
                               key={`${size.id}-${index}`}
                               className="flex items-center gap-2 rounded-full bg-zinc-100 py-1.5 ps-3.5 pe-2 text-sm font-semibold text-zinc-700"
                             >
-                              מידה {size.size} · {size.price} ₪
+                              <SizeFacts size={size.size} price={size.price} />
                               <button
                                 type="button"
                                 onClick={() => removeSizeFromSelection(index)}

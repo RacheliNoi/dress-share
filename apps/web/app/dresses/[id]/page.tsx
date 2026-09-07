@@ -8,6 +8,7 @@ import { ApiError, Dress, getDressImageUrl, getMyDresses } from "@/lib/api";
 import Header from "@/components/Header";
 import DressAvailabilityManager from "@/components/DressAvailabilityManager";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import SizeFacts from "@/components/ui/SizeFacts";
 
 function StatusPanel({ dress }: { dress: Dress }) {
   switch (dress.status) {
@@ -339,7 +340,7 @@ export default function MyDressDetailsPage() {
                         className="flex items-center justify-between py-3"
                       >
                         <span className="rounded-full bg-zinc-100 px-3 py-1.5 text-sm font-semibold text-zinc-700">
-                          מידה {size.size} · {size.quantity} יחידות
+                          <SizeFacts size={size.size} quantity={size.quantity} />
                         </span>
                         <span className="text-base font-black text-zinc-900">
                           {size.price} ₪

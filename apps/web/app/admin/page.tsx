@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import Header from "@/components/Header";
 import PhotoGallery from "@/components/PhotoGallery";
+import SizeFacts from "@/components/ui/SizeFacts";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -303,7 +304,11 @@ export default function AdminDashboardPage() {
                                 key={size.id}
                                 className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600"
                               >
-                                מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
+                                <SizeFacts
+                                  size={size.size}
+                                  price={size.price}
+                                  quantity={size.quantity}
+                                />
                               </span>
                             ))}
                             {addedSizes.map((size) => (
@@ -311,7 +316,12 @@ export default function AdminDashboardPage() {
                                 key={size.id}
                                 className="rounded-full bg-success-soft px-3 py-1 text-xs font-semibold text-success"
                               >
-                                + מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
+                                +{" "}
+                                <SizeFacts
+                                  size={size.size}
+                                  price={size.price}
+                                  quantity={size.quantity}
+                                />
                               </span>
                             ))}
                             {removedSizes.map((size) => (
@@ -319,7 +329,11 @@ export default function AdminDashboardPage() {
                                 key={size.id}
                                 className="rounded-full bg-error-soft px-3 py-1 text-xs font-semibold text-error line-through"
                               >
-                                מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
+                                <SizeFacts
+                                  size={size.size}
+                                  price={size.price}
+                                  quantity={size.quantity}
+                                />
                               </span>
                             ))}
                           </>

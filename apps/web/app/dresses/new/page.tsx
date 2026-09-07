@@ -22,6 +22,7 @@ import Header from "@/components/Header";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import PhotoEditModal from "@/components/PhotoEditModal";
+import SizeFacts from "@/components/ui/SizeFacts";
 
 export default function NewDressPage() {
   const router = useRouter();
@@ -463,7 +464,7 @@ export default function NewDressPage() {
                       key={size.id}
                       className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-700"
                     >
-                      מידה {size.size} · {size.price} ₪
+                      <SizeFacts size={size.size} price={size.price} />
                     </li>
                   ))}
                 </ul>

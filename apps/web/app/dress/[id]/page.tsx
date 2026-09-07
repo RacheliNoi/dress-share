@@ -19,6 +19,11 @@ export default function DressDetailsPage() {
   // Photo ids whose <img> failed to load - shown with the shared branded
   // placeholder instead of the browser's own broken-image UI.
   const [failedPhotoIds, setFailedPhotoIds] = useState<Set<number>>(new Set());
+  // Bumped after a successful interested-booking submission to remount (and
+  // so re-fetch) the calendar below - it otherwise only fetches once on
+  // mount and would keep showing the pre-submission state until a full
+  // page reload.
+  const [calendarKey, setCalendarKey] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -201,9 +206,14 @@ export default function DressDetailsPage() {
                 dressId={dress.id}
                 ownerId={dress.ownerId}
                 sizes={dress.sizes}
+                onSuccess={() => setCalendarKey((key) => key + 1)}
               />
 
-              <DressAvailabilityCalendar dressId={dress.id} sizes={dress.sizes} />
+              <DressAvailabilityCalendar
+                dressId={dress.id}
+                sizes={dress.sizes}
+                key={calendarKey}
+              />
             </div>
           </div>
         ) : null}

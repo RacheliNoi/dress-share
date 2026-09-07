@@ -26,6 +26,7 @@ import Header from "@/components/Header";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import PhotoEditModal from "@/components/PhotoEditModal";
+import SizeFacts from "@/components/ui/SizeFacts";
 
 type PendingConfirm =
   | { type: "removeSize"; sizeId: number }
@@ -750,7 +751,11 @@ export default function EditDressPage() {
                           className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-error-soft bg-error-soft/40 p-3"
                         >
                           <span className="text-sm text-error line-through">
-                            מידה {size.size} · {size.price} ₪ · {size.quantity} יחידות
+                            <SizeFacts
+                              size={size.size}
+                              price={size.price}
+                              quantity={size.quantity}
+                            />
                           </span>
                           <span className="rounded-full bg-error-soft px-2.5 py-1 text-[11px] font-bold text-error">
                             מסומן להסרה
