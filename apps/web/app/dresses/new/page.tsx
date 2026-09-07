@@ -15,11 +15,13 @@ import {
   deleteDressPhoto,
   getDressImageUrl,
   getMyDresses,
+  reprocessDressPhoto,
   submitDressForApproval,
 } from "@/lib/api";
 import Header from "@/components/Header";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import PhotoEditModal from "@/components/PhotoEditModal";
 
 export default function NewDressPage() {
   const router = useRouter();
@@ -56,6 +58,8 @@ export default function NewDressPage() {
   const [photoError, setPhotoError] = useState("");
   const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
   const [pendingDeletePhotoId, setPendingDeletePhotoId] = useState<number | null>(null);
+  const [reprocessingPhotoId, setReprocessingPhotoId] = useState<number | null>(null);
+  const [viewingPhotoId, setViewingPhotoId] = useState<number | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -228,6 +232,30 @@ export default function NewDressPage() {
     }
   }
 
+  async function handleReprocessPhoto(photoId: number) {
+    const token = getToken();
+
+    if (!token || !dress) {
+      return;
+    }
+
+    setReprocessingPhotoId(photoId);
+    setPhotoError("");
+
+    try {
+      const updated = await reprocessDressPhoto(token, dress.id, photoId);
+      setPhotos((current) =>
+        current.map((photo) => (photo.id === photoId ? updated : photo)),
+      );
+    } catch (err) {
+      setPhotoError(
+        err instanceof ApiError ? err.message : "שגיאה בעריכה מחדש של התמונה",
+      );
+    } finally {
+      setReprocessingPhotoId(null);
+    }
+  }
+
   async function handleSubmitForApproval() {
     const token = getToken();
 
@@ -249,6 +277,11 @@ export default function NewDressPage() {
       setSubmitting(false);
     }
   }
+
+  // Derived from the live photos array (not a snapshot), so a freshly
+  // reprocessed photo's new processedUrl shows up immediately - see the
+  // identical pattern on the dress edit page.
+  const viewingPhoto = photos.find((photo) => photo.id === viewingPhotoId) ?? null;
 
   return (
     <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
@@ -506,11 +539,22 @@ export default function NewDressPage() {
                         className="group relative aspect-square animate-fade-scale-in overflow-hidden rounded-2xl bg-zinc-100 ring-1 ring-zinc-200/70 transition duration-300 hover:shadow-lg"
                         style={{ animationDelay: `${index * 40}ms` }}
                       >
-                        <img
-                          src={getDressImageUrl(photo)}
-                          alt={`תמונה ${index + 1}`}
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => setViewingPhotoId(photo.id)}
+                          aria-label={`הגדלת תמונה ${index + 1} ועריכה ב-AI`}
+                          className="block h-full w-full"
+                        >
+                          <img
+                            src={getDressImageUrl(photo)}
+                            alt={`תמונה ${index + 1}`}
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                          />
+
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-sm font-bold text-white opacity-0 transition duration-200 group-hover:bg-black/25 group-hover:opacity-100">
+                            הגדלה ועריכה
+                          </span>
+                        </button>
 
                         {index === 0 && (
                           <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur">
@@ -662,6 +706,16 @@ export default function NewDressPage() {
         onConfirm={confirmDeletePhoto}
         onCancel={() => setPendingDeletePhotoId(null)}
       />
+
+      {viewingPhoto && (
+        <PhotoEditModal
+          photo={viewingPhoto}
+          onClose={() => setViewingPhotoId(null)}
+          onReprocess={() => handleReprocessPhoto(viewingPhoto.id)}
+          reprocessing={reprocessingPhotoId === viewingPhoto.id}
+          error={photoError}
+        />
+      )}
     </main>
   );
 }
