@@ -127,14 +127,16 @@ describe('NotificationsService', () => {
       const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
       expect(body.to).toBe('owner@test.com');
       expect(body.subject).toContain('שמלת ערב');
-      // The dress link must render as a real clickable <a>, not just
-      // visible plain-text that happens to look like a URL.
-      expect(body.html).toContain(
-        '<a href="http://localhost:3000/dresses/42">http://localhost:3000/dresses/42</a>',
-      );
+      // The dress link must render as a real clickable <a> button, not
+      // just visible plain-text that happens to look like a URL.
+      expect(body.html).toContain('href="http://localhost:3000/dresses/42"');
+      expect(body.html).toContain('לצפייה בבקשה');
+      // Branded template - not just a bare paragraph of text.
+      expect(body.html).toContain('DressShare');
+      expect(body.text).toContain('http://localhost:3000/dresses/42');
     });
 
-    it('renders the password reset link as a real clickable <a>, HTML-escaping the query string safely', async () => {
+    it('renders the password reset link as a real clickable <a> button, HTML-escaping the query string safely', async () => {
       const fetchMock = jest
         .fn()
         .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve('') });
@@ -148,8 +150,9 @@ describe('NotificationsService', () => {
 
       const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
       expect(body.html).toContain(
-        '<a href="http://localhost:3000/reset-password?token=abc123">http://localhost:3000/reset-password?token=abc123</a>',
+        'href="http://localhost:3000/reset-password?token=abc123"',
       );
+      expect(body.html).toContain('איפוס הסיסמה');
     });
 
     it('does not fall back to the console log when Resend accepts the send', async () => {
