@@ -25,6 +25,7 @@ import {
 import Header from "@/components/Header";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import PhotoEditModal from "@/components/PhotoEditModal";
 
 type PendingConfirm =
   | { type: "removeSize"; sizeId: number }
@@ -68,6 +69,7 @@ export default function EditDressPage() {
   const [photoError, setPhotoError] = useState("");
   const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
   const [reprocessingPhotoId, setReprocessingPhotoId] = useState<number | null>(null);
+  const [viewingPhotoId, setViewingPhotoId] = useState<number | null>(null);
 
   const [resubmitting, setResubmitting] = useState(false);
   const [resubmitError, setResubmitError] = useState("");
@@ -578,6 +580,12 @@ export default function EditDressPage() {
     }
   }
 
+  // Derived (not a separate piece of state) from the live dress.photos array,
+  // so it automatically reflects a freshly-reprocessed photo's new
+  // processedUrl the moment refreshDressAndSizeDrafts updates `dress` -
+  // never a stale snapshot taken when the modal was opened.
+  const viewingPhoto = dress?.photos.find((photo) => photo.id === viewingPhotoId) ?? null;
+
   const canResubmit = dress?.status === "DRAFT" || dress?.status === "REJECTED";
   const hasPendingChanges = Boolean(
     dress &&
@@ -930,11 +938,22 @@ export default function EditDressPage() {
                             : "ring-zinc-200/70"
                       }`}
                     >
-                      <img
-                        src={getDressImageUrl(photo)}
-                        alt={`תמונה ${index + 1}`}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setViewingPhotoId(photo.id)}
+                        aria-label={`הגדלת תמונה ${index + 1} ועריכה ב-AI`}
+                        className="block h-full w-full"
+                      >
+                        <img
+                          src={getDressImageUrl(photo)}
+                          alt={`תמונה ${index + 1}`}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-sm font-bold text-white opacity-0 transition duration-200 group-hover:bg-black/25 group-hover:opacity-100">
+                          הגדלה ועריכה
+                        </span>
+                      </button>
 
                       {index === 0 && (
                         <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-zinc-700 shadow-sm backdrop-blur">
@@ -952,23 +971,6 @@ export default function EditDressPage() {
                         <span className="absolute bottom-2 right-2 rounded-full bg-error-soft/95 px-2 py-0.5 text-[10px] font-bold text-error shadow-sm backdrop-blur">
                           מסומן להסרה
                         </span>
-                      )}
-
-                      {photo.pendingAction !== "REMOVE" && (
-                        <button
-                          type="button"
-                          onClick={() => handleReprocessPhoto(photo.id)}
-                          disabled={reprocessingPhotoId === photo.id}
-                          title="עריכה מחדש ע״י AI"
-                          aria-label="עריכה מחדש ע״י AI"
-                          className="absolute bottom-2 left-2 flex h-7 items-center justify-center gap-1 rounded-full bg-zinc-900/70 px-2.5 text-[10px] font-bold text-white shadow-sm backdrop-blur transition duration-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {reprocessingPhotoId === photo.id ? (
-                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                          ) : (
-                            "↻ עריכה מחדש"
-                          )}
-                        </button>
                       )}
 
                       {photo.pendingAction === "REMOVE" ? (
@@ -1195,6 +1197,16 @@ export default function EditDressPage() {
         }}
         onCancel={() => setPendingConfirm(null)}
       />
+
+      {viewingPhoto && (
+        <PhotoEditModal
+          photo={viewingPhoto}
+          onClose={() => setViewingPhotoId(null)}
+          onReprocess={() => handleReprocessPhoto(viewingPhoto.id)}
+          reprocessing={reprocessingPhotoId === viewingPhoto.id}
+          error={photoError}
+        />
+      )}
     </main>
   );
 }

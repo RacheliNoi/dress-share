@@ -226,6 +226,12 @@ export function getDressImageUrl(photo: DressPhoto) {
   return `${API_URL}${photo.processedUrl ?? photo.originalUrl}`;
 }
 
+// The untouched upload, regardless of whether an AI-enhanced version
+// exists - used by the before/after comparison in the photo preview modal.
+export function getDressOriginalImageUrl(photo: DressPhoto) {
+  return `${API_URL}${photo.originalUrl}`;
+}
+
 // Mirrors exactly what GET /bookings/dress/:dressId/availability returns -
 // no renterId, no user details, nothing beyond what that public endpoint
 // actually sends.
