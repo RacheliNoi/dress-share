@@ -2,14 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
-// TODO(deploy): resend.dev's shared sender only delivers to Resend's own
-// testing addresses (verified live - an arbitrary real recipient gets a 422
-// "please verify a domain" error) until a real sending domain is verified
-// in the Resend dashboard. Switch this to a verified DressShare address
-// once that's done - until then, `send` below falls back to the same
-// [dev-only] console log used before this integration existed, so nothing
-// breaks; notifications just aren't actually delivered to real inboxes yet.
-const FROM_ADDRESS = 'DressShare <onboarding@resend.dev>';
+// dressshare.co.il is verified in Resend (infra: notif-1 deploy step) - real
+// recipients get real emails now, not just Resend's own testing addresses.
+const FROM_ADDRESS = 'DressShare <no-reply@dressshare.co.il>';
 
 // Mirrors apps/web/app/globals.css's design tokens exactly (--color-accent,
 // --color-ink, etc.) - kept as literal hex here rather than imported, since
