@@ -18,7 +18,7 @@ UI is in Hebrew with full RTL support.
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
 - Editing an already-approved listing doesn't affect what's publicly visible until an admin approves the edit — proposed changes are held in a separate "pending" shadow (`pendingDetails`, `pendingAction: ADD/REMOVE` on sizes/photos) rather than mutating the live row
 - Per-size inventory (multiple physical units per size)
-- Every uploaded photo is automatically enhanced: background swap via the Photoroom API (clean warm-neutral studio background, subject never altered), then a local color/contrast/sharpen touch-up — falls back to the original upload untouched if either step fails or isn't configured
+- Every uploaded photo is automatically checked for faces (Google Cloud Vision) and any detected face is blurred, protecting the privacy of whoever is wearing the dress — falls back to the original upload untouched if detection fails or isn't configured. (Previously did an AI background swap via Photoroom instead; swapped out for face-blurring until a more flattering background treatment is found)
 - Owners can click any photo to open a large preview with a before/after toggle and re-run the AI enhancement as many times as they want, without losing the original upload
 
 **Bookings**
@@ -101,8 +101,7 @@ npm run dev             # http://localhost:3000
 | `apps/api` | `JWT_SECRET` | Secret used to sign auth tokens |
 | `apps/api` | `PORT` | Optional, defaults to `3001` |
 | `apps/api` | `FRONTEND_URL` | Optional. Allowed CORS origin, defaults to `http://localhost:3000` — set to the real frontend URL on deploy |
-| `apps/api` | `PHOTOROOM_API_KEY_SANDBOX` | Optional. Photo enhancement on upload — free tier, output is watermarked. Uploads work fine without it (skips enhancement, keeps the original photo only) |
-| `apps/api` | `PHOTOROOM_API_KEY_LIVE` | Optional. Used automatically instead of the sandbox key when `NODE_ENV=production`, so shipped listings never carry Photoroom's watermark — costs money past 10 free edits |
+| `apps/api` | `GOOGLE_VISION_API_KEY` | Optional. Blurs any detected face in an uploaded photo (privacy for whoever is wearing the dress) via the Cloud Vision API. Requires billing enabled on the Google Cloud project. Uploads work fine without it (skips blurring, keeps the original photo only) |
 | `apps/api` | `RESEND_API_KEY` | Optional. Real email delivery. Without a verified sending domain, real recipients get rejected by Resend and notifications fall back to a console log |
 | `apps/api` | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Optional. Dress photo storage on Cloudflare R2. Without these (or if R2 is unreachable), uploads fall back to local disk under `apps/api/uploads` automatically — the app works fine either way |
 | `apps/web` | `NEXT_PUBLIC_API_URL` | Optional, defaults to `http://localhost:3001` |
