@@ -1,8 +1,13 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 
+// Rate-limited (see AuthModule's ThrottlerModule config) on every route in
+// this controller - the one place in the app bots would actually try to
+// brute-force or spam.
+@UseGuards(ThrottlerGuard)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

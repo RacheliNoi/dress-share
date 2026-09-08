@@ -46,6 +46,7 @@ UI is in Hebrew with full RTL support.
 **Auth & authorization**
 - JWT-based authentication, role-based access control (`USER` / `ADMIN`)
 - Server-side ownership checks on every mutating endpoint — never trusts a client-supplied owner/role claim
+- Rate-limited (5 requests/minute per IP) on every `/auth` route — blocks brute-force login/credential-stuffing and registration/reset-email spam
 
 **Admin**
 - Review queue for pending listings and pending edits, with approve/reject + rejection reason
