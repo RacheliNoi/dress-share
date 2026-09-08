@@ -5,9 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { readFile, unlink, writeFile } from 'fs/promises';
-import { basename, join } from 'path';
+import { randomUUID } from 'crypto';
+import { basename, extname, join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { PhotoProcessingService } from '../photo-processing/photo-processing.service';
+import { StorageService } from '../storage/storage.service';
 import { DressStatus, BookingStatus } from '../../generated/prisma/enums';
 import { Prisma } from '../../generated/prisma/client';
 
@@ -58,6 +60,7 @@ export class DressesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly photoProcessing: PhotoProcessingService,
+    private readonly storage: StorageService,
   ) {}
 
   async findAll() {
@@ -584,34 +587,61 @@ export class DressesService {
     // preferred over originalUrl when present) only gets a value once
     // enhancement actually succeeds.
     const processed = await Promise.all(
-      files.map(async (file) => {
-        const buffer = await readFile(file.path);
+      files.map(async (file, index) => {
         const enhanced = await this.photoProcessing.enhance(
-          buffer,
-          file.filename,
+          file.buffer,
+          file.originalname,
+        );
+
+        const originalUrl = await this.storeFile(
+          `dresses/${dressId}/${Date.now()}-${index}-${randomUUID()}${extname(file.originalname)}`,
+          file.buffer,
+          file.mimetype,
         );
 
         if (!enhanced) {
-          return { file, processedFilename: null as string | null };
+          return { originalUrl, processedUrl: null as string | null };
         }
 
-        const processedFilename = `${file.filename}-enhanced.png`;
-        await writeFile(join(UPLOADS_DIR, processedFilename), enhanced);
-        return { file, processedFilename };
+        const processedUrl = await this.storeFile(
+          `dresses/${dressId}/${Date.now()}-${index}-${randomUUID()}-enhanced.png`,
+          enhanced,
+          'image/png',
+        );
+
+        return { originalUrl, processedUrl };
       }),
     );
 
     return this.prisma.dressPhoto.createMany({
-      data: processed.map(({ file, processedFilename }, index) => ({
+      data: processed.map(({ originalUrl, processedUrl }, index) => ({
         dressId,
-        originalUrl: `/uploads/${file.filename}`,
-        processedUrl: processedFilename
-          ? `/uploads/${processedFilename}`
-          : undefined,
+        originalUrl,
+        processedUrl: processedUrl ?? undefined,
         sortOrder: index,
         pendingAction: dress.status === DressStatus.APPROVED ? 'ADD' : undefined,
       })),
     });
+  }
+
+  // Uploads to R2 when it's configured and reachable; otherwise (not
+  // configured, or the sandbox/network blocks it) falls back to writing the
+  // buffer to local disk under UPLOADS_DIR - same "try the real thing,
+  // gracefully degrade" shape as PhotoProcessingService.enhance() falling
+  // back to "keep the original".
+  private async storeFile(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
+    const uploaded = await this.storage.upload(buffer, key, contentType);
+    if (uploaded) {
+      return uploaded;
+    }
+
+    const filename = basename(key);
+    await writeFile(join(UPLOADS_DIR, filename), buffer);
+    return `/uploads/${filename}`;
   }
 
   // Manual, explicit re-run of the AI enhancement on ONE photo's original
@@ -638,9 +668,16 @@ export class DressesService {
 
     this.assertEditable(photo.dress);
 
-    const originalBuffer = await readFile(
-      join(UPLOADS_DIR, basename(photo.originalUrl)),
-    );
+    const originalBuffer = this.storage.isManagedUrl(photo.originalUrl)
+      ? await this.storage.download(photo.originalUrl)
+      : await readFile(join(UPLOADS_DIR, basename(photo.originalUrl)));
+
+    if (!originalBuffer) {
+      throw new BadRequestException(
+        'לא ניתן היה לטעון את התמונה המקורית, נסי שוב בעוד רגע',
+      );
+    }
+
     const enhanced = await this.photoProcessing.enhance(
       originalBuffer,
       basename(photo.originalUrl),
@@ -655,14 +692,17 @@ export class DressesService {
     // A fresh, unique filename each time (not the same "-enhanced.png"
     // suffix addPhotos uses) so the browser/CDN never serves a stale
     // cached copy from a previous attempt at the same URL.
-    const processedFilename = `${basename(photo.originalUrl)}-enhanced-${Date.now()}.png`;
-    await writeFile(join(UPLOADS_DIR, processedFilename), enhanced);
+    const processedUrl = await this.storeFile(
+      `dresses/${dressId}/${basename(photo.originalUrl)}-enhanced-${Date.now()}.png`,
+      enhanced,
+      'image/png',
+    );
 
     const previousProcessedUrl = photo.processedUrl;
 
     const updated = await this.prisma.dressPhoto.update({
       where: { id: photoId },
-      data: { processedUrl: `/uploads/${processedFilename}` },
+      data: { processedUrl },
     });
 
     if (previousProcessedUrl) {
@@ -762,6 +802,11 @@ export class DressesService {
   }
 
   private async deleteUploadedFile(url: string) {
+    if (this.storage.isManagedUrl(url)) {
+      await this.storage.delete(url);
+      return;
+    }
+
     const filePath = join(UPLOADS_DIR, basename(url));
 
     try {

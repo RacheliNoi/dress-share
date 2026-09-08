@@ -222,14 +222,21 @@ export async function getApprovedDressById(id: number) {
   return dresses.find((dress) => dress.id === id);
 }
 
+// Photo URLs are relative (`/uploads/...`, served by this API) for local-disk
+// storage, but absolute (`https://cdn...`) once a photo lives on R2 - only
+// the relative form needs the API origin prefixed.
+function resolvePhotoUrl(url: string) {
+  return /^https?:\/\//.test(url) ? url : `${API_URL}${url}`;
+}
+
 export function getDressImageUrl(photo: DressPhoto) {
-  return `${API_URL}${photo.processedUrl ?? photo.originalUrl}`;
+  return resolvePhotoUrl(photo.processedUrl ?? photo.originalUrl);
 }
 
 // The untouched upload, regardless of whether an AI-enhanced version
 // exists - used by the before/after comparison in the photo preview modal.
 export function getDressOriginalImageUrl(photo: DressPhoto) {
-  return `${API_URL}${photo.originalUrl}`;
+  return resolvePhotoUrl(photo.originalUrl);
 }
 
 // Mirrors exactly what GET /bookings/dress/:dressId/availability returns -

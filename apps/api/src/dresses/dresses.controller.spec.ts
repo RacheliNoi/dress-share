@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DressStatus } from '../../generated/prisma/enums';
 
 jest.mock('fs/promises', () => ({
+  ...jest.requireActual('fs/promises'),
   unlink: jest.fn().mockResolvedValue(undefined),
 }));
 

@@ -103,6 +103,7 @@ npm run dev             # http://localhost:3000
 | `apps/api` | `PHOTOROOM_API_KEY_SANDBOX` | Optional. Photo enhancement on upload — free tier, output is watermarked. Uploads work fine without it (skips enhancement, keeps the original photo only) |
 | `apps/api` | `PHOTOROOM_API_KEY_LIVE` | Optional, not currently wired to any code path — reserved for switching off the sandbox watermark before shipping |
 | `apps/api` | `RESEND_API_KEY` | Optional. Real email delivery. Without a verified sending domain, real recipients get rejected by Resend and notifications fall back to a console log |
+| `apps/api` | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Optional. Dress photo storage on Cloudflare R2. Without these (or if R2 is unreachable), uploads fall back to local disk under `apps/api/uploads` automatically — the app works fine either way |
 | `apps/web` | `NEXT_PUBLIC_API_URL` | Optional, defaults to `http://localhost:3001` |
 
 ### Default seeded admin (local dev only)

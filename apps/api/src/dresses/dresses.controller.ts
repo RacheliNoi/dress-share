@@ -13,8 +13,7 @@ import {
 } from '@nestjs/common';
 
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { DressesService } from './dresses.service';
 import type { CatalogSortOption } from './dresses.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -170,18 +169,11 @@ cancelPendingSizeChange(
 @UseGuards(JwtAuthGuard)
 @Post(':id/photos')
 @UseInterceptors(
-  FilesInterceptor('images', 10, {
-    storage: diskStorage({
-      destination: './uploads',
-      filename: (_req, file, callback) => {
-        const uniqueName = `${Date.now()}-${Math.round(
-          Math.random() * 1e9,
-        )}${extname(file.originalname)}`;
-
-        callback(null, uniqueName);
-      },
-    }),
-  }),
+  // Buffers only, in memory - no disk write here at all. DressesService
+  // decides where each file actually ends up (R2, falling back to local
+  // disk only if R2 is unreachable or unconfigured - see StorageService),
+  // so filename/key generation lives there too, not in this multer config.
+  FilesInterceptor('images', 10, { storage: memoryStorage() }),
 )
 addPhotos(
   @Param('id') id: string,

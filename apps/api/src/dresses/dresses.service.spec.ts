@@ -8,9 +8,11 @@ import { readFile, unlink, writeFile } from 'fs/promises';
 import { DressesService } from './dresses.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PhotoProcessingService } from '../photo-processing/photo-processing.service';
+import { StorageService } from '../storage/storage.service';
 import { DressStatus } from '../../generated/prisma/enums';
 
 jest.mock('fs/promises', () => ({
+  ...jest.requireActual('fs/promises'),
   unlink: jest.fn().mockResolvedValue(undefined),
   readFile: jest.fn().mockResolvedValue(Buffer.from('fake-image-bytes')),
   writeFile: jest.fn().mockResolvedValue(undefined),
@@ -49,6 +51,12 @@ describe('DressesService', () => {
     $transaction: jest.Mock;
   };
   let photoProcessing: { enhance: jest.Mock };
+  let storage: {
+    upload: jest.Mock;
+    download: jest.Mock;
+    delete: jest.Mock;
+    isManagedUrl: jest.Mock;
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -58,6 +66,17 @@ describe('DressesService', () => {
       // a successful enhancement, matching the "must never block the
       // upload" behavior being the safe default here too.
       enhance: jest.fn().mockResolvedValue(null),
+    };
+
+    storage = {
+      // Defaults to "R2 unreachable/unconfigured" and "this URL isn't
+      // R2-managed" - matching this sandbox's actual behavior, so the
+      // default path through every test is the local-disk fallback.
+      // Individual tests opt in to a successful R2 upload/managed URL.
+      upload: jest.fn().mockResolvedValue(null),
+      download: jest.fn().mockResolvedValue(null),
+      delete: jest.fn().mockResolvedValue(undefined),
+      isManagedUrl: jest.fn().mockReturnValue(false),
     };
 
     prisma = {
@@ -96,6 +115,7 @@ describe('DressesService', () => {
         DressesService,
         { provide: PrismaService, useValue: prisma },
         { provide: PhotoProcessingService, useValue: photoProcessing },
+        { provide: StorageService, useValue: storage },
       ],
     }).compile();
 
@@ -1265,6 +1285,29 @@ describe('DressesService', () => {
       expect(unlink).not.toHaveBeenCalled();
     });
 
+    it('deletes from R2 (not local disk) when the photo is R2-managed', async () => {
+      const r2Url = 'https://cdn.dressshare.co.il/dresses/1/photo-5.jpg';
+      prisma.dressPhoto.findUnique.mockResolvedValue({
+        id: 5,
+        dressId: 1,
+        originalUrl: r2Url,
+        processedUrl: null,
+        dress: { id: 1, ownerId: 7, status: DressStatus.DRAFT },
+      });
+      prisma.dressPhoto.delete.mockResolvedValue({
+        id: 5,
+        dressId: 1,
+        originalUrl: r2Url,
+        processedUrl: null,
+      });
+      storage.isManagedUrl.mockReturnValue(true);
+
+      await service.removePhoto(1, 5, 7);
+
+      expect(storage.delete).toHaveBeenCalledWith(r2Url);
+      expect(unlink).not.toHaveBeenCalled();
+    });
+
     it('returns NotFoundException for a missing photo', async () => {
       prisma.dressPhoto.findUnique.mockResolvedValue(null);
 
@@ -1453,7 +1496,7 @@ describe('DressesService', () => {
       prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
 
       await service.addPhotos(1, 7, [
-        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+        { originalname: 'a.jpg', buffer: Buffer.from('raw-bytes'), mimetype: 'image/jpeg' } as Express.Multer.File,
       ]);
 
       expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
@@ -1477,7 +1520,7 @@ describe('DressesService', () => {
       expect(prisma.dressPhoto.createMany).not.toHaveBeenCalled();
     });
 
-    it('sets originalUrl only when enhancement is unavailable (the default mock behavior)', async () => {
+    it('sets originalUrl only when enhancement is unavailable (the default mock behavior), falling back to local disk since R2 upload is also unavailable by default', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         ownerId: 7,
@@ -1486,14 +1529,41 @@ describe('DressesService', () => {
       prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
 
       await service.addPhotos(1, 7, [
-        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+        { originalname: 'a.jpg', buffer: Buffer.from('raw-bytes'), mimetype: 'image/jpeg' } as Express.Multer.File,
       ]);
 
+      expect(writeFile).toHaveBeenCalledWith(
+        expect.stringMatching(/\.jpg$/),
+        Buffer.from('raw-bytes'),
+      );
       expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
         data: [
           expect.objectContaining({
-            originalUrl: '/uploads/a.jpg',
+            originalUrl: expect.stringMatching(/^\/uploads\/.+\.jpg$/),
             processedUrl: undefined,
+          }),
+        ],
+      });
+    });
+
+    it('uploads to R2 and uses its returned public URL when R2 upload succeeds', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
+      storage.upload.mockResolvedValue('https://cdn.dressshare.co.il/dresses/1/a.jpg');
+
+      await service.addPhotos(1, 7, [
+        { originalname: 'a.jpg', buffer: Buffer.from('raw-bytes'), mimetype: 'image/jpeg' } as Express.Multer.File,
+      ]);
+
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            originalUrl: 'https://cdn.dressshare.co.il/dresses/1/a.jpg',
           }),
         ],
       });
@@ -1509,41 +1579,38 @@ describe('DressesService', () => {
       photoProcessing.enhance.mockResolvedValue(Buffer.from('enhanced-bytes'));
 
       await service.addPhotos(1, 7, [
-        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+        { originalname: 'a.jpg', buffer: Buffer.from('raw-bytes'), mimetype: 'image/jpeg' } as Express.Multer.File,
       ]);
 
       expect(writeFile).toHaveBeenCalledWith(
-        expect.stringContaining('a.jpg-enhanced.png'),
+        expect.stringMatching(/-enhanced\.png$/),
         Buffer.from('enhanced-bytes'),
       );
       expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
         data: [
           expect.objectContaining({
-            originalUrl: '/uploads/a.jpg',
-            processedUrl: '/uploads/a.jpg-enhanced.png',
+            originalUrl: expect.stringMatching(/^\/uploads\/.+\.jpg$/),
+            processedUrl: expect.stringMatching(/^\/uploads\/.+-enhanced\.png$/),
           }),
         ],
       });
     });
 
-    it('passes each uploaded file to the enhancer by its own file buffer and filename', async () => {
+    it('passes each uploaded file to the enhancer by its own file buffer and originalname, without reading from disk', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         ownerId: 7,
         status: DressStatus.DRAFT,
       });
       prisma.dressPhoto.createMany.mockResolvedValue({ count: 1 });
-      (readFile as jest.Mock).mockResolvedValue(Buffer.from('raw-bytes'));
+      const buffer = Buffer.from('raw-bytes');
 
       await service.addPhotos(1, 7, [
-        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
+        { originalname: 'a.jpg', buffer, mimetype: 'image/jpeg' } as Express.Multer.File,
       ]);
 
-      expect(readFile).toHaveBeenCalledWith('/uploads/a.jpg');
-      expect(photoProcessing.enhance).toHaveBeenCalledWith(
-        Buffer.from('raw-bytes'),
-        'a.jpg',
-      );
+      expect(readFile).not.toHaveBeenCalled();
+      expect(photoProcessing.enhance).toHaveBeenCalledWith(buffer, 'a.jpg');
     });
 
     it('one photo failing to enhance never blocks the others in the same upload', async () => {
@@ -1558,18 +1625,18 @@ describe('DressesService', () => {
         .mockResolvedValueOnce(null);
 
       await service.addPhotos(1, 7, [
-        { filename: 'a.jpg', path: '/uploads/a.jpg' } as Express.Multer.File,
-        { filename: 'b.jpg', path: '/uploads/b.jpg' } as Express.Multer.File,
+        { originalname: 'a.jpg', buffer: Buffer.from('a-bytes'), mimetype: 'image/jpeg' } as Express.Multer.File,
+        { originalname: 'b.jpg', buffer: Buffer.from('b-bytes'), mimetype: 'image/jpeg' } as Express.Multer.File,
       ]);
 
       expect(prisma.dressPhoto.createMany).toHaveBeenCalledWith({
         data: [
           expect.objectContaining({
-            originalUrl: '/uploads/a.jpg',
-            processedUrl: '/uploads/a.jpg-enhanced.png',
+            originalUrl: expect.stringMatching(/^\/uploads\/.+\.jpg$/),
+            processedUrl: expect.stringMatching(/^\/uploads\/.+-enhanced\.png$/),
           }),
           expect.objectContaining({
-            originalUrl: '/uploads/b.jpg',
+            originalUrl: expect.stringMatching(/^\/uploads\/.+\.jpg$/),
             processedUrl: undefined,
           }),
         ],
@@ -1658,6 +1725,36 @@ describe('DressesService', () => {
       await expect(service.reprocessPhoto(1, 5, 7)).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('reads the original from R2 (not local disk) when originalUrl is R2-managed', async () => {
+      const r2Photo = { ...photo, originalUrl: 'https://cdn.dressshare.co.il/dresses/1/a.jpg' };
+      prisma.dressPhoto.findUnique.mockResolvedValue(r2Photo);
+      storage.isManagedUrl.mockReturnValue(true);
+      storage.download.mockResolvedValue(Buffer.from('raw-bytes'));
+      photoProcessing.enhance.mockResolvedValue(Buffer.from('enhanced-again'));
+      prisma.dressPhoto.update.mockResolvedValue(r2Photo);
+
+      await service.reprocessPhoto(1, 5, 7);
+
+      expect(storage.download).toHaveBeenCalledWith(r2Photo.originalUrl);
+      expect(readFile).not.toHaveBeenCalled();
+      expect(photoProcessing.enhance).toHaveBeenCalledWith(
+        Buffer.from('raw-bytes'),
+        'a.jpg',
+      );
+    });
+
+    it('throws a clear error when the R2 download of the original fails', async () => {
+      const r2Photo = { ...photo, originalUrl: 'https://cdn.dressshare.co.il/dresses/1/a.jpg' };
+      prisma.dressPhoto.findUnique.mockResolvedValue(r2Photo);
+      storage.isManagedUrl.mockReturnValue(true);
+      storage.download.mockResolvedValue(null);
+
+      await expect(service.reprocessPhoto(1, 5, 7)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(photoProcessing.enhance).not.toHaveBeenCalled();
     });
   });
 
