@@ -18,7 +18,9 @@ UI is in Hebrew with full RTL support.
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
 - Editing an already-approved listing doesn't affect what's publicly visible until an admin approves the edit — proposed changes are held in a separate "pending" shadow (`pendingDetails`, `pendingAction: ADD/REMOVE` on sizes/photos) rather than mutating the live row
 - Per-size inventory (multiple physical units per size)
-- Every uploaded photo is automatically checked for faces (Google Cloud Vision) and any detected face is blurred, protecting the privacy of whoever is wearing the dress — falls back to the original upload untouched if detection fails or isn't configured. (Previously did an AI background swap via Photoroom instead; swapped out for face-blurring until a more flattering background treatment is found)
+- Every uploaded photo gets two independent, optional enhancement passes, each falling back to leaving the photo untouched if it doesn't apply or fails:
+  - **Backdrop replacement** — for a dress photographed on a hanger against a plain, evenly lit backdrop, the backdrop is swapped for a clean studio tone. Fully local (no AI, no external service, no cost, no volume limit) — works by sampling the photo's border color and keying out anything close to it.
+  - **Face blurring** (Google Cloud Vision, optional) — any detected face is blurred, protecting the privacy of whoever is wearing the dress. Requires billing enabled on the Google Cloud project; skipped entirely if not configured.
 - Owners can click any photo to open a large preview with a before/after toggle and re-run the AI enhancement as many times as they want, without losing the original upload
 
 **Bookings**
