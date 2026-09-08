@@ -122,6 +122,13 @@ npm test            # unit + integration (Jest, Supertest)
 npm run test:cov    # with coverage
 ```
 
+## Deployment
+
+- **Frontend (`apps/web`):** Vercel, with the project's root directory set to `apps/web`. Set `NEXT_PUBLIC_API_URL` to the deployed API's URL.
+- **Backend (`apps/api`) + database:** Railway (or any Node host + managed Postgres), with the service's root directory set to `apps/api`. Build command `npm run build`, start command `npm run start:prod` — this runs `prisma migrate deploy` before starting, so migrations apply automatically on every deploy. Set every variable from the [environment variables](#environment-variables) table above, especially a real (non-default) `JWT_SECRET`, `DATABASE_URL` pointing at the production Postgres instance, and `FRONTEND_URL` pointing at the deployed frontend.
+- **Photo storage:** once R2 credentials are set and reachable in production, uploads go straight to R2 — the local-disk fallback (`apps/api/uploads`) is a dev-environment safety net, not meant to hold real production photos long-term, since most Node hosts (Railway included) wipe the local filesystem on every redeploy.
+- Do not carry over the local dev Postgres database. Point production at a fresh database and let `prisma migrate deploy` build the schema; the seeded dev admin (`admin@dressshare.local`) is for local dev only, per the environment variables section above.
+
 ## Notable design decisions
 
 - **Ownership enforced in the service layer, not just guarded routes.** Every mutation re-fetches the resource and checks `ownerId` before writing — a missing route guard alone would never be enough to leak data.
