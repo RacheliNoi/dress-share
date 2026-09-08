@@ -20,11 +20,13 @@ export class PhotoProcessingService {
   private readonly logger = new Logger(PhotoProcessingService.name);
 
   private get apiKey(): string | undefined {
-    // TODO(deploy): PHOTOROOM_API_KEY_LIVE removes the sandbox tier's
-    // tiled watermark, but costs money past 10 free edits and needs a
-    // payment method on file - switching is a deliberate production
-    // decision to make once, not something to default to silently.
-    return process.env.PHOTOROOM_API_KEY_SANDBOX;
+    // Sandbox (watermarked, effectively free) everywhere except a real
+    // production deploy (NODE_ENV=production) - live costs money past 10
+    // free edits, so dev/test must never touch it, but a shipped listing
+    // should never carry Photoroom's tiled watermark either.
+    return process.env.NODE_ENV === 'production'
+      ? process.env.PHOTOROOM_API_KEY_LIVE
+      : process.env.PHOTOROOM_API_KEY_SANDBOX;
   }
 
   // Returns the enhanced image as a PNG buffer, or null if enhancement
