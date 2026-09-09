@@ -2,6 +2,18 @@ import { Test, TestingModule } from '@nestjs/testing';
 import sharp from 'sharp';
 import { PhotoProcessingService } from './photo-processing.service';
 
+// The real BlazeFace model does a one-time network fetch to load - mocked
+// so tests stay fast and deterministic. Defaults (in beforeEach) to
+// "finds no face," so the existing Vision-focused tests below exercise
+// Vision in isolation, exactly as if the local detector had genuinely
+// found nothing.
+const estimateFacesMock = jest.fn();
+const blazeFaceLoadMock = jest.fn().mockResolvedValue({ estimateFaces: estimateFacesMock });
+
+jest.mock('@tensorflow-models/blazeface', () => ({
+  load: (...args: unknown[]) => blazeFaceLoadMock(...args),
+}));
+
 // A real, valid 40x40 high-contrast checkerboard PNG - its border is
 // nowhere near a plain photographed backdrop (huge pixel-to-pixel color
 // variance), so replaceBackdrop always no-ops on it. Used to isolate the
@@ -37,6 +49,7 @@ describe('PhotoProcessingService', () => {
 
   beforeEach(async () => {
     process.env.GOOGLE_VISION_API_KEY = 'test-key';
+    estimateFacesMock.mockReset().mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [PhotoProcessingService],
@@ -110,7 +123,70 @@ describe('PhotoProcessingService', () => {
     });
   });
 
-  describe('blurDetectedFaces (Google Vision, optional/billing-gated)', () => {
+  describe('blurDetectedFaces - local detection (BlazeFace, free, default)', () => {
+    it('detects a face locally and blurs it, without calling Vision at all', async () => {
+      delete process.env.GOOGLE_VISION_API_KEY;
+      const fetchMock = jest.fn();
+      global.fetch = fetchMock;
+      estimateFacesMock.mockResolvedValue([{ topLeft: [10, 10], bottomRight: [25, 25] }]);
+
+      const result = await service.enhance(CHECKERBOARD_PNG, 'a.jpg');
+
+      expect(result).not.toBeNull();
+      expect(result).not.toEqual(CHECKERBOARD_PNG);
+      expect(result?.subarray(0, 8)).toEqual(CHECKERBOARD_PNG.subarray(0, 8));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('blurs every locally-detected face when there is more than one', async () => {
+      delete process.env.GOOGLE_VISION_API_KEY;
+      estimateFacesMock.mockResolvedValue([
+        { topLeft: [2, 2], bottomRight: [10, 10] },
+        { topLeft: [20, 20], bottomRight: [35, 35] },
+      ]);
+
+      const result = await service.enhance(CHECKERBOARD_PNG, 'a.jpg');
+
+      expect(result).not.toBeNull();
+      expect(result).not.toEqual(CHECKERBOARD_PNG);
+    });
+
+    it('falls through to the Vision fallback when local detection finds no face', async () => {
+      estimateFacesMock.mockResolvedValue([]);
+      const fetchMock = mockVisionResponse([
+        {
+          boundingPoly: {
+            vertices: [
+              { x: 10, y: 10 },
+              { x: 25, y: 10 },
+              { x: 25, y: 25 },
+              { x: 10, y: 25 },
+            ],
+          },
+        },
+      ]);
+      global.fetch = fetchMock;
+
+      const result = await service.enhance(CHECKERBOARD_PNG, 'a.jpg');
+
+      expect(fetchMock).toHaveBeenCalled();
+      expect(result).not.toBeNull();
+      expect(result).not.toEqual(CHECKERBOARD_PNG);
+    });
+
+    it('falls through to Vision (never throws) when the local model itself fails', async () => {
+      estimateFacesMock.mockRejectedValue(new Error('model inference failed'));
+      const fetchMock = mockVisionResponse([]);
+      global.fetch = fetchMock;
+
+      const result = await service.enhance(CHECKERBOARD_PNG, 'a.jpg');
+
+      expect(fetchMock).toHaveBeenCalled();
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('blurDetectedFaces - Vision fallback (optional/billing-gated, only tried when local finds nothing)', () => {
     it('returns null immediately when no API key is configured - never calls fetch', async () => {
       delete process.env.GOOGLE_VISION_API_KEY;
       const fetchMock = jest.fn();

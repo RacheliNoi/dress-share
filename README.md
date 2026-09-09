@@ -20,7 +20,7 @@ UI is in Hebrew with full RTL support.
 - Per-size inventory (multiple physical units per size)
 - Every uploaded photo gets two independent, optional enhancement passes, each falling back to leaving the photo untouched if it doesn't apply or fails:
   - **Backdrop replacement** — for a dress photographed on a hanger against a plain, evenly lit backdrop, the backdrop is swapped for a clean studio tone. Fully local (no AI, no external service, no cost, no volume limit) — works by sampling the photo's border color and keying out anything close to it.
-  - **Face blurring** (Google Cloud Vision, optional) — any detected face is blurred, protecting the privacy of whoever is wearing the dress. Requires billing enabled on the Google Cloud project; skipped entirely if not configured.
+  - **Face blurring** — any detected face is blurred, protecting the privacy of whoever is wearing the dress. Detected for free by a local model (BlazeFace, via TensorFlow.js) that runs entirely on the server — no API key, no billing, no per-photo cost. Falls back to Google Cloud Vision only if the local model finds nothing (kept as an optional, more accurate upgrade path; requires billing enabled on the Google Cloud project, skipped entirely if not configured).
 - Owners can click any photo to open a large preview with a before/after toggle and re-run the AI enhancement as many times as they want, without losing the original upload
 
 **Bookings**
@@ -103,7 +103,7 @@ npm run dev             # http://localhost:3000
 | `apps/api` | `JWT_SECRET` | Secret used to sign auth tokens |
 | `apps/api` | `PORT` | Optional, defaults to `3001` |
 | `apps/api` | `FRONTEND_URL` | Optional. Allowed CORS origin, defaults to `http://localhost:3000` — set to the real frontend URL on deploy |
-| `apps/api` | `GOOGLE_VISION_API_KEY` | Optional. Blurs any detected face in an uploaded photo (privacy for whoever is wearing the dress) via the Cloud Vision API. Requires billing enabled on the Google Cloud project. Uploads work fine without it (skips blurring, keeps the original photo only) |
+| `apps/api` | `GOOGLE_VISION_API_KEY` | Optional. Face blurring works for free without this (local BlazeFace model) — this only adds a Cloud Vision fallback for photos the local model misses. Requires billing enabled on the Google Cloud project |
 | `apps/api` | `RESEND_API_KEY` | Optional. Real email delivery. Without a verified sending domain, real recipients get rejected by Resend and notifications fall back to a console log |
 | `apps/api` | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Optional. Dress photo storage on Cloudflare R2. Without these (or if R2 is unreachable), uploads fall back to local disk under `apps/api/uploads` automatically — the app works fine either way |
 | `apps/web` | `NEXT_PUBLIC_API_URL` | Optional, defaults to `http://localhost:3001` |

@@ -1,7 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
+import * as tf from '@tensorflow/tfjs';
+import * as blazeface from '@tensorflow-models/blazeface';
 
 const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
+
+// Loaded once per process (not per request, not per service instance) -
+// the model is a few MB and stateless, so every enhance() call reuses the
+// same one. A failed load isn't cached, so the next call retries instead
+// of being stuck failing forever.
+let blazeFaceModelPromise: Promise<blazeface.BlazeFaceModel> | null = null;
+function getBlazeFaceModel(): Promise<blazeface.BlazeFaceModel> {
+  if (!blazeFaceModelPromise) {
+    blazeFaceModelPromise = blazeface.load().catch((error) => {
+      blazeFaceModelPromise = null;
+      throw error;
+    });
+  }
+  return blazeFaceModelPromise;
+}
 
 // Vision's face box is tight to facial features (eyes/nose/mouth) - it
 // doesn't cover the whole head. Padding (as a fraction of the box's own
@@ -41,11 +58,14 @@ type RgbColor = { r: number; g: number; b: number };
 // blocking the upload if they don't apply or fail:
 //  1. replaceBackdrop - free, local, no AI - swaps a plain photographed
 //     backdrop for a clean studio tone (for dresses shot on a hanger).
-//  2. blurDetectedFaces - Google Vision - blurs any face found (privacy for
-//     whoever is wearing the dress). Requires billing enabled on the
-//     Vision project; kept in the code (not removed) even though the
-//     background-swap-only path above covers today's actual need, since
-//     it's a real upgrade path once that's turned on.
+//  2. blurDetectedFaces - blurs any face found (privacy for whoever is
+//     wearing the dress), detected via a free local model (BlazeFace,
+//     via TensorFlow.js) that runs entirely on this server - no API key,
+//     no billing, no per-photo cost, no network call once its (~1MB) model
+//     is loaded. Google Vision's cloud face detection is kept in the code
+//     as a fallback, tried only if the local model finds nothing - it's a
+//     real upgrade path (more accurate on some photos) once its billing is
+//     turned on, not the default path.
 // Runs backdrop replacement first, then face-blurring on whatever result
 // that produced - a hanger shot gets just the backdrop swapped, a worn
 // photo (no plain backdrop to key out) gets just its face blurred, and a
@@ -177,14 +197,80 @@ export class PhotoProcessingService {
   }
 
   // Returns the blurred image as a PNG buffer, or null if there's nothing
-  // to apply - no API key configured, no faces detected, or the
-  // request/processing itself failed. Never blocks the upload - Vision
-  // being flaky, unconfigured, or finding no face must never fail it.
+  // to blur - neither detector found a face, or the processing itself
+  // failed. Never blocks the upload.
   private async blurDetectedFaces(imageBuffer: Buffer, filename: string): Promise<Buffer | null> {
+    let faces = await this.detectFacesLocally(imageBuffer, filename);
+
+    if (faces.length === 0) {
+      faces = await this.detectFacesViaVision(imageBuffer, filename);
+    }
+
+    if (faces.length === 0) {
+      return null;
+    }
+
+    return await this.blurFaces(imageBuffer, faces, filename);
+  }
+
+  // Free, local, no network call once the model is loaded - the default
+  // detector. Never throws; an empty array means "found nothing" to the
+  // caller, same as "no faces" from Vision, so blurDetectedFaces falls
+  // through to the Vision fallback (if configured) exactly the same way
+  // whether that's because there really is no face or because this failed.
+  private async detectFacesLocally(imageBuffer: Buffer, filename: string): Promise<FaceAnnotation[]> {
+    let tensor: tf.Tensor3D | undefined;
+
+    try {
+      const model = await getBlazeFaceModel();
+      const { data, info } = await sharp(imageBuffer)
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      if (!info.width || !info.height) {
+        return [];
+      }
+
+      tensor = tf.tensor3d(new Uint8Array(data), [info.height, info.width, info.channels]);
+      const predictions = await model.estimateFaces(tensor, false, false, false);
+
+      return predictions.map((prediction) => {
+        const [x1, y1] = prediction.topLeft as [number, number];
+        const [x2, y2] = prediction.bottomRight as [number, number];
+
+        return {
+          boundingPoly: {
+            vertices: [
+              { x: x1, y: y1 },
+              { x: x2, y: y1 },
+              { x: x2, y: y2 },
+              { x: x1, y: y2 },
+            ],
+          },
+        };
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Local face detection failed for ${filename} - falling back to Vision if configured`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      return [];
+    } finally {
+      tensor?.dispose();
+    }
+  }
+
+  // Cloud fallback, only reached when the free local detector above found
+  // nothing - kept as the upgrade path for photos it misses, not the
+  // default (costs money past its free tier, and requires billing enabled
+  // on the Google Cloud project). Never throws; an empty array covers "not
+  // configured," "no faces," and any request/parsing failure alike.
+  private async detectFacesViaVision(imageBuffer: Buffer, filename: string): Promise<FaceAnnotation[]> {
     const apiKey = this.visionApiKey;
 
     if (!apiKey) {
-      return null;
+      return [];
     }
 
     try {
@@ -206,7 +292,7 @@ export class PhotoProcessingService {
         this.logger.warn(
           `Vision face detection failed (${response.status}): ${detail.slice(0, 300)}`,
         );
-        return null;
+        return [];
       }
 
       const data = (await response.json()) as {
@@ -220,22 +306,16 @@ export class PhotoProcessingService {
 
       if (result?.error) {
         this.logger.warn(`Vision face detection error: ${result.error.message}`);
-        return null;
+        return [];
       }
 
-      const faces = result?.faceAnnotations ?? [];
-
-      if (faces.length === 0) {
-        return null;
-      }
-
-      return await this.blurFaces(imageBuffer, faces, filename);
+      return result?.faceAnnotations ?? [];
     } catch (error) {
       this.logger.warn(
-        'Vision face detection request failed - keeping the original photo only',
+        `Vision face detection request failed for ${filename} - keeping the original photo only`,
         error instanceof Error ? error.stack : String(error),
       );
-      return null;
+      return [];
     }
   }
 
