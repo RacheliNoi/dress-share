@@ -82,6 +82,11 @@ model Dress {
   description     String?
   category        String?
   color           String?
+  city            String?
+  // Public page views only (dress/[id]) - incremented via a dedicated
+  // fire-and-forget endpoint, not part of the pendingDetails edit-shadow
+  // system below, since it's a live counter rather than editable content.
+  viewCount       Int         @default(0)
   status          DressStatus @default(DRAFT)
   rejectionReason String?
   ownerId         Int

@@ -26,6 +26,9 @@ export default function CatalogFilters({
   colors,
   selectedColor,
   onColorChange,
+  cities,
+  selectedCity,
+  onCityChange,
   sizes,
   selectedSize,
   onSizeChange,
@@ -53,6 +56,9 @@ export default function CatalogFilters({
   colors: string[];
   selectedColor: string;
   onColorChange: (value: string) => void;
+  cities: string[];
+  selectedCity: string;
+  onCityChange: (value: string) => void;
   sizes: string[];
   selectedSize: string;
   onSizeChange: (value: string) => void;
@@ -160,7 +166,7 @@ export default function CatalogFilters({
             type="search"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="חיפוש לפי שם, קטגוריה, צבע או תיאור..."
+            placeholder="חיפוש לפי שם, קטגוריה, צבע, עיר או תיאור..."
             className="w-full rounded-2xl border border-line-strong bg-white py-3.5 pe-11 ps-4 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent focus:ring-4 focus:ring-accent-soft"
           />
         </div>
@@ -350,6 +356,21 @@ export default function CatalogFilters({
                 {colors.map((color) => (
                   <option key={color} value={color}>
                     {color}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {cities.length > 0 && (
+              <select
+                value={selectedCity}
+                onChange={(event) => onCityChange(event.target.value)}
+                className={selectClassName}
+              >
+                <option value="">כל הערים</option>
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
                   </option>
                 ))}
               </select>

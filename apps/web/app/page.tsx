@@ -123,6 +123,7 @@ export default function CatalogPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
@@ -177,6 +178,11 @@ export default function CatalogPage() {
     setPage(1);
   }
 
+  function updateCity(value: string) {
+    setSelectedCity(value);
+    setPage(1);
+  }
+
   function updateSize(value: string) {
     setSelectedSize(value);
     setPage(1);
@@ -213,6 +219,7 @@ export default function CatalogPage() {
         search: debouncedSearch.trim() || undefined,
         category: selectedCategory || undefined,
         color: selectedColor || undefined,
+        city: selectedCity || undefined,
         size: selectedSize || undefined,
         priceMin: priceMinValue ?? undefined,
         priceMax: priceMaxValue ?? undefined,
@@ -232,7 +239,7 @@ export default function CatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedColor, selectedSize, priceMinValue, priceMaxValue, sort, page]);
+  }, [debouncedSearch, selectedCategory, selectedColor, selectedCity, selectedSize, priceMinValue, priceMaxValue, sort, page]);
 
   useEffect(() => {
     loadDresses();
@@ -335,6 +342,10 @@ export default function CatalogPage() {
     () => uniqueSorted(optionsDresses.map((dress) => dress.color)),
     [optionsDresses],
   );
+  const cities = useMemo(
+    () => uniqueSorted(optionsDresses.map((dress) => dress.city)),
+    [optionsDresses],
+  );
   const sizes = useMemo(
     () =>
       uniqueSorted(optionsDresses.flatMap((dress) => dress.sizes.map((size) => size.size))),
@@ -413,6 +424,7 @@ export default function CatalogPage() {
     search.trim() ||
       selectedCategory ||
       selectedColor ||
+      selectedCity ||
       selectedSize ||
       priceMinValue !== null ||
       priceMaxValue !== null ||
@@ -435,6 +447,7 @@ export default function CatalogPage() {
     clearSearch();
     updateCategory("");
     updateColor("");
+    updateCity("");
     updateSize("");
     updatePriceMin("");
     updatePriceMax("");
@@ -456,6 +469,11 @@ export default function CatalogPage() {
       key: "color",
       label: selectedColor,
       onRemove: () => updateColor(""),
+    },
+    selectedCity && {
+      key: "city",
+      label: selectedCity,
+      onRemove: () => updateCity(""),
     },
     selectedSize && {
       key: "size",
@@ -612,6 +630,9 @@ export default function CatalogPage() {
               colors={colors}
               selectedColor={selectedColor}
               onColorChange={updateColor}
+              cities={cities}
+              selectedCity={selectedCity}
+              onCityChange={updateCity}
               sizes={sizes}
               selectedSize={selectedSize}
               onSizeChange={updateSize}

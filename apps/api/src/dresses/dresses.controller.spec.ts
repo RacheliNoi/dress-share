@@ -106,12 +106,12 @@ describe('DressesController', () => {
     });
 
     // 2. forwarding search/category/color/size
-    it('forwards search, category, color, and size query params to the service', async () => {
+    it('forwards search, category, color, city, and size query params to the service', async () => {
       prisma.dress.findMany.mockResolvedValue([]);
 
       await request(app.getHttpServer())
         .get('/dresses/approved')
-        .query({ search: 'ערב', category: 'קוקטייל', color: 'אדום', size: 'M' })
+        .query({ search: 'ערב', category: 'קוקטייל', color: 'אדום', city: 'תל אביב', size: 'M' })
         .expect(200);
 
       const call = prisma.dress.findMany.mock.calls[0][0];
@@ -121,11 +121,13 @@ describe('DressesController', () => {
             { name: { contains: 'ערב', mode: 'insensitive' } },
             { category: { contains: 'ערב', mode: 'insensitive' } },
             { color: { contains: 'ערב', mode: 'insensitive' } },
+            { city: { contains: 'ערב', mode: 'insensitive' } },
             { description: { contains: 'ערב', mode: 'insensitive' } },
           ],
         },
         { category: 'קוקטייל' },
         { color: 'אדום' },
+        { city: 'תל אביב' },
         {
           sizes: {
             some: {

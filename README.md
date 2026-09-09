@@ -9,7 +9,7 @@ UI is in Hebrew with full RTL support.
 ## Features
 
 **Catalog**
-- Server-side search, filtering (category, color, size, price range) and sorting
+- Server-side search, filtering (category, color, city, size, price range) and sorting
 - Server-side pagination (`page`/`limit`, with total match count)
 - Availability-by-date filtering, layered on top of the paginated results
 - Downloadable PDF catalog (`/catalog-pdf`) via the browser's own print-to-PDF, listing every approved dress with a real clickable link to its page — for anyone who can browse the images offline but can't reach the live site to click through directly
@@ -18,6 +18,8 @@ UI is in Hebrew with full RTL support.
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
 - Editing an already-approved listing doesn't affect what's publicly visible until an admin approves the edit — proposed changes are held in a separate "pending" shadow (`pendingDetails`, `pendingAction: ADD/REMOVE` on sizes/photos) rather than mutating the live row
 - Per-size inventory (multiple physical units per size)
+- City (owner-set, searchable/filterable like category and color)
+- View count on the public dress page — a fire-and-forget counter bumped once per page load, visible to the owner too
 - Every uploaded photo gets two independent, optional enhancement passes, each falling back to leaving the photo untouched if it doesn't apply or fails:
   - **Backdrop replacement** — for a dress photographed on a hanger against a plain, evenly lit backdrop, the backdrop is swapped for a clean studio tone. Fully local (no AI, no external service, no cost, no volume limit) — works by sampling the photo's border color and keying out anything close to it.
   - **Face blurring** — any detected face is blurred, protecting the privacy of whoever is wearing the dress. Detected for free by a local model (BlazeFace, via TensorFlow.js) that runs entirely on the server — no API key, no billing, no per-photo cost. Falls back to Google Cloud Vision only if the local model finds nothing (kept as an optional, more accurate upgrade path; requires billing enabled on the Google Cloud project, skipped entirely if not configured).

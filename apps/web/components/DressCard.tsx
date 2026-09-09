@@ -84,6 +84,7 @@ export default function DressCard({
             <p className="mt-1 truncate text-xs text-zinc-500 sm:text-sm">
               {dress.category || "ללא קטגוריה"}
               {dress.color && ` · ${dress.color}`}
+              {dress.city && ` · ${dress.city}`}
             </p>
           </div>
 

@@ -313,11 +313,16 @@ export default function MyDressDetailsPage() {
               <p className="text-sm font-medium tracking-wide text-accent">
                 {dress.category || "ללא קטגוריה"}
                 {dress.color && ` · ${dress.color}`}
+                {dress.city && ` · ${dress.city}`}
               </p>
 
               <h1 className="font-display mt-2 text-4xl font-semibold tracking-tight text-zinc-900">
                 {dress.name}
               </h1>
+
+              <p className="mt-1 text-xs font-medium text-zinc-400">
+                {dress.viewCount} {dress.viewCount === 1 ? "צפייה" : "צפיות"}
+              </p>
 
               {dress.description && (
                 <p className="mt-5 text-base leading-7 text-zinc-600">

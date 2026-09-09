@@ -46,6 +46,7 @@ export default function EditDressPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [color, setColor] = useState("");
+  const [city, setCity] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState("");
@@ -133,6 +134,7 @@ export default function EditDressPage() {
       setDescription((pending?.description ?? found.description) ?? "");
       setCategory((pending?.category ?? found.category) ?? "");
       setColor((pending?.color ?? found.color) ?? "");
+      setCity((pending?.city ?? found.city) ?? "");
       setSizeDrafts(
         Object.fromEntries(
           found.sizes.map((size) => [
@@ -187,6 +189,7 @@ export default function EditDressPage() {
         description: description || undefined,
         category: category || undefined,
         color: color || undefined,
+        city: city || undefined,
       });
 
       setDress(updated);
@@ -515,6 +518,7 @@ export default function EditDressPage() {
         description: description || undefined,
         category: category || undefined,
         color: color || undefined,
+        city: city || undefined,
       });
 
       await submitDressForApproval(token, dress.id);
@@ -539,7 +543,7 @@ export default function EditDressPage() {
     setSubmitEditError("");
 
     try {
-      // Detail fields (name/description/category/color) are saved live into
+      // Detail fields (name/description/category/color/city) are saved live into
       // the pending draft on every "שמירת שינויים" click above, so nothing
       // extra needs flushing here - this just locks in what's already
       // staged and sends it to the admin queue.
@@ -697,6 +701,14 @@ export default function EditDressPage() {
                   value={color}
                   onChange={(event) => setColor(event.target.value)}
                   placeholder="צבע"
+                  className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                />
+
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                  placeholder="עיר"
                   className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 

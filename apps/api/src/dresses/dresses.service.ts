@@ -31,6 +31,7 @@ type PendingDetails = {
   description?: string | null;
   category?: string | null;
   color?: string | null;
+  city?: string | null;
 };
 
 // Mirrors the frontend's CatalogFilters SortOption exactly, so this can be
@@ -42,6 +43,7 @@ export type FindApprovedParams = {
   search?: string;
   category?: string;
   color?: string;
+  city?: string;
   size?: string;
   priceMin?: number;
   priceMax?: number;
@@ -122,7 +124,7 @@ export class DressesService {
   // dresses for the current search/filter/sort query, before pagination
   // slicing, so the caller can compute page count without a second request.
   async findApproved(params: FindApprovedParams = {}) {
-    const { search, category, color, size, priceMin, priceMax, sort, page, limit } = params;
+    const { search, category, color, city, size, priceMin, priceMax, sort, page, limit } = params;
 
     const andConditions: Prisma.DressWhereInput[] = [];
 
@@ -133,6 +135,7 @@ export class DressesService {
           { name: { contains: trimmedSearch, mode: 'insensitive' } },
           { category: { contains: trimmedSearch, mode: 'insensitive' } },
           { color: { contains: trimmedSearch, mode: 'insensitive' } },
+          { city: { contains: trimmedSearch, mode: 'insensitive' } },
           { description: { contains: trimmedSearch, mode: 'insensitive' } },
         ],
       });
@@ -144,6 +147,10 @@ export class DressesService {
 
     if (color) {
       andConditions.push({ color });
+    }
+
+    if (city) {
+      andConditions.push({ city });
     }
 
     if (size) {
@@ -177,6 +184,8 @@ export class DressesService {
       description: true,
       category: true,
       color: true,
+      city: true,
+      viewCount: true,
       status: true,
       rejectionReason: true,
       ownerId: true,
@@ -262,6 +271,7 @@ export class DressesService {
     description?: string;
     category?: string;
     color?: string;
+    city?: string;
     ownerId: number;
   }) {
     return this.prisma.dress.create({
@@ -270,6 +280,7 @@ export class DressesService {
         description: data.description,
         category: data.category,
         color: data.color,
+        city: data.city,
         ownerId: data.ownerId,
         status: DressStatus.DRAFT,
       },
@@ -971,6 +982,7 @@ export class DressesService {
       description?: string;
       category?: string;
       color?: string;
+      city?: string;
     },
   ) {
     const dress = await this.prisma.dress.findUnique({
@@ -995,6 +1007,7 @@ export class DressesService {
         description: dress.description ?? undefined,
         category: dress.category ?? undefined,
         color: dress.color ?? undefined,
+        city: dress.city ?? undefined,
       };
 
       const nextPending: PendingDetails = {
@@ -1003,6 +1016,7 @@ export class DressesService {
           data.description !== undefined ? data.description : currentPending.description,
         category: data.category !== undefined ? data.category : currentPending.category,
         color: data.color !== undefined ? data.color : currentPending.color,
+        city: data.city !== undefined ? data.city : currentPending.city,
       };
 
       return this.prisma.dress.update({
@@ -1032,6 +1046,7 @@ export class DressesService {
         description: data.description,
         category: data.category,
         color: data.color,
+        city: data.city,
       },
       include: {
         sizes: true,
@@ -1041,6 +1056,18 @@ export class DressesService {
           },
         },
       },
+    });
+  }
+
+  // Fire-and-forget public counter - only counts views of a dress that's
+  // actually live (APPROVED), and never throws or reports "not found":
+  // updateMany simply touches 0 rows for a missing/non-approved id, which is
+  // exactly the right no-op for a public endpoint that shouldn't leak
+  // whether an id exists at all.
+  async incrementViewCount(id: number): Promise<void> {
+    await this.prisma.dress.updateMany({
+      where: { id, status: DressStatus.APPROVED },
+      data: { viewCount: { increment: 1 } },
     });
   }
 

@@ -43,6 +43,7 @@ export type DressPendingDetails = {
   description?: string | null;
   category?: string | null;
   color?: string | null;
+  city?: string | null;
 };
 
 export type Dress = {
@@ -51,6 +52,9 @@ export type Dress = {
   description: string | null;
   category: string | null;
   color: string | null;
+  city: string | null;
+  // Public dress/[id] page views only - see incrementDressView.
+  viewCount: number;
   status: DressStatus;
   rejectionReason: string | null;
   ownerId: number;
@@ -173,6 +177,7 @@ export type CatalogFilterParams = {
   search?: string;
   category?: string;
   color?: string;
+  city?: string;
   size?: string;
   priceMin?: number;
   priceMax?: number;
@@ -199,6 +204,7 @@ function buildCatalogQuery(params?: CatalogFilterParams): string {
   if (params.search) searchParams.set("search", params.search);
   if (params.category) searchParams.set("category", params.category);
   if (params.color) searchParams.set("color", params.color);
+  if (params.city) searchParams.set("city", params.city);
   if (params.size) searchParams.set("size", params.size);
   if (params.priceMin !== undefined) searchParams.set("priceMin", String(params.priceMin));
   if (params.priceMax !== undefined) searchParams.set("priceMax", String(params.priceMax));
@@ -220,6 +226,13 @@ export function getApprovedDresses(params?: CatalogFilterParams) {
 export async function getApprovedDressById(id: number) {
   const { dresses } = await getApprovedDresses();
   return dresses.find((dress) => dress.id === id);
+}
+
+// Fire-and-forget public view counter, bumped once when the dress detail
+// page loads. Public (no token) - always resolves, never surfaces an error
+// to the caller, since a failed view ping should never affect the page.
+export function incrementDressView(id: number) {
+  return request<void>(`/dresses/${id}/view`, { method: "POST" }).catch(() => undefined);
 }
 
 // Photo URLs are relative (`/uploads/...`, served by this API) for local-disk
@@ -421,6 +434,7 @@ export function createDress(
     description?: string;
     category?: string;
     color?: string;
+    city?: string;
   },
 ) {
   return request<Dress>("/dresses", {
@@ -502,6 +516,7 @@ export function updateDress(
     description?: string;
     category?: string;
     color?: string;
+    city?: string;
   },
 ) {
   return request<Dress>(`/dresses/${dressId}/update`, {

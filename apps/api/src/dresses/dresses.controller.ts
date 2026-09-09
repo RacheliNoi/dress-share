@@ -54,6 +54,7 @@ export class DressesController {
     @Query('search') search?: string,
     @Query('category') category?: string,
     @Query('color') color?: string,
+    @Query('city') city?: string,
     @Query('size') size?: string,
     @Query('priceMin') priceMin?: string,
     @Query('priceMax') priceMax?: string,
@@ -65,6 +66,7 @@ export class DressesController {
       search,
       category,
       color,
+      city,
       size,
       priceMin: parseOptionalIntQueryParam(priceMin),
       priceMax: parseOptionalIntQueryParam(priceMax),
@@ -83,6 +85,7 @@ export class DressesController {
       description?: string;
       category?: string;
       color?: string;
+      city?: string;
     },
     @CurrentUser() user: { sub: number },
   ) {
@@ -90,6 +93,15 @@ export class DressesController {
       ...body,
       ownerId: user.sub,
     });
+  }
+
+  // Public, unauthenticated - fire-and-forget view counter, bumped from the
+  // public dress detail page. Always 200s regardless of whether the id
+  // exists or is approved (see incrementViewCount) - a view ping isn't
+  // something a client should ever need to handle an error for.
+  @Post(':id/view')
+  incrementViewCount(@Param('id') id: string) {
+    return this.dressesService.incrementViewCount(Number(id));
   }
 
   @UseGuards(JwtAuthGuard)
@@ -251,6 +263,7 @@ update(
     description?: string;
     category?: string;
     color?: string;
+    city?: string;
   },
   @CurrentUser() user: { sub: number },
 ) {

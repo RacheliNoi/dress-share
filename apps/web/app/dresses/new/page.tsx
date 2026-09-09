@@ -41,6 +41,7 @@ export default function NewDressPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [color, setColor] = useState("");
+  const [city, setCity] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
@@ -102,6 +103,7 @@ export default function NewDressPage() {
         description: description || undefined,
         category: category || undefined,
         color: color || undefined,
+        city: city || undefined,
       });
 
       setDress(created);
@@ -404,6 +406,14 @@ export default function NewDressPage() {
                 className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
               />
 
+              <input
+                type="text"
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                placeholder="עיר"
+                className="rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+              />
+
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -443,6 +453,7 @@ export default function NewDressPage() {
               <p className="mt-1 text-sm text-zinc-500">
                 {dress.category || "ללא קטגוריה"}
                 {dress.color && ` · ${dress.color}`}
+                {dress.city && ` · ${dress.city}`}
               </p>
 
               {dress.description && (

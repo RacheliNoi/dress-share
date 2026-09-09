@@ -26,6 +26,7 @@ describe('DressesService', () => {
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       count: jest.Mock;
     };
     dressPhoto: {
@@ -85,6 +86,7 @@ describe('DressesService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
       dressPhoto: {
@@ -183,7 +185,7 @@ describe('DressesService', () => {
     });
 
     // 2. search
-    it('search matches name/category/color/description, case-insensitively, and trims whitespace', async () => {
+    it('search matches name/category/color/city/description, case-insensitively, and trims whitespace', async () => {
       prisma.dress.findMany.mockResolvedValue([]);
 
       await service.findApproved({ search: '  Cocktail  ' });
@@ -197,6 +199,7 @@ describe('DressesService', () => {
               { name: { contains: 'Cocktail', mode: 'insensitive' } },
               { category: { contains: 'Cocktail', mode: 'insensitive' } },
               { color: { contains: 'Cocktail', mode: 'insensitive' } },
+              { city: { contains: 'Cocktail', mode: 'insensitive' } },
               { description: { contains: 'Cocktail', mode: 'insensitive' } },
             ],
           },
@@ -236,6 +239,19 @@ describe('DressesService', () => {
       expect(call.where).toEqual({
         status: DressStatus.APPROVED,
         AND: [{ color: 'אדום' }],
+      });
+    });
+
+    // 4b. city
+    it('filters by exact city', async () => {
+      prisma.dress.findMany.mockResolvedValue([]);
+
+      await service.findApproved({ city: 'תל אביב' });
+
+      const call = prisma.dress.findMany.mock.calls[0][0];
+      expect(call.where).toEqual({
+        status: DressStatus.APPROVED,
+        AND: [{ city: 'תל אביב' }],
       });
     });
 
@@ -675,6 +691,55 @@ describe('DressesService', () => {
               color: 'כחול',
             },
           },
+        }),
+      );
+    });
+
+    it('writes city into pendingDetails on an APPROVED dress, same as category/color', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        name: 'שם חי',
+        description: 'תיאור חי',
+        category: 'ערב',
+        color: 'אדום',
+        city: 'ירושלים',
+        pendingDetails: null,
+        pendingReviewSubmittedAt: null,
+      });
+      prisma.dress.update.mockResolvedValue({ id: 1, status: DressStatus.APPROVED });
+
+      await service.update(1, 7, { city: 'תל אביב' });
+
+      expect(prisma.dress.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            pendingDetails: {
+              name: 'שם חי',
+              description: 'תיאור חי',
+              category: 'ערב',
+              color: 'אדום',
+              city: 'תל אביב',
+            },
+          },
+        }),
+      );
+    });
+
+    it('updates city directly (no pendingDetails shadow) on a non-APPROVED dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+      });
+      prisma.dress.update.mockResolvedValue({ id: 1, city: 'חיפה' });
+
+      await service.update(1, 7, { city: 'חיפה' });
+
+      expect(prisma.dress.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ city: 'חיפה' }),
         }),
       );
     });
@@ -1932,6 +1997,37 @@ describe('DressesService', () => {
       await expect(service.cancelPendingSizeChange(1, 3, 7)).rejects.toThrow(
         BadRequestException,
       );
+    });
+  });
+
+  describe('create', () => {
+    it('creates a DRAFT dress with the given city (same as category/color)', async () => {
+      prisma.dress.create.mockResolvedValue({ id: 1, city: 'ירושלים' });
+
+      await service.create({ name: 'שמלת ערב', city: 'ירושלים', ownerId: 7 });
+
+      expect(prisma.dress.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ city: 'ירושלים' }),
+      });
+    });
+  });
+
+  describe('incrementViewCount', () => {
+    it('increments viewCount for an APPROVED dress by id', async () => {
+      prisma.dress.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.incrementViewCount(5);
+
+      expect(prisma.dress.updateMany).toHaveBeenCalledWith({
+        where: { id: 5, status: DressStatus.APPROVED },
+        data: { viewCount: { increment: 1 } },
+      });
+    });
+
+    it('is a silent no-op (never throws) for a missing or non-approved dress', async () => {
+      prisma.dress.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.incrementViewCount(999)).resolves.toBeUndefined();
     });
   });
 });

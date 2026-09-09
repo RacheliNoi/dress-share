@@ -7,7 +7,7 @@ import Header from "@/components/Header";
 import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
 import InterestedBookingButton from "@/components/InterestedBookingButton";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
-import { Dress, getApprovedDressById, getDressImageUrl } from "@/lib/api";
+import { Dress, getApprovedDressById, getDressImageUrl, incrementDressView } from "@/lib/api";
 
 export default function DressDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -46,6 +46,8 @@ export default function DressDetailsPage() {
         }
 
         setDress(found);
+        // Fire-and-forget - never blocks or affects the page either way.
+        incrementDressView(found.id);
       } catch {
         setError("לא הצלחנו לטעון את פרטי השמלה. נסי שוב.");
       } finally {
@@ -162,11 +164,16 @@ export default function DressDetailsPage() {
               <p className="text-sm font-medium tracking-wide text-accent">
                 {dress.category || "ללא קטגוריה"}
                 {dress.color && ` · ${dress.color}`}
+                {dress.city && ` · ${dress.city}`}
               </p>
 
               <h1 className="font-display mt-2 text-4xl font-semibold tracking-tight text-zinc-900">
                 {dress.name}
               </h1>
+
+              <p className="mt-1 text-xs font-medium text-zinc-400">
+                {dress.viewCount} {dress.viewCount === 1 ? "צפייה" : "צפיות"}
+              </p>
 
               {dress.description && (
                 <p className="mt-5 text-base leading-7 text-zinc-600">
