@@ -105,6 +105,7 @@ npm run dev             # http://localhost:3000
 | `apps/api` | `JWT_SECRET` | Secret used to sign auth tokens |
 | `apps/api` | `PORT` | Optional, defaults to `3001` |
 | `apps/api` | `FRONTEND_URL` | Optional. Allowed CORS origin, defaults to `http://localhost:3000` — set to the real frontend URL on deploy |
+| `apps/api` | `PUBLIC_APP_URL` | Optional. Base URL used inside real email links (password reset, etc.) only — separate from `FRONTEND_URL` so local dev can send real emails (via a real `RESEND_API_KEY`) with links pointing at the real production site instead of `localhost`. Falls back to `FRONTEND_URL`, so production never needs to set it |
 | `apps/api` | `GOOGLE_VISION_API_KEY` | Optional. Face blurring works for free without this (local BlazeFace model) — this only adds a Cloud Vision fallback for photos the local model misses. Requires billing enabled on the Google Cloud project |
 | `apps/api` | `RESEND_API_KEY` | Optional. Real email delivery. Without a verified sending domain, real recipients get rejected by Resend and notifications fall back to a console log |
 | `apps/api` | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Optional. Dress photo storage on Cloudflare R2. Without these (or if R2 is unreachable), uploads fall back to local disk under `apps/api/uploads` automatically — the app works fine either way |

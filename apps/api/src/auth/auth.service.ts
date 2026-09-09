@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { getPublicAppUrl } from '../notifications/public-app-url';
 
 const RESET_TOKEN_BYTES = 32;
 const RESET_TOKEN_TTL_MINUTES = 30;
@@ -242,7 +243,15 @@ export class AuthService {
     // to its own [dev-only] console log automatically if Resend isn't
     // configured or rejects the send, so local development stays observable
     // either way without a separate console.log here.
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    // Deliberately NOT the same var main.ts uses for CORS (FRONTEND_URL) -
+    // in local dev, FRONTEND_URL is (correctly) the local frontend so CORS
+    // keeps working, but a link mailed to a real inbox needs the real
+    // public site instead, which only differs from FRONTEND_URL in exactly
+    // that one case (local dev sending through the real Resend key). Set
+    // PUBLIC_APP_URL to override just this; both fall back to
+    // FRONTEND_URL/localhost when unset, so production (where they're the
+    // same URL) never needs to set it separately.
+    const frontendUrl = getPublicAppUrl();
     this.notifications.notifyPasswordReset(
       email,
       `${frontendUrl}/reset-password?token=${rawToken}`,

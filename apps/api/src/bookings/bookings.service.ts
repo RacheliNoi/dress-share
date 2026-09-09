@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { getPublicAppUrl } from '../notifications/public-app-url';
 import { BookingStatus, DressStatus } from '../../generated/prisma/enums';
 import { Prisma } from '../../generated/prisma/client';
 
@@ -388,7 +389,10 @@ export class BookingsService {
     // Fire-and-forget from the caller's perspective: notification delivery
     // is not part of this transaction and a delivery failure must never
     // fail (or roll back) an otherwise-successful booking creation.
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    // See getPublicAppUrl's own comment - deliberately not FRONTEND_URL
+    // (main.ts's CORS origin), which needs to stay the local frontend in
+    // dev even when real emails are going out through a real Resend key.
+    const frontendUrl = getPublicAppUrl();
     this.notifications.notifyNewInterest(
       dress.owner.email,
       dress.name,
