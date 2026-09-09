@@ -508,118 +508,49 @@ export default function CatalogPage() {
     Boolean(chip),
   );
 
-  function scrollToCatalog() {
-    document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" });
-  }
-
   return (
     <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
       <Header />
 
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
-        {/* Hero */}
-        <section className="relative mb-8 overflow-hidden rounded-[28px] bg-zinc-900 px-7 py-9 text-white shadow-xl sm:px-10 lg:px-14 lg:py-11">
-          <div className="relative z-10 max-w-2xl">
-            <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur">
-              ✦ קטלוג שמלות להשכרה
-            </div>
+        {/* Compact title bar - replaces the old marketing Hero + editorial
+            spacer + separate catalog heading (three stacked sections) with
+            one, so the grid below starts much closer to the top of the
+            page. */}
+        <section className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
+          <div>
+            <p className="text-sm font-medium text-accent">✦ קטלוג שמלות להשכרה</p>
 
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
-              שמלה לכל אירוע,
-              <br />
-              <span className="text-accent-light">בלי לקנות.</span>
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
+              שמלה לכל אירוע, בלי לקנות
             </h1>
 
-            <p className="mt-4 max-w-xl text-base leading-7 text-zinc-300">
-              עיינו במבחר השמלות המאושרות שלנו להשכרה, ומצאו את
-              השמלה המושלמת לאירוע הבא שלכם.
-            </p>
-
-            <button
-              type="button"
-              onClick={scrollToCatalog}
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-accent-soft"
-            >
-              לצפייה בקטלוג
-              <svg
-                className="h-3.5 w-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                aria-hidden
-              >
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="pointer-events-none absolute -left-20 -top-32 h-80 w-80 rounded-full bg-accent/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-40 right-1/3 h-96 w-96 rounded-full bg-purple-400/10 blur-3xl" />
-
-          <div className="pointer-events-none absolute bottom-0 left-8 hidden opacity-10 lg:block">
-            <svg
-              width="220"
-              height="220"
-              viewBox="0 0 260 260"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <circle cx="130" cy="130" r="112" stroke="white" strokeWidth="1" />
-              <circle cx="130" cy="130" r="82" stroke="white" strokeWidth="1" />
-              <circle cx="130" cy="130" r="52" stroke="white" strokeWidth="1" />
-            </svg>
-          </div>
-        </section>
-
-        {/* Editorial moment - a quiet pause between the marketing Hero and
-            the functional catalog below, so the page doesn't jump straight
-            from "welcome" to a search form. Intentionally undecorated: no
-            card, no ring, no shadow - just typography on the page's own
-            canvas, closer to a magazine spread than a UI component. */}
-        <section className="border-t border-line py-16 sm:py-20 lg:py-24">
-          <div className="max-w-2xl">
-            <h2 className="font-display text-3xl font-semibold leading-tight text-ink text-balance sm:text-4xl lg:text-[2.75rem]">
-              השמלות שעושות את הרגע.
-            </h2>
-
-            <p className="mt-4 max-w-md text-base leading-7 text-ink-soft">
-              כל שמלה כאן כבר הייתה חלק מרגע מיוחד אחד, ומוכנה עכשיו לרגע הבא
-              — שלך.
+            <p className="mt-2 text-sm text-zinc-500">
+              {totalMatches > 0
+                ? `${totalMatches} שמלות מאושרות, מוכנות להשכרה.`
+                : "עיינו במבחר השמלות המאושרות שלנו להשכרה."}
             </p>
           </div>
+
+          <Link
+            href="/catalog-pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full border border-line-strong px-4 py-2 text-sm font-bold text-zinc-700 transition hover:border-accent hover:text-accent"
+          >
+            הורדת קטלוג כ-PDF
+          </Link>
         </section>
 
-        <div id="catalog" className="scroll-mt-24">
-          {/* Catalog heading */}
-          <section className="mb-5 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="mb-2 text-sm font-medium text-accent">הקטלוג שלנו</p>
-
-              <h2 className="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">
-                שמלות זמינות להשכרה
-              </h2>
-
-              <p className="mt-2 text-sm text-zinc-500">
-                כל השמלות שאושרו ומוכנות להשכרה.
-              </p>
-            </div>
-
-            <Link
-              href="/catalog-pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full border border-line-strong px-4 py-2 text-sm font-bold text-zinc-700 transition hover:border-accent hover:text-accent"
-            >
-              הורדת קטלוג כ-PDF
-            </Link>
-          </section>
-
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_272px] lg:items-start lg:gap-8">
           {/* dresses.length > 0 covers the normal case; hasActiveFilters
               keeps the panel visible (so filters stay adjustable/removable)
               even when the current filter combination matches nothing -
               matching this panel's original visibility rule from when
-              `dresses` still held the full unfiltered catalog. */}
+              `dresses` still held the full unfiltered catalog. lg:order-2
+              puts it in the second (left, under RTL) grid column while
+              staying first in source order, so it's still the first thing a
+              mobile reader reaches. */}
           {!loading && (dresses.length > 0 || hasActiveFilters) && (
             <CatalogFilters
               search={search}
@@ -641,17 +572,51 @@ export default function CatalogPage() {
               onPriceMinChange={updatePriceMin}
               onPriceMaxChange={updatePriceMax}
               priceBounds={priceBounds}
-              sort={sort}
-              onSortChange={updateSort}
               availabilityDate={availabilityDate}
               onAvailabilityDateChange={setAvailabilityDate}
               availabilityLoading={availabilityLoading}
-              resultCount={visibleDresses.length}
-              totalCount={totalMatches}
               hasActiveFilters={hasActiveFilters}
               onReset={resetFilters}
-              chips={chips}
+              className="lg:order-2"
             />
+          )}
+
+          <div className="min-w-0 lg:order-1">
+          {/* Sort + active-filter chips + result count - sits right above
+              the grid it acts on, rather than bundled into the filter
+              sidebar. */}
+          {!loading && (chips.length > 0 || totalMatches > 0) && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {chips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={chip.onRemove}
+                  className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-700"
+                >
+                  {chip.label}
+                  <span aria-hidden>✕</span>
+                </button>
+              ))}
+
+              <span className="text-xs font-medium text-zinc-400">
+                {hasActiveFilters
+                  ? `מציגה ${visibleDresses.length} מתוך ${totalMatches} שמלות`
+                  : `${totalMatches} ${totalMatches === 1 ? "שמלה" : "שמלות"}`}
+              </span>
+
+              <select
+                value={sort}
+                onChange={(event) => updateSort(event.target.value as SortOption)}
+                aria-label="מיון"
+                className="ms-auto rounded-xl border border-line-strong bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+              >
+                <option value="recommended">מומלצות</option>
+                <option value="newest">חדשות ביותר</option>
+                <option value="price-asc">מחיר: מהנמוך לגבוה</option>
+                <option value="price-desc">מחיר: מהגבוה לנמוך</option>
+              </select>
+            </div>
           )}
 
           {/* Error */}
@@ -779,6 +744,7 @@ export default function CatalogPage() {
               )}
             </>
           )}
+          </div>
         </div>
       </div>
     </main>

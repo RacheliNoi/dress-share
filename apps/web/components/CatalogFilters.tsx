@@ -17,6 +17,12 @@ export type FilterChip = {
   onRemove: () => void;
 };
 
+// Renders as a vertical sidebar (sticky, always open) from lg: up, and as a
+// collapsible panel behind a "סינון ומיון" toggle below that - the same
+// collapse mechanism the previous horizontal layout used, just reused for a
+// vertical stack instead. Sort/chips/result-count live in the page itself
+// (next to the grid they act on), not here - this component owns only the
+// filter fields themselves.
 export default function CatalogFilters({
   search,
   onSearchChange,
@@ -37,16 +43,12 @@ export default function CatalogFilters({
   onPriceMinChange,
   onPriceMaxChange,
   priceBounds,
-  sort,
-  onSortChange,
   availabilityDate,
   onAvailabilityDateChange,
   availabilityLoading,
-  resultCount,
-  totalCount,
   hasActiveFilters,
   onReset,
-  chips,
+  className,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
@@ -67,16 +69,12 @@ export default function CatalogFilters({
   onPriceMinChange: (value: string) => void;
   onPriceMaxChange: (value: string) => void;
   priceBounds: { min: number; max: number } | null;
-  sort: SortOption;
-  onSortChange: (value: SortOption) => void;
   availabilityDate: string;
   onAvailabilityDateChange: (value: string) => void;
   availabilityLoading: boolean;
-  resultCount: number;
-  totalCount: number;
   hasActiveFilters: boolean;
   onReset: () => void;
-  chips: FilterChip[];
+  className?: string;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -142,284 +140,294 @@ export default function CatalogFilters({
     }
   }
 
-  const selectClassName =
-    "w-full rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft sm:w-auto";
+  const fieldLabelClass =
+    "mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-zinc-400";
+  const fieldClassName =
+    "w-full rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft";
 
   return (
-    <section className="mb-6 sm:mb-7">
-      {/* Search + sort + mobile filter toggle */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <svg
-            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="חיפוש לפי שם, קטגוריה, צבע, עיר או תיאור..."
-            className="w-full rounded-2xl border border-line-strong bg-white py-3.5 pe-11 ps-4 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-accent focus:ring-4 focus:ring-accent-soft"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPanelOpen((current) => !current)}
-            className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-bold transition sm:hidden ${
-              panelOpen
-                ? "border-zinc-900 bg-zinc-900 text-white"
-                : "border-line-strong bg-white text-zinc-700"
-            }`}
-          >
-            סינון ומיון
-            <svg
-              className={`h-3.5 w-3.5 transition-transform ${panelOpen ? "rotate-180" : ""}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              aria-hidden
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-
-          <select
-            value={sort}
-            onChange={(event) => onSortChange(event.target.value as SortOption)}
-            className={`${selectClassName} hidden sm:block`}
-            aria-label="מיון"
-          >
-            <option value="recommended">מומלצות</option>
-            <option value="newest">חדשות ביותר</option>
-            <option value="price-asc">מחיר: מהנמוך לגבוה</option>
-            <option value="price-desc">מחיר: מהגבוה לנמוך</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Date-of-rental availability filter - always visible (not tucked
-          inside the collapsible mobile panel) since it's a distinct kind of
-          filter from the rest. */}
-      <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-accent-soft bg-accent-soft/60 p-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <label
-            htmlFor="availability-date-filter"
-            className="text-sm font-bold text-zinc-800"
-          >
-            מחפשת שמלה לתאריך?
-          </label>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              id="availability-date-filter"
-              type="date"
-              value={availabilityDate}
-              onChange={(event) => onAvailabilityDateChange(event.target.value)}
-              className="rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-            />
-
-            {availabilityDate && (
-              <button
-                type="button"
-                onClick={() => onAvailabilityDateChange("")}
-                className="rounded-xl px-3 py-2.5 text-sm font-bold text-accent transition hover:bg-accent-soft-strong"
-              >
-                ניקוי תאריך
-              </button>
-            )}
-
-            {availabilityLoading && (
-              <span className="text-xs font-medium text-zinc-500">
-                בודקת זמינות...
-              </span>
-            )}
-          </div>
-
-          {availabilityDate && !availabilityLoading && (
-            <span className="text-xs font-medium text-accent-deep sm:ms-auto">
-              מוצגות רק שמלות שפנויות בתאריך שנבחר
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 border-t border-accent-soft/70 pt-3 sm:flex-row sm:items-center sm:gap-2">
-          <span className="text-xs font-bold text-zinc-500">
-            או לפי תאריך עברי:
+    <aside className={`lg:sticky lg:top-6 lg:self-start ${className ?? ""}`}>
+      <button
+        type="button"
+        onClick={() => setPanelOpen((current) => !current)}
+        className={`flex w-full items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-sm font-bold transition lg:hidden ${
+          panelOpen
+            ? "border-zinc-900 bg-zinc-900 text-white"
+            : "border-line-strong bg-white text-zinc-700"
+        }`}
+      >
+        סינון
+        {hasActiveFilters && (
+          <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] text-white">
+            פעיל
           </span>
+        )}
+        <svg
+          className={`h-3.5 w-3.5 transition-transform ${panelOpen ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          aria-hidden
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={hebrewYear}
-              onChange={(event) => handleHebrewYearChange(Number(event.target.value))}
-              aria-label="שנה עברית"
-              className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-            >
-              {hebrewYearOptions.map((year) => (
-                <option key={year} value={year}>
-                  {toHebrewYearNumeral(year)}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={hebrewMonthName}
-              onChange={(event) => handleHebrewMonthChange(event.target.value)}
-              aria-label="חודש עברי"
-              className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-            >
-              <option value="">חודש</option>
-              {hebrewTable.map((month) => (
-                <option key={month.name} value={month.name}>
-                  {month.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={hebrewDay}
-              onChange={(event) => handleHebrewDayChange(event.target.value)}
-              aria-label="יום עברי"
-              disabled={!hebrewMonthName}
-              className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">יום</option>
-              {hebrewDayOptions.map((day) => (
-                <option key={day} value={day}>
-                  {toHebrewNumeral(day)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {availabilityDate && (
-            <span className="text-xs font-medium text-zinc-500 sm:ms-auto">
-              נבחר: {new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(`${availabilityDate}T00:00:00.000Z`))}
-              {hebrewMonthName && hebrewDay && ` · ${toHebrewNumeral(Number(hebrewDay))} ב${hebrewMonthName} ${toHebrewYearNumeral(hebrewYear)}`}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Collapsible filter panel (always open from sm: up) */}
+      {/* Same collapse-on-mobile / always-open-on-desktop mechanism the
+          previous horizontal layout used (grid-rows animated between 0fr/1fr),
+          just forced open + un-clipped from lg: up via !-prefixed overrides. */}
       <div
-        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out sm:mt-4 sm:grid-rows-[1fr] sm:overflow-visible ${
-          panelOpen ? "mt-4 grid-rows-[1fr]" : "grid-rows-[0fr]"
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out lg:!mt-0 lg:!grid-rows-[1fr] lg:overflow-visible ${
+          panelOpen ? "mt-3 grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
       >
         <div className="min-h-0">
-          <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200/60 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:bg-transparent sm:p-0 sm:shadow-none sm:ring-0">
-            <select
-              value={sort}
-              onChange={(event) => onSortChange(event.target.value as SortOption)}
-              className={`${selectClassName} sm:hidden`}
-              aria-label="מיון"
-            >
-              <option value="recommended">מומלצות</option>
-              <option value="newest">חדשות ביותר</option>
-              <option value="price-asc">מחיר: מהנמוך לגבוה</option>
-              <option value="price-desc">מחיר: מהגבוה לנמוך</option>
-            </select>
+          <div className="flex flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200/60 lg:w-64">
+            <div>
+              <label htmlFor="catalog-search" className={fieldLabelClass}>
+                חיפוש
+              </label>
+              <div className="relative">
+                <svg
+                  className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  id="catalog-search"
+                  type="search"
+                  value={search}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder="שם, קטגוריה, עיר..."
+                  className={`${fieldClassName} pr-10 pl-3.5`}
+                />
+              </div>
+            </div>
 
             {categories.length > 0 && (
-              <select
-                value={selectedCategory}
-                onChange={(event) => onCategoryChange(event.target.value)}
-                className={selectClassName}
-              >
-                <option value="">כל הקטגוריות</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor="catalog-category" className={fieldLabelClass}>
+                  קטגוריה
+                </label>
+                <select
+                  id="catalog-category"
+                  value={selectedCategory}
+                  onChange={(event) => onCategoryChange(event.target.value)}
+                  className={fieldClassName}
+                >
+                  <option value="">כל הקטגוריות</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             {colors.length > 0 && (
-              <select
-                value={selectedColor}
-                onChange={(event) => onColorChange(event.target.value)}
-                className={selectClassName}
-              >
-                <option value="">כל הצבעים</option>
-                {colors.map((color) => (
-                  <option key={color} value={color}>
-                    {color}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor="catalog-color" className={fieldLabelClass}>
+                  צבע
+                </label>
+                <select
+                  id="catalog-color"
+                  value={selectedColor}
+                  onChange={(event) => onColorChange(event.target.value)}
+                  className={fieldClassName}
+                >
+                  <option value="">כל הצבעים</option>
+                  {colors.map((color) => (
+                    <option key={color} value={color}>
+                      {color}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             {cities.length > 0 && (
-              <select
-                value={selectedCity}
-                onChange={(event) => onCityChange(event.target.value)}
-                className={selectClassName}
-              >
-                <option value="">כל הערים</option>
-                {cities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor="catalog-city" className={fieldLabelClass}>
+                  עיר
+                </label>
+                <select
+                  id="catalog-city"
+                  value={selectedCity}
+                  onChange={(event) => onCityChange(event.target.value)}
+                  className={fieldClassName}
+                >
+                  <option value="">כל הערים</option>
+                  {cities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             {sizes.length > 0 && (
-              <select
-                value={selectedSize}
-                onChange={(event) => onSizeChange(event.target.value)}
-                className={selectClassName}
-              >
-                <option value="">כל המידות</option>
-                {sizes.map((size) => (
-                  <option key={size} value={size}>
-                    מידה {size}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor="catalog-size" className={fieldLabelClass}>
+                  מידה
+                </label>
+                <select
+                  id="catalog-size"
+                  value={selectedSize}
+                  onChange={(event) => onSizeChange(event.target.value)}
+                  className={fieldClassName}
+                >
+                  <option value="">כל המידות</option>
+                  {sizes.map((size) => (
+                    <option key={size} value={size}>
+                      מידה {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             {priceBounds && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={priceMin}
-                  onChange={(event) => onPriceMinChange(event.target.value)}
-                  placeholder={`מ־${priceBounds.min} ₪`}
-                  min={0}
-                  className="w-24 rounded-xl border border-line-strong bg-white px-3 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-                />
-                <span className="text-zinc-300">–</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={priceMax}
-                  onChange={(event) => onPriceMaxChange(event.target.value)}
-                  placeholder={`עד ${priceBounds.max} ₪`}
-                  min={0}
-                  className="w-24 rounded-xl border border-line-strong bg-white px-3 py-2.5 text-sm text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-                />
+              <div>
+                <span className={fieldLabelClass}>טווח מחיר</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={priceMin}
+                    onChange={(event) => onPriceMinChange(event.target.value)}
+                    placeholder={`מ־${priceBounds.min}`}
+                    min={0}
+                    aria-label="מחיר מינימלי"
+                    className={`${fieldClassName} w-1/2`}
+                  />
+                  <span className="text-zinc-300">–</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={priceMax}
+                    onChange={(event) => onPriceMaxChange(event.target.value)}
+                    placeholder={`עד ${priceBounds.max}`}
+                    min={0}
+                    aria-label="מחיר מקסימלי"
+                    className={`${fieldClassName} w-1/2`}
+                  />
+                </div>
               </div>
             )}
+
+            <div className="rounded-2xl border border-accent-soft bg-accent-soft/60 p-4">
+              <label htmlFor="availability-date-filter" className="text-sm font-bold text-zinc-800">
+                זמינה בתאריך
+              </label>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  id="availability-date-filter"
+                  type="date"
+                  value={availabilityDate}
+                  onChange={(event) => onAvailabilityDateChange(event.target.value)}
+                  className="w-full rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                />
+
+                {availabilityDate && (
+                  <button
+                    type="button"
+                    onClick={() => onAvailabilityDateChange("")}
+                    className="rounded-xl px-2 py-1 text-xs font-bold text-accent transition hover:bg-accent-soft-strong"
+                  >
+                    ניקוי תאריך
+                  </button>
+                )}
+
+                {availabilityLoading && (
+                  <span className="text-xs font-medium text-zinc-500">בודקת זמינות...</span>
+                )}
+              </div>
+
+              {availabilityDate && !availabilityLoading && (
+                <p className="mt-2 text-xs font-medium text-accent-deep">
+                  מוצגות רק שמלות שפנויות בתאריך שנבחר
+                </p>
+              )}
+
+              <div className="mt-3 flex flex-col gap-2 border-t border-accent-soft/70 pt-3">
+                <span className="text-xs font-bold text-zinc-500">או לפי תאריך עברי:</span>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={hebrewYear}
+                    onChange={(event) => handleHebrewYearChange(Number(event.target.value))}
+                    aria-label="שנה עברית"
+                    className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-xs text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  >
+                    {hebrewYearOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {toHebrewYearNumeral(year)}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={hebrewMonthName}
+                    onChange={(event) => handleHebrewMonthChange(event.target.value)}
+                    aria-label="חודש עברי"
+                    className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-xs text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  >
+                    <option value="">חודש</option>
+                    {hebrewTable.map((month) => (
+                      <option key={month.name} value={month.name}>
+                        {month.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={hebrewDay}
+                    onChange={(event) => handleHebrewDayChange(event.target.value)}
+                    aria-label="יום עברי"
+                    disabled={!hebrewMonthName}
+                    className="rounded-xl border border-line-strong bg-white px-2.5 py-2 text-xs text-zinc-700 outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">יום</option>
+                    {hebrewDayOptions.map((day) => (
+                      <option key={day} value={day}>
+                        {toHebrewNumeral(day)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {availabilityDate && (
+                  <span className="text-xs font-medium text-zinc-500">
+                    נבחר:{" "}
+                    {new Intl.DateTimeFormat("he-IL", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    }).format(new Date(`${availabilityDate}T00:00:00.000Z`))}
+                    {hebrewMonthName &&
+                      hebrewDay &&
+                      ` · ${toHebrewNumeral(Number(hebrewDay))} ב${hebrewMonthName} ${toHebrewYearNumeral(hebrewYear)}`}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={onReset}
-                className="rounded-xl px-3 py-2.5 text-sm font-bold text-accent transition hover:bg-accent-soft sm:me-auto"
+                className="rounded-xl border border-line-strong px-3 py-2.5 text-sm font-bold text-accent transition hover:bg-accent-soft"
               >
                 נקי סינון
               </button>
@@ -427,29 +435,6 @@ export default function CatalogFilters({
           </div>
         </div>
       </div>
-
-      {/* Active filter chips + result count */}
-      {(chips.length > 0 || totalCount > 0) && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {chips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={chip.onRemove}
-              className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-700"
-            >
-              {chip.label}
-              <span aria-hidden>✕</span>
-            </button>
-          ))}
-
-          <span className="ms-auto text-xs font-medium text-zinc-400">
-            {hasActiveFilters
-              ? `מציגה ${resultCount} מתוך ${totalCount} שמלות`
-              : `${totalCount} ${totalCount === 1 ? "שמלה" : "שמלות"}`}
-          </span>
-        </div>
-      )}
-    </section>
+    </aside>
   );
 }
