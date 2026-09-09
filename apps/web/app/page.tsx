@@ -513,33 +513,40 @@ export default function CatalogPage() {
       <Header />
 
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
-        {/* Compact title bar - replaces the old marketing Hero + editorial
-            spacer + separate catalog heading (three stacked sections) with
-            one, so the grid below starts much closer to the top of the
-            page. */}
-        <section className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
-          <div>
-            <p className="text-sm font-medium text-accent">✦ קטלוג שמלות להשכרה</p>
+        {/* Hero card - the first thing anyone sees on the site, so it gets
+            real visual weight (size, color, a soft gradient card), while
+            staying a single compact section rather than the old stacked
+            marketing Hero + editorial spacer + separate catalog heading. */}
+        <section className="relative mb-6 overflow-hidden rounded-3xl border border-accent-soft/70 bg-gradient-to-br from-accent-soft/50 via-paper to-paper px-6 py-10 sm:mb-8 sm:px-10 sm:py-14">
+          <p className="text-xs font-semibold tracking-wide text-accent uppercase">
+            ✦ קטלוג שמלות להשכרה
+          </p>
 
-            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
-              השמלה שתעשה את השמחה שלך
-            </h1>
+          <h1 className="font-display mt-3 text-4xl leading-[1.1] font-semibold tracking-tight text-accent-deep sm:text-5xl lg:text-6xl">
+            השמלה שתעשה את השמחה שלך
+          </h1>
 
-            <p className="mt-2 text-sm text-zinc-500">
+          <p className="font-display mt-4 max-w-xl text-lg leading-relaxed text-zinc-700 sm:text-xl">
+            כל שמלה כאן כבר הייתה חלק מרגע מיוחד אחד, ומוכנה עכשיו לרגע הבא —
+            שלך.
+          </p>
+
+          <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-zinc-500">
               {totalMatches > 0
                 ? `${totalMatches} שמלות מאושרות, מוכנות להשכרה.`
                 : "עיינו במבחר השמלות המאושרות שלנו להשכרה."}
             </p>
-          </div>
 
-          <Link
-            href="/catalog-pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-line-strong px-4 py-2 text-sm font-bold text-zinc-700 transition hover:border-accent hover:text-accent"
-          >
-            הורדת קטלוג כ-PDF
-          </Link>
+            <Link
+              href="/catalog-pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-line-strong bg-paper px-4 py-2 text-sm font-bold text-zinc-700 transition hover:border-accent hover:text-accent"
+            >
+              הורדת קטלוג כ-PDF
+            </Link>
+          </div>
         </section>
 
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_272px] lg:items-start lg:gap-8">
