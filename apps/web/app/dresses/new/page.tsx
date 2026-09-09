@@ -50,6 +50,7 @@ export default function NewDressPage() {
   const [sizes, setSizes] = useState<DressSize[]>([]);
   const [sizeValue, setSizeValue] = useState("");
   const [priceValue, setPriceValue] = useState("");
+  const [quantityValue, setQuantityValue] = useState("1");
   const [addingSize, setAddingSize] = useState(false);
   const [sizeError, setSizeError] = useState("");
 
@@ -126,8 +127,9 @@ export default function NewDressPage() {
 
     const token = getToken();
     const price = Number(priceValue);
+    const quantity = Number(quantityValue);
 
-    if (!token || !dress || !sizeValue.trim() || !price) {
+    if (!token || !dress || !sizeValue.trim() || !price || !quantity || quantity < 1) {
       return;
     }
 
@@ -138,11 +140,13 @@ export default function NewDressPage() {
       const created = await addDressSize(token, dress.id, {
         size: sizeValue.trim(),
         price,
+        quantity,
       });
 
       setSizes((current) => [...current, created]);
       setSizeValue("");
       setPriceValue("");
+      setQuantityValue("1");
     } catch (err) {
       setSizeError(
         err instanceof ApiError ? err.message : "שגיאה בהוספת המידה",
@@ -475,22 +479,26 @@ export default function NewDressPage() {
                       key={size.id}
                       className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-700"
                     >
-                      <SizeFacts size={size.size} price={size.price} />
+                      <SizeFacts size={size.size} price={size.price} quantity={size.quantity} />
                     </li>
                   ))}
                 </ul>
               )}
 
+              {/* Grid, not a single unwrapped flex row - see the same fix on
+                  the edit page: fitting four fields on one line needed more
+                  width than this card has, which overflowed it instead of
+                  wrapping. */}
               <form
                 onSubmit={handleAddSize}
-                className="mt-4 flex flex-col gap-3 sm:flex-row"
+                className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"
               >
                 <input
                   type="text"
                   value={sizeValue}
                   onChange={(event) => setSizeValue(event.target.value)}
                   placeholder="מידה (למשל: M)"
-                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <input
@@ -499,12 +507,28 @@ export default function NewDressPage() {
                   value={priceValue}
                   onChange={(event) => setPriceValue(event.target.value)}
                   placeholder="מחיר (₪)"
-                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                />
+
+                <input
+                  type="number"
+                  min={1}
+                  value={quantityValue}
+                  onChange={(event) => setQuantityValue(event.target.value)}
+                  placeholder="כמות יחידות"
+                  aria-label="כמות יחידות"
+                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <button
                   type="submit"
-                  disabled={addingSize || !sizeValue.trim() || !priceValue}
+                  disabled={
+                    addingSize ||
+                    !sizeValue.trim() ||
+                    !priceValue ||
+                    !quantityValue ||
+                    Number(quantityValue) < 1
+                  }
                   className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-bold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {addingSize ? "מוסיפה..." : "+ הוספת מידה"}
