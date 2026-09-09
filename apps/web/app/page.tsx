@@ -522,7 +522,7 @@ export default function CatalogPage() {
             <p className="text-sm font-medium text-accent">✦ קטלוג שמלות להשכרה</p>
 
             <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
-              שמלה לכל אירוע, בלי לקנות
+              השמלה שתעשה את השמחה שלך
             </h1>
 
             <p className="mt-2 text-sm text-zinc-500">

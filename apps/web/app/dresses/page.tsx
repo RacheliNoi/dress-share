@@ -186,92 +186,32 @@ return (<main
  >
 {/* Top navigation */} <Header />
 
-  <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
-    {/* Hero */}
-    <section className="relative mb-10 overflow-hidden rounded-[28px] bg-zinc-900 px-7 py-10 text-white shadow-xl sm:px-10 lg:px-14 lg:py-14">
-      <div className="relative z-10 max-w-2xl">
-        <div className="mb-4 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur">
-          ✦ ניהול השמלות שלך
-        </div>
+  <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
+    {/* Compact title bar - matches the catalog page's layout (one section
+        instead of a stacked marketing Hero + separate header), so the
+        dress grid starts much closer to the top here too. */}
+    <section className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
+      <div>
+        <p className="text-sm font-medium text-accent">✦ ניהול השמלות שלך</p>
 
-        <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
-          השמלות שלך,
-          <br />
-          <span className="text-accent-light">הסיפור שלהן.</span>
+        <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
+          הארון שלך
         </h1>
 
-        <p className="mt-5 max-w-xl text-base leading-7 text-zinc-300 sm:text-lg">
-          הוסיפי שמלות להשכרה, הגדירי מידות ומחירים,
-          ושמרי על כל הארון שלך מסודר במקום אחד.
-        </p>
-
-        <a
-          href="/dresses/new"
-          className="mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-bold text-zinc-900 shadow-lg transition hover:-translate-y-0.5 hover:bg-accent-soft"
-        >
-          <span className="text-lg">+</span>
-          הוספת שמלה חדשה
-        </a>
-      </div>
-
-      <div className="pointer-events-none absolute -left-20 -top-32 h-80 w-80 rounded-full bg-accent/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-40 right-1/3 h-96 w-96 rounded-full bg-purple-400/10 blur-3xl" />
-
-      <div className="pointer-events-none absolute bottom-0 left-8 hidden opacity-10 lg:block">
-        <svg
-          width="260"
-          height="260"
-          viewBox="0 0 260 260"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle
-            cx="130"
-            cy="130"
-            r="112"
-            stroke="white"
-            strokeWidth="1"
-          />
-          <circle
-            cx="130"
-            cy="130"
-            r="82"
-            stroke="white"
-            strokeWidth="1"
-          />
-          <circle
-            cx="130"
-            cy="130"
-            r="52"
-            stroke="white"
-            strokeWidth="1"
-          />
-        </svg>
-      </div>
-    </section>
-
-    {/* Header */}
-    <section className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="mb-2 text-sm font-medium text-accent">
-          הארון שלך
-        </p>
-
-        <h2 className="text-3xl font-black tracking-tight text-zinc-900">
-          השמלות שלי
-        </h2>
-
         <p className="mt-2 text-sm text-zinc-500">
-          כאן תוכלי לנהל את כל השמלות שהעלית להשכרה.
+          {dresses.length > 0
+            ? `${dresses.length} שמלות בניהולך.`
+            : "הוסיפי שמלות להשכרה, הגדירי מידות ומחירים, ושמרי על כל הארון שלך מסודר במקום אחד."}
         </p>
       </div>
 
-      <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm shadow-sm ring-1 ring-line">
-        <span className="font-bold text-zinc-900">
-          {dresses.length}
-        </span>
-        <span className="text-zinc-500">שמלות</span>
-      </div>
+      <a
+        href="/dresses/new"
+        className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-zinc-700"
+      >
+        <span className="text-lg">+</span>
+        הוספת שמלה חדשה
+      </a>
     </section>
 
     {/* Error */}
