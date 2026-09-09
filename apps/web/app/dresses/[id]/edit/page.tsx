@@ -884,16 +884,21 @@ export default function EditDressPage() {
                 <p className="mt-3 text-sm text-error">{sizeActionError}</p>
               )}
 
+              {/* Grid, not a single unwrapped flex row - fitting all four
+                  fields (size/price/quantity/button) on one line needed more
+                  width than this card actually has, which overflowed the
+                  card instead of wrapping. Two columns share the available
+                  width predictably at every size instead. */}
               <form
                 onSubmit={handleAddSize}
-                className="mt-4 flex flex-col gap-3 sm:flex-row"
+                className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"
               >
                 <input
                   type="text"
                   value={newSizeValue}
                   onChange={(event) => setNewSizeValue(event.target.value)}
                   placeholder="מידה (למשל: M)"
-                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <input
@@ -902,7 +907,7 @@ export default function EditDressPage() {
                   value={newPriceValue}
                   onChange={(event) => setNewPriceValue(event.target.value)}
                   placeholder="מחיר (₪)"
-                  className="flex-1 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <input
@@ -912,7 +917,7 @@ export default function EditDressPage() {
                   onChange={(event) => setNewQuantityValue(event.target.value)}
                   placeholder="כמות יחידות"
                   aria-label="כמות יחידות"
-                  className="w-full rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft sm:w-32"
+                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
                 <button
