@@ -20,15 +20,38 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_NAME = "DressShare";
+const SITE_DESCRIPTION =
+  "השכרת שמלות בקלות — עיינו בקטלוג ומצאו את השמלה הבאה שלכם";
+
 export const metadata: Metadata = {
-  title: "DressShare",
-  description: "השכרת שמלות בקלות — עיינו בקטלוג ומצאו את השמלה הבאה שלכם",
+  metadataBase: new URL("https://dressshare.co.il"),
+  title: SITE_NAME,
+  description: SITE_DESCRIPTION,
+  // Without these, sharing the site link anywhere (WhatsApp, Facebook,
+  // Slack...) showed the bare URL instead of a real name - these give
+  // link-preview crawlers a proper Hebrew title/description to show
+  // instead.
+  openGraph: {
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: "https://dressshare.co.il",
+    siteName: SITE_NAME,
+    locale: "he_IL",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="he"
+      dir="rtl"
       className={`${rubik.variable} ${frankRuhlLibre.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
