@@ -23,6 +23,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import PhotoEditModal from "@/components/PhotoEditModal";
 import SizeFacts from "@/components/ui/SizeFacts";
+import InfoTooltip from "@/components/ui/InfoTooltip";
 
 export default function NewDressPage() {
   const router = useRouter();
@@ -510,15 +511,21 @@ export default function NewDressPage() {
                   className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
-                <input
-                  type="number"
-                  min={1}
-                  value={quantityValue}
-                  onChange={(event) => setQuantityValue(event.target.value)}
-                  placeholder="כמות יחידות"
-                  aria-label="כמות יחידות"
-                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-                />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-zinc-500">כמות יחידות</span>
+                    <InfoTooltip text="כמה עותקים זהים יש לך מהמידה הזו - לדוגמה 3, אם יש לך שלוש שמלות זהות במידה M. משפיע כמה אפשר להשכיר באותו טווח תאריכים." />
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    value={quantityValue}
+                    onChange={(event) => setQuantityValue(event.target.value)}
+                    placeholder="כמות יחידות"
+                    aria-label="כמות יחידות"
+                    className="w-full min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  />
+                </div>
 
                 <button
                   type="submit"
