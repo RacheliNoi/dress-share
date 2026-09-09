@@ -527,12 +527,6 @@ export default function CatalogPage() {
               כל שמלה כאן כבר הייתה חלק מרגע מיוחד אחד, ומוכנה עכשיו לרגע הבא
               — שלך.
             </p>
-
-            <p className="mt-2 text-sm text-zinc-500">
-              {totalMatches > 0
-                ? `${totalMatches} שמלות מאושרות, מוכנות להשכרה.`
-                : "עיינו במבחר השמלות המאושרות שלנו להשכרה."}
-            </p>
           </div>
 
           <Link
