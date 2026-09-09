@@ -33,6 +33,8 @@ export default function DressCard({
   dress,
   style,
   sizeAvailability,
+  isFavorited,
+  onToggleFavorite,
 }: {
   dress: Dress;
   style?: CSSProperties;
@@ -40,6 +42,10 @@ export default function DressCard({
   // available/blocked chip styling below without affecting whether the
   // dress is shown at all (that's already decided by the caller).
   sizeAvailability?: { available: string[]; blocked: string[] } | null;
+  // Favoriting is opt-in per usage - omit both props (e.g. on the owner's
+  // own "my dresses" list) and the heart button simply doesn't render.
+  isFavorited?: boolean;
+  onToggleFavorite?: (dress: Dress) => void;
 }) {
   const photo = [...dress.photos].sort(
     (a, b) => a.sortOrder - b.sortOrder,
@@ -80,6 +86,31 @@ export default function DressCard({
             📷 {dress.photos.length}
           </div>
         )}
+
+        {onToggleFavorite && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onToggleFavorite(dress);
+            }}
+            aria-label={isFavorited ? "הסרה ממועדפים" : "הוספה למועדפים"}
+            aria-pressed={isFavorited}
+            className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:scale-110 sm:left-4 sm:top-4"
+          >
+            <svg
+              className={`h-4 w-4 transition-colors ${isFavorited ? "text-accent" : "text-zinc-400"}`}
+              viewBox="0 0 24 24"
+              fill={isFavorited ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+            >
+              <path d="M12 20.5s-7.6-4.6-10.2-9.2C.3 8.4 1.6 4.9 5 4a5 5 0 0 1 7 1.5A5 5 0 0 1 19 4c3.4.9 4.7 4.4 3.2 7.3C19.6 15.9 12 20.5 12 20.5Z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="p-4 sm:p-5">
@@ -107,7 +138,32 @@ export default function DressCard({
           )}
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+        <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
+          {dress.sizes.length > 0 ? (
+            dress.sizes.map((size) => {
+              const isBlockedOnDate = sizeAvailability?.blocked.includes(size.size);
+
+              return (
+                <span
+                  key={size.id}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold sm:px-3 sm:py-1.5 sm:text-xs ${
+                    isBlockedOnDate
+                      ? "bg-zinc-50 text-zinc-300 line-through"
+                      : "bg-zinc-100 text-zinc-600"
+                  }`}
+                >
+                  {size.size}
+                </span>
+              );
+            })
+          ) : (
+            <span className="text-[11px] text-zinc-400 sm:text-xs">
+              טרם הוגדרו מידות
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-xs text-zinc-400 sm:mt-4">
           <span className="flex items-center gap-1">
             <svg
               className="h-3.5 w-3.5"
@@ -154,31 +210,6 @@ export default function DressCard({
             </svg>
             {dress.viewCount}
           </span>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
-          {dress.sizes.length > 0 ? (
-            dress.sizes.map((size) => {
-              const isBlockedOnDate = sizeAvailability?.blocked.includes(size.size);
-
-              return (
-                <span
-                  key={size.id}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold sm:px-3 sm:py-1.5 sm:text-xs ${
-                    isBlockedOnDate
-                      ? "bg-zinc-50 text-zinc-300 line-through"
-                      : "bg-zinc-100 text-zinc-600"
-                  }`}
-                >
-                  {size.size}
-                </span>
-              );
-            })
-          ) : (
-            <span className="text-[11px] text-zinc-400 sm:text-xs">
-              טרם הוגדרו מידות
-            </span>
-          )}
         </div>
       </div>
     </Link>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import DressCard from "@/components/DressCard";
 import CatalogFilters, { SortOption } from "@/components/CatalogFilters";
@@ -10,9 +11,13 @@ import {
   Dress,
   DressAvailabilityEntry,
   DressSize,
+  favoriteDress,
   getApprovedDresses,
   getDressAvailability,
+  getFavoriteDressIds,
+  unfavoriteDress,
 } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import { getSizeUsageForDay } from "@/lib/availability";
 
 // How long to wait after the last keystroke before the search box triggers a
@@ -100,6 +105,8 @@ function isDressAvailableOnDate(dress: Dress, dateValue: string, entries: DressA
 }
 
 export default function CatalogPage() {
+  const router = useRouter();
+
   // The ONLY source for the displayed grid - always exactly what the server
   // returned for the current search/category/color/size/price/sort. Never
   // filtered or re-sorted client-side beyond the availability-date pass
@@ -107,6 +114,71 @@ export default function CatalogPage() {
   const [dresses, setDresses] = useState<Dress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Fetched once on mount (only when logged in) - the set of dress ids the
+  // current user has favorited, so DressCard's heart button always reflects
+  // the real server state, not just clicks made this session.
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      return;
+    }
+
+    let cancelled = false;
+
+    getFavoriteDressIds(token)
+      .then((ids) => {
+        if (!cancelled) {
+          setFavoriteIds(new Set(ids));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Optimistic toggle - updates local state immediately, then reverts if the
+  // request fails, so a flaky network never leaves the heart showing the
+  // wrong state for long.
+  function handleToggleFavorite(dress: Dress) {
+    const token = getToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const alreadyFavorited = favoriteIds.has(dress.id);
+
+    setFavoriteIds((current) => {
+      const next = new Set(current);
+      if (alreadyFavorited) {
+        next.delete(dress.id);
+      } else {
+        next.add(dress.id);
+      }
+      return next;
+    });
+
+    const request = alreadyFavorited
+      ? unfavoriteDress(token, dress.id)
+      : favoriteDress(token, dress.id);
+
+    request.catch(() => {
+      setFavoriteIds((current) => {
+        const next = new Set(current);
+        if (alreadyFavorited) {
+          next.add(dress.id);
+        } else {
+          next.delete(dress.id);
+        }
+        return next;
+      });
+    });
+  }
 
   // Fetched once, unfiltered, on mount - used ONLY to derive the filter
   // dropdown option lists (categories/colors/sizes/priceBounds) and the
@@ -706,6 +778,8 @@ export default function CatalogPage() {
                     dress={dress}
                     style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
                     sizeAvailability={sizeAvailabilityByDressId?.get(dress.id) ?? null}
+                    isFavorited={favoriteIds.has(dress.id)}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 ))}
               </div>

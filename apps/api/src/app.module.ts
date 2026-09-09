@@ -12,6 +12,7 @@ import { DressesModule } from './dresses/dresses.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AdminModule } from './admin/admin.module';
     BookingsModule,
     AuthModule,
     AdminModule,
+    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

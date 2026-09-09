@@ -37,6 +37,7 @@ UI is in Hebrew with full RTL support.
 **Renter-facing UI**
 - "מעוניינת בהשכרה" (interested in renting) action on the public dress page, gated to logged-in non-owners — supports picking multiple sizes and multiple units of the same size in one request, respecting each size's real remaining capacity. Size picking is gated behind choosing dates first (capacity is meaningless without a date range), and availability re-fetches on every date change and after a successful submission
 - "הבקשות שלי" (my requests) page listing everything the current user has booked as a renter, with the same chat thread as the owner sees
+- Favoriting — a heart toggle on each catalog card for logged-in users (redirects to login otherwise), backed by a `Favorite` join table (one row per user/dress pair, idempotent add/remove)
 
 **Owner-facing UI**
 - Incoming-requests panel (real renter-initiated bookings only — no manual "create a booking for a customer" form, which would bypass the same-platform requirement above) with reply/chat and rent-confirmation

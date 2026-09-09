@@ -235,6 +235,18 @@ export function incrementDressView(id: number) {
   return request<void>(`/dresses/${id}/view`, { method: "POST" }).catch(() => undefined);
 }
 
+export function getFavoriteDressIds(token: string) {
+  return request<number[]>("/favorites/ids", { token });
+}
+
+export function favoriteDress(token: string, dressId: number) {
+  return request<void>(`/favorites/${dressId}`, { method: "POST", token });
+}
+
+export function unfavoriteDress(token: string, dressId: number) {
+  return request<void>(`/favorites/${dressId}`, { method: "DELETE", token });
+}
+
 // Photo URLs are relative (`/uploads/...`, served by this API) for local-disk
 // storage, but absolute (`https://cdn...`) once a photo lives on R2 - only
 // the relative form needs the API origin prefixed.

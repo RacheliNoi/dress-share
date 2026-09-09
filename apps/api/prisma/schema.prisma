@@ -41,6 +41,7 @@ model User {
   bookings            Booking[]
   passwordResetTokens PasswordResetToken[]
   bookingMessages     BookingMessage[]
+  favorites           Favorite[]
 }
 
 // A password-reset request creates exactly one of these rows. Only a hash of
@@ -115,9 +116,26 @@ model Dress {
   sizes              DressSize[]
   bookings           Booking[]
   availabilityBlocks DressAvailabilityBlock[]
+  favoritedBy        Favorite[]
 
   @@index([ownerId])
   @@index([status])
+}
+
+// A user marking a dress as a favorite (heart icon on the catalog card).
+// One row per (user, dress) pair - @@unique makes favoriting an
+// already-favorited dress a no-op rather than a duplicate row.
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  dressId   Int
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dress Dress @relation(fields: [dressId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dressId])
+  @@index([dressId])
 }
 
 model DressPhoto {
