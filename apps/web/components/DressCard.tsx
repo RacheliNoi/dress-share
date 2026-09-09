@@ -163,10 +163,10 @@ export default function DressCard({
           )}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-xs text-zinc-400 sm:mt-4">
-          <span className="flex items-center gap-1">
+        <div className="mt-3 flex items-center gap-x-3 overflow-hidden border-t border-line pt-3 text-xs text-zinc-400 sm:mt-4">
+          <span className="flex shrink-0 items-center gap-1">
             <svg
-              className="h-3.5 w-3.5"
+              className="h-3.5 w-3.5 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -180,9 +180,9 @@ export default function DressCard({
           </span>
 
           {dress.city && (
-            <span className="flex items-center gap-1">
+            <span className="flex min-w-0 items-center gap-1 overflow-hidden">
               <svg
-                className="h-3.5 w-3.5"
+                className="h-3.5 w-3.5 shrink-0"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -192,13 +192,13 @@ export default function DressCard({
                 <path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11Z" />
                 <circle cx="12" cy="10" r="2.5" />
               </svg>
-              {dress.city}
+              <span className="truncate">{dress.city}</span>
             </span>
           )}
 
-          <span className="flex items-center gap-1">
+          <span className="flex shrink-0 items-center gap-1">
             <svg
-              className="h-3.5 w-3.5"
+              className="h-3.5 w-3.5 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
