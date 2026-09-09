@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
@@ -24,6 +24,11 @@ export default function DressDetailsPage() {
   // mount and would keep showing the pre-submission state until a full
   // page reload.
   const [calendarKey, setCalendarKey] = useState(0);
+  // Guards against React Strict Mode's dev-only double-invoke of this
+  // effect double-counting one page load as two views. Tracks the id
+  // already counted (not just a boolean) so navigating to a different
+  // dress - a genuinely new view - still counts normally.
+  const countedViewForId = useRef<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -46,8 +51,12 @@ export default function DressDetailsPage() {
         }
 
         setDress(found);
+
         // Fire-and-forget - never blocks or affects the page either way.
-        incrementDressView(found.id);
+        if (countedViewForId.current !== found.id) {
+          countedViewForId.current = found.id;
+          incrementDressView(found.id);
+        }
       } catch {
         setError("לא הצלחנו לטעון את פרטי השמלה. נסי שוב.");
       } finally {
