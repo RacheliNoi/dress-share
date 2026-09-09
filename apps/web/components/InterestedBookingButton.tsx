@@ -14,6 +14,7 @@ import {
 import { getPeakUsageForRange } from "@/lib/availability";
 import { buttonClassName } from "./ui/Button";
 import SizeFacts from "./ui/SizeFacts";
+import InfoTooltip from "./ui/InfoTooltip";
 
 // Same multi-size/multi-unit selection logic as the owner's old booking-
 // creation form (DressAvailabilityManager, before owner-1's redesign moved
@@ -247,13 +248,17 @@ export default function InterestedBookingButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openModal}
-        className={buttonClassName("primary", "mt-6 w-full sm:w-auto")}
-      >
-        מעוניינת בהשכרה
-      </button>
+      <div className="mt-6 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={openModal}
+          className={buttonClassName("primary", "w-full sm:w-auto")}
+        >
+          מעוניינת בהשכרה
+        </button>
+
+        <InfoTooltip text="זו לא הזמנה סופית - הבקשה שלך תישלח לבעלת השמלה, והיא זו שמאשרת אותה." />
+      </div>
 
       {open && (
         <div

@@ -15,8 +15,13 @@ import Header from "@/components/Header";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import BookingChat from "@/components/BookingChat";
 
+// Labels written from the renter's own point of view - this page shows a
+// renter their OWN requests, so "מישהו מתעניין" ("someone is interested," a
+// third-person phrasing meant for the owner's side) read as if a stranger's
+// request was showing up on the renter's own list, not their own pending
+// request.
 const STATUS_BADGES: Partial<Record<BookingStatus, { label: string; className: string }>> = {
-  INTERESTED: { label: "מישהו מתעניין", className: "bg-warning-soft text-warning" },
+  INTERESTED: { label: "ממתינה לתשובת בעלת השמלה", className: "bg-warning-soft text-warning" },
   RENTED: { label: "מושכר", className: "bg-accent-soft text-accent-deep" },
   CANCELLED: { label: "בוטל", className: "bg-zinc-100 text-zinc-500" },
 };
