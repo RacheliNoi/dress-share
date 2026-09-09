@@ -239,6 +239,10 @@ export function getFavoriteDressIds(token: string) {
   return request<number[]>("/favorites/ids", { token });
 }
 
+export function getFavoriteDresses(token: string) {
+  return request<Dress[]>("/favorites", { token });
+}
+
 export function favoriteDress(token: string, dressId: number) {
   return request<void>(`/favorites/${dressId}`, { method: "POST", token });
 }

@@ -83,6 +83,9 @@ export default function Header() {
                     הארון שלי
                   </Link>
                 )}
+                <Link href="/favorites" className={navLinkClass}>
+                  מועדפים
+                </Link>
                 <Link href="/dresses" className={navLinkClass}>
                   השמלות שלי
                 </Link>
@@ -161,6 +164,9 @@ export default function Header() {
                   הארון שלי
                 </Link>
               )}
+              <Link href="/favorites" className="rounded-xl px-3 py-2.5 transition hover:bg-surface-sunken hover:text-accent">
+                מועדפים
+              </Link>
               <Link href="/dresses" className="rounded-xl px-3 py-2.5 transition hover:bg-surface-sunken hover:text-accent">
                 השמלות שלי
               </Link>

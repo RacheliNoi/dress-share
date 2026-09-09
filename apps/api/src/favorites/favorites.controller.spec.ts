@@ -82,6 +82,28 @@ describe('FavoritesController', () => {
     });
   });
 
+  describe('GET /favorites', () => {
+    it('rejects unauthenticated requests (401)', async () => {
+      await request(app.getHttpServer()).get('/favorites').expect(401);
+    });
+
+    it("returns the caller's favorited dresses", async () => {
+      prisma.favorite.findMany.mockResolvedValue([
+        { dress: { id: 5, name: 'שמלה' } },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/favorites')
+        .set('Authorization', `Bearer ${tokenFor(1)}`)
+        .expect(200);
+
+      expect(response.body).toEqual([{ id: 5, name: 'שמלה' }]);
+      expect(prisma.favorite.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 1 } }),
+      );
+    });
+  });
+
   describe('POST /favorites/:dressId', () => {
     it('rejects unauthenticated requests (401)', async () => {
       await request(app.getHttpServer()).post('/favorites/5').expect(401);

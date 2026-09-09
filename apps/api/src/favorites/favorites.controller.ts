@@ -22,6 +22,12 @@ export class FavoritesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get()
+  listDresses(@CurrentUser() user: { sub: number }) {
+    return this.favoritesService.listDresses(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post(':dressId')
   add(
     @Param('dressId', ParseIntPipe) dressId: number,

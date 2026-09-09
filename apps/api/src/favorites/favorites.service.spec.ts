@@ -94,4 +94,25 @@ describe('FavoritesService', () => {
       });
     });
   });
+
+  describe('listDresses', () => {
+    it('returns the full dress objects, most-recently-favorited first', async () => {
+      const dressA = { id: 5, name: 'שמלה א' };
+      const dressB = { id: 9, name: 'שמלה ב' };
+      prisma.favorite.findMany.mockResolvedValue([
+        { dress: dressB },
+        { dress: dressA },
+      ]);
+
+      const result = await service.listDresses(1);
+
+      expect(result).toEqual([dressB, dressA]);
+      expect(prisma.favorite.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 1 },
+          orderBy: { createdAt: 'desc' },
+        }),
+      );
+    });
+  });
 });
