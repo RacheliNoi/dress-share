@@ -104,15 +104,41 @@ function isDressAvailableOnDate(dress: Dress, dateValue: string, entries: DressA
   return dress.sizes.some((size) => !blockedSizes.has(size.size));
 }
 
+// Module-scope (not state) so it survives this page unmounting when the
+// user clicks into a dress, and is still there when they navigate back to
+// it - without this, the catalog would always remount empty and show its
+// loading skeleton (a shorter page) before the real grid re-populates,
+// which cuts off the browser's scroll-position restoration on that first,
+// too-short paint. Keyed by the exact query params, so it only ever serves
+// a result that actually matches what's about to be requested. Cleared
+// naturally on a real page reload (it's just a JS variable), which is
+// correct - a fresh visit should never show stale/from-memory results.
+const catalogResultCache = new Map<string, { dresses: Dress[]; total: number }>();
+
+// undefined-valued properties are dropped by JSON.stringify, so this
+// intentionally-sparse object produces the exact same key as the fully
+// spelled-out params object below once every filter is at its default (""/
+// null) - no need to duplicate that whole shape just for the initial key.
+function buildCacheKey(params: CatalogFilterParams): string {
+  return JSON.stringify(params);
+}
+
+const DEFAULT_CATALOG_CACHE_KEY = buildCacheKey({ page: 1, limit: PAGE_SIZE });
+
 export default function CatalogPage() {
   const router = useRouter();
 
   // The ONLY source for the displayed grid - always exactly what the server
   // returned for the current search/category/color/size/price/sort. Never
   // filtered or re-sorted client-side beyond the availability-date pass
-  // below (which the backend has no endpoint for yet).
-  const [dresses, setDresses] = useState<Dress[]>([]);
-  const [loading, setLoading] = useState(true);
+  // below (which the backend has no endpoint for yet). Seeded from
+  // catalogResultCache (lazy initializer - runs once, before the first
+  // paint) so returning here from a dress page via router.back() shows the
+  // same grid at the same height immediately, instead of an empty loading
+  // skeleton that would cut the browser's scroll-restoration short.
+  const cachedDefault = catalogResultCache.get(DEFAULT_CATALOG_CACHE_KEY);
+  const [dresses, setDresses] = useState<Dress[]>(() => cachedDefault?.dresses ?? []);
+  const [loading, setLoading] = useState(() => !cachedDefault);
   const [error, setError] = useState("");
 
   // Fetched once on mount (only when logged in) - the set of dress ids the
@@ -207,7 +233,7 @@ export default function CatalogPage() {
   // Total matches for the CURRENT search/filter/sort query, before
   // pagination - comes straight from the server's `total`, independent of
   // how many results happen to be on the current page.
-  const [totalMatches, setTotalMatches] = useState(0);
+  const [totalMatches, setTotalMatches] = useState(() => cachedDefault?.total ?? 0);
 
   const [availabilityDate, setAvailabilityDate] = useState("");
   // Keyed by dressId - fetched lazily (only once a date is picked) and kept
@@ -283,33 +309,51 @@ export default function CatalogPage() {
   // existing pattern of a named loader function wired to both a mount effect
   // and a manual retry button.
   const loadDresses = useCallback(async () => {
-    try {
+    const params: CatalogFilterParams = {
+      search: debouncedSearch.trim() || undefined,
+      category: selectedCategory || undefined,
+      color: selectedColor || undefined,
+      city: selectedCity || undefined,
+      size: selectedSize || undefined,
+      priceMin: priceMinValue ?? undefined,
+      priceMax: priceMaxValue ?? undefined,
+      // Omitted (not just "recommended") on the default/no-filter case, so
+      // the very first load fires the exact same bare request as before
+      // this endpoint accepted any query params at all.
+      sort: sort === "recommended" ? undefined : sort,
+      page,
+      limit: PAGE_SIZE,
+    };
+
+    const cacheKey = buildCacheKey(params);
+    const cached = catalogResultCache.get(cacheKey);
+
+    // A cache hit (e.g. landing back on this exact view via router.back())
+    // renders instantly at the right height instead of the loading
+    // skeleton, then this still silently revalidates in the background -
+    // it just doesn't toggle `loading` around that refetch.
+    if (cached) {
+      setDresses(cached.dresses);
+      setTotalMatches(cached.total);
+      setError("");
+    } else {
       setLoading(true);
       setError("");
+    }
 
-      const params: CatalogFilterParams = {
-        search: debouncedSearch.trim() || undefined,
-        category: selectedCategory || undefined,
-        color: selectedColor || undefined,
-        city: selectedCity || undefined,
-        size: selectedSize || undefined,
-        priceMin: priceMinValue ?? undefined,
-        priceMax: priceMaxValue ?? undefined,
-        // Omitted (not just "recommended") on the default/no-filter case, so
-        // the very first load fires the exact same bare request as before
-        // this endpoint accepted any query params at all.
-        sort: sort === "recommended" ? undefined : sort,
-        page,
-        limit: PAGE_SIZE,
-      };
-
+    try {
       const { dresses: data, total } = await getApprovedDresses(params);
       setDresses(data);
       setTotalMatches(total);
+      catalogResultCache.set(cacheKey, { dresses: data, total });
     } catch {
-      setError("לא הצלחנו לטעון את הקטלוג. נסי שוב.");
+      if (!cached) {
+        setError("לא הצלחנו לטעון את הקטלוג. נסי שוב.");
+      }
     } finally {
-      setLoading(false);
+      if (!cached) {
+        setLoading(false);
+      }
     }
   }, [debouncedSearch, selectedCategory, selectedColor, selectedCity, selectedSize, priceMinValue, priceMaxValue, sort, page]);
 

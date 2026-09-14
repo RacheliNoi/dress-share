@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
 import InterestedBookingButton from "@/components/InterestedBookingButton";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import { Dress, getApprovedDressById, getDressImageUrl, incrementDressView } from "@/lib/api";
+import { cameFromDressList } from "@/lib/auth";
 
 export default function DressDetailsPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
 
   const [dress, setDress] = useState<Dress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,17 +74,37 @@ export default function DressDetailsPage() {
   const activePhoto = photos[activePhotoIndex];
   const activePhotoFailed = activePhoto ? failedPhotoIds.has(activePhoto.id) : false;
 
+  // A plain <Link href="/"> always scrolls the catalog to the top, because
+  // it's a fresh (push) navigation to that route - Next.js only preserves
+  // scroll position on a true back/forward navigation. router.back() is a
+  // real history pop, so the catalog is restored exactly where the user
+  // left it. window.history.length can't tell us whether that pop is safe
+  // - browsers already start a fresh tab at length 2 (a blank initial
+  // document plus this page), so it's always "truthy" even with nothing
+  // real to go back to; calling back() there leaves the app entirely
+  // (blank tab) instead of landing back on the catalog. cameFromDressList()
+  // is the real signal: it's only true when this page was actually reached
+  // via a click from the catalog or favorites, in this tab.
+  function goBackToCatalog() {
+    if (cameFromDressList()) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  }
+
   return (
     <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
       <Header />
 
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 lg:py-14">
-        <Link
-          href="/"
+        <button
+          type="button"
+          onClick={goBackToCatalog}
           className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-accent"
         >
           → חזרה לקטלוג
-        </Link>
+        </button>
 
         {loading ? (
           <div className="grid gap-8 lg:grid-cols-2">
@@ -104,12 +125,13 @@ export default function DressDetailsPage() {
               {error}
             </h1>
 
-            <Link
-              href="/"
+            <button
+              type="button"
+              onClick={goBackToCatalog}
               className="mt-7 inline-flex rounded-full bg-zinc-900 px-6 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-zinc-700"
             >
               חזרה לקטלוג
-            </Link>
+            </button>
           </div>
         ) : dress ? (
           <div className="grid gap-8 lg:grid-cols-2">

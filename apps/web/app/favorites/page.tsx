@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getToken, logout } from "@/lib/auth";
+import { getToken, getUser, logout } from "@/lib/auth";
 import {
   ApiError,
   Dress,
@@ -13,28 +13,54 @@ import {
 import Header from "@/components/Header";
 import DressCard from "@/components/DressCard";
 
+// Module-scope (not state) so it survives this page unmounting when the
+// user clicks into a dress, and is still there when they navigate back via
+// router.back() - see the identical, more-detailed comment on
+// catalogResultCache in app/page.tsx for why this is what makes scroll
+// restoration actually work (no loading-skeleton flash on return). Keyed by
+// user id so switching accounts in the same tab never shows a stale list.
+let favoritesCache: { userId: number; dresses: Dress[] } | null = null;
+
 export default function FavoritesPage() {
   const router = useRouter();
 
-  const [dresses, setDresses] = useState<Dress[]>([]);
-  const [loading, setLoading] = useState(true);
+  const currentUserId = getUser()?.id;
+  const cached =
+    currentUserId !== undefined && favoritesCache?.userId === currentUserId
+      ? favoritesCache
+      : null;
+
+  const [dresses, setDresses] = useState<Dress[]>(() => cached?.dresses ?? []);
+  const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   async function loadFavorites() {
     const token = getToken();
+    const userId = getUser()?.id;
 
-    if (!token) {
+    if (!token || userId === undefined) {
       router.push("/login");
       return;
     }
 
-    try {
+    const hasCache = favoritesCache?.userId === userId;
+
+    // A cache hit (returning here via router.back()) renders instantly at
+    // the right height instead of the loading skeleton, then this still
+    // silently revalidates in the background rather than blocking on it.
+    if (hasCache) {
+      setDresses(favoritesCache!.dresses);
+      setError("");
+    } else {
       setLoading(true);
       setError("");
+    }
 
+    try {
       const data = await getFavoriteDresses(token);
       setDresses(data);
+      favoritesCache = { userId, dresses: data };
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         logout();
@@ -42,9 +68,13 @@ export default function FavoritesPage() {
         return;
       }
 
-      setError("לא הצלחנו לטעון את המועדפים שלך. נסי שוב.");
+      if (!hasCache) {
+        setError("לא הצלחנו לטעון את המועדפים שלך. נסי שוב.");
+      }
     } finally {
-      setLoading(false);
+      if (!hasCache) {
+        setLoading(false);
+      }
     }
   }
 
@@ -69,6 +99,13 @@ export default function FavoritesPage() {
     }
 
     setDresses((current) => current.filter((item) => item.id !== dress.id));
+    if (favoritesCache) {
+      favoritesCache = {
+        ...favoritesCache,
+        dresses: favoritesCache.dresses.filter((item) => item.id !== dress.id),
+      };
+    }
+
     unfavoriteDress(token, dress.id).catch(() => {
       loadFavorites();
     });

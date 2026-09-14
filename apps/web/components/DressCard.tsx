@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useState } from "react";
 import { Dress, getDressImageUrl } from "@/lib/api";
+import { markCameFromDressList } from "@/lib/auth";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 
 function formatShortDate(iso: string) {
@@ -60,6 +61,7 @@ export default function DressCard({
     <Link
       href={`/dress/${dress.id}`}
       style={style}
+      onClick={markCameFromDressList}
       className="animate-fade-scale-in group block overflow-hidden rounded-[20px] bg-white ring-1 ring-line transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_-15px_rgba(34,31,31,0.18)] hover:ring-accent-soft-strong"
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-zinc-100">
