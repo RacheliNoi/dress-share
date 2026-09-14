@@ -21,6 +21,15 @@ import DressCard from "@/components/DressCard";
 // user id so switching accounts in the same tab never shows a stale list.
 let favoritesCache: { userId: number; dresses: Dress[] } | null = null;
 
+// Starts false on every real page load (server-rendered HTML always has
+// this false too, since it's a fresh module instance per request) and
+// flips true once this component has mounted for the first time. Lets the
+// checkingAuth initializer below skip straight past its gate on a later
+// client-side-only remount (e.g. router.back() from a dress page) without
+// ever disagreeing with what was server-rendered on the real first load -
+// see checkingAuth's declaration for why that distinction matters.
+let hasMountedBefore = false;
+
 export default function FavoritesPage() {
   const router = useRouter();
 
@@ -33,7 +42,24 @@ export default function FavoritesPage() {
   const [dresses, setDresses] = useState<Dress[]>(() => cached?.dresses ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState("");
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  // getToken() is a synchronous localStorage read, not real async work -
+  // when it already confirms a token at mount time, there's nothing to
+  // "check" and this skips straight past the gate below. Without this, the
+  // page always rendered null for at least one tick (this state starting
+  // true, only flipped by the mount effect after first paint) even when
+  // already known-authenticated - on a return visit via router.back(),
+  // that blank first paint was enough to occasionally cut the browser's
+  // scroll restoration short, the same failure mode the caching above
+  // fixes for the loading skeleton.
+  //
+  // Only takes that shortcut once hasMountedBefore is true, i.e. this is a
+  // later client-side remount, not the real first load - on the real first
+  // load, getToken() would read `null` during server rendering (no
+  // localStorage there) but a real token during client hydration, and
+  // starting from two different values would be a hydration mismatch.
+  const [checkingAuth, setCheckingAuth] = useState(() =>
+    hasMountedBefore ? !getToken() : true,
+  );
 
   async function loadFavorites() {
     const token = getToken();
@@ -79,6 +105,8 @@ export default function FavoritesPage() {
   }
 
   useEffect(() => {
+    hasMountedBefore = true;
+
     if (!getToken()) {
       router.push("/login");
       return;

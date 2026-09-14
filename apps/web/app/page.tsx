@@ -115,18 +115,99 @@ function isDressAvailableOnDate(dress: Dress, dateValue: string, entries: DressA
 // correct - a fresh visit should never show stale/from-memory results.
 const catalogResultCache = new Map<string, { dresses: Dress[]; total: number }>();
 
-// undefined-valued properties are dropped by JSON.stringify, so this
-// intentionally-sparse object produces the exact same key as the fully
-// spelled-out params object below once every filter is at its default (""/
-// null) - no need to duplicate that whole shape just for the initial key.
 function buildCacheKey(params: CatalogFilterParams): string {
   return JSON.stringify(params);
 }
 
-const DEFAULT_CATALOG_CACHE_KEY = buildCacheKey({ page: 1, limit: PAGE_SIZE });
+type CatalogViewState = {
+  search: string;
+  selectedCategory: string;
+  selectedColor: string;
+  selectedCity: string;
+  selectedSize: string;
+  priceMin: string;
+  priceMax: string;
+  sort: SortOption;
+  page: number;
+  availabilityDate: string;
+};
+
+function defaultCatalogViewState(): CatalogViewState {
+  return {
+    search: "",
+    selectedCategory: "",
+    selectedColor: "",
+    selectedCity: "",
+    selectedSize: "",
+    priceMin: "",
+    priceMax: "",
+    sort: "recommended",
+    page: 1,
+    availabilityDate: "",
+  };
+}
+
+// Same idea as catalogResultCache, one level up: which page/filters/sort/
+// search the user actually had selected. Without this, every one of those
+// would reset to its default on remount - so "go back" would land back on
+// page 1 with no filters, not wherever the user actually was, even once
+// scroll and the fetched results were already being restored correctly.
+let catalogViewState: CatalogViewState | null = null;
+
+// Single source of truth for turning UI state into API params - used both
+// to compute the cache key/params for a real fetch (loadDresses) and to
+// look up a cache hit for the *restored* view state during the initial
+// render, before any of the state hooks below even exist yet.
+function buildFilterParams(state: {
+  debouncedSearch: string;
+  selectedCategory: string;
+  selectedColor: string;
+  selectedCity: string;
+  selectedSize: string;
+  priceMin: string;
+  priceMax: string;
+  sort: SortOption;
+  page: number;
+}): CatalogFilterParams {
+  const priceMinValue = state.priceMin.trim() === "" ? null : Number(state.priceMin);
+  const priceMaxValue = state.priceMax.trim() === "" ? null : Number(state.priceMax);
+
+  return {
+    search: state.debouncedSearch.trim() || undefined,
+    category: state.selectedCategory || undefined,
+    color: state.selectedColor || undefined,
+    city: state.selectedCity || undefined,
+    size: state.selectedSize || undefined,
+    priceMin: priceMinValue ?? undefined,
+    priceMax: priceMaxValue ?? undefined,
+    // Omitted (not just "recommended") on the default/no-filter case, so
+    // the very first load fires the exact same bare request as before this
+    // endpoint accepted any query params at all.
+    sort: state.sort === "recommended" ? undefined : state.sort,
+    page: state.page,
+    limit: PAGE_SIZE,
+  };
+}
 
 export default function CatalogPage() {
   const router = useRouter();
+
+  // What page/filters/sort/search to restore, if any - read once (this
+  // `const` is cheap to recompute every render, but only the lazy
+  // initializers below actually consult it, on the very first render).
+  const restoredView = catalogViewState ?? defaultCatalogViewState();
+  const restoredParams = buildFilterParams({
+    debouncedSearch: restoredView.search,
+    selectedCategory: restoredView.selectedCategory,
+    selectedColor: restoredView.selectedColor,
+    selectedCity: restoredView.selectedCity,
+    selectedSize: restoredView.selectedSize,
+    priceMin: restoredView.priceMin,
+    priceMax: restoredView.priceMax,
+    sort: restoredView.sort,
+    page: restoredView.page,
+  });
+  const cachedResult = catalogResultCache.get(buildCacheKey(restoredParams));
 
   // The ONLY source for the displayed grid - always exactly what the server
   // returned for the current search/category/color/size/price/sort. Never
@@ -134,11 +215,11 @@ export default function CatalogPage() {
   // below (which the backend has no endpoint for yet). Seeded from
   // catalogResultCache (lazy initializer - runs once, before the first
   // paint) so returning here from a dress page via router.back() shows the
-  // same grid at the same height immediately, instead of an empty loading
-  // skeleton that would cut the browser's scroll-restoration short.
-  const cachedDefault = catalogResultCache.get(DEFAULT_CATALOG_CACHE_KEY);
-  const [dresses, setDresses] = useState<Dress[]>(() => cachedDefault?.dresses ?? []);
-  const [loading, setLoading] = useState(() => !cachedDefault);
+  // same grid, on the same page, at the same height immediately, instead
+  // of an empty loading skeleton that would cut the browser's
+  // scroll-restoration short.
+  const [dresses, setDresses] = useState<Dress[]>(() => cachedResult?.dresses ?? []);
+  const [loading, setLoading] = useState(() => !cachedResult);
   const [error, setError] = useState("");
 
   // Fetched once on mount (only when logged in) - the set of dress ids the
@@ -213,29 +294,30 @@ export default function CatalogPage() {
   // filtered/sorted, never touched by the availability-date pass.
   const [optionsDresses, setOptionsDresses] = useState<Dress[]>([]);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => restoredView.search);
   // The value actually sent to the server - updates SEARCH_DEBOUNCE_MS after
   // the user stops typing. `search` itself still drives the input's
   // displayed value directly, so typing feels instant even though the
-  // request lags slightly behind.
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedColor, setSelectedColor] = useState("");
-  const [selectedCity, setSelectedCity] = useState("");
-  const [selectedSize, setSelectedSize] = useState("");
-  const [priceMin, setPriceMin] = useState("");
-  const [priceMax, setPriceMax] = useState("");
-  const [sort, setSort] = useState<SortOption>("recommended");
+  // request lags slightly behind. Restored in sync with `search` (not
+  // "" - see the debounce effect below for why that matters).
+  const [debouncedSearch, setDebouncedSearch] = useState(() => restoredView.search);
+  const [selectedCategory, setSelectedCategory] = useState(() => restoredView.selectedCategory);
+  const [selectedColor, setSelectedColor] = useState(() => restoredView.selectedColor);
+  const [selectedCity, setSelectedCity] = useState(() => restoredView.selectedCity);
+  const [selectedSize, setSelectedSize] = useState(() => restoredView.selectedSize);
+  const [priceMin, setPriceMin] = useState(() => restoredView.priceMin);
+  const [priceMax, setPriceMax] = useState(() => restoredView.priceMax);
+  const [sort, setSort] = useState<SortOption>(() => restoredView.sort);
 
   // 1-based. Reset to 1 whenever a server-side filter/sort changes (see the
   // update* wrappers below) - never reset by changing the page itself.
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => restoredView.page);
   // Total matches for the CURRENT search/filter/sort query, before
   // pagination - comes straight from the server's `total`, independent of
   // how many results happen to be on the current page.
-  const [totalMatches, setTotalMatches] = useState(() => cachedDefault?.total ?? 0);
+  const [totalMatches, setTotalMatches] = useState(() => cachedResult?.total ?? 0);
 
-  const [availabilityDate, setAvailabilityDate] = useState("");
+  const [availabilityDate, setAvailabilityDate] = useState(() => restoredView.availabilityDate);
   // Keyed by dressId - fetched lazily (only once a date is picked) and kept
   // for the rest of the session, so switching the date around never
   // re-fetches anything already known.
@@ -248,6 +330,20 @@ export default function CatalogPage() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   useEffect(() => {
+    // Nothing to debounce once search already matches what was last sent
+    // to the server - true right after mount, including a restored,
+    // non-empty search term (debouncedSearch is restored in sync with
+    // `search`, see its declaration above). Skipping in that case is what
+    // stops this from resetting a restored page number back to 1 for no
+    // reason. A ref-based "skip only the very first run" guard can't do
+    // this reliably: React Strict Mode's dev-only mount->cleanup->remount
+    // effect cycle reuses the same ref across both effect passes, so a
+    // guard that flips a ref to false on its first run leaves the second,
+    // Strict-Mode-only pass completely unguarded.
+    if (search === debouncedSearch) {
+      return;
+    }
+
     const timeout = setTimeout(() => {
       // Batched into one re-render (React 18+ automatic batching applies
       // inside setTimeout callbacks too) - loadDresses' effect below then
@@ -258,7 +354,37 @@ export default function CatalogPage() {
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timeout);
-  }, [search]);
+  }, [search, debouncedSearch]);
+
+  // Keeps catalogViewState in sync with the latest page/filters/sort/
+  // search/availability-date, so whatever this was set to right before the
+  // user clicked into a dress is exactly what's restored if they come back
+  // (see catalogViewState's declaration above the component).
+  useEffect(() => {
+    catalogViewState = {
+      search,
+      selectedCategory,
+      selectedColor,
+      selectedCity,
+      selectedSize,
+      priceMin,
+      priceMax,
+      sort,
+      page,
+      availabilityDate,
+    };
+  }, [
+    search,
+    selectedCategory,
+    selectedColor,
+    selectedCity,
+    selectedSize,
+    priceMin,
+    priceMax,
+    sort,
+    page,
+    availabilityDate,
+  ]);
 
   // Wrap each filter setter to also reset pagination to page 1, batched into
   // the same render as the filter change itself (see the search debounce
@@ -309,21 +435,17 @@ export default function CatalogPage() {
   // existing pattern of a named loader function wired to both a mount effect
   // and a manual retry button.
   const loadDresses = useCallback(async () => {
-    const params: CatalogFilterParams = {
-      search: debouncedSearch.trim() || undefined,
-      category: selectedCategory || undefined,
-      color: selectedColor || undefined,
-      city: selectedCity || undefined,
-      size: selectedSize || undefined,
-      priceMin: priceMinValue ?? undefined,
-      priceMax: priceMaxValue ?? undefined,
-      // Omitted (not just "recommended") on the default/no-filter case, so
-      // the very first load fires the exact same bare request as before
-      // this endpoint accepted any query params at all.
-      sort: sort === "recommended" ? undefined : sort,
+    const params = buildFilterParams({
+      debouncedSearch,
+      selectedCategory,
+      selectedColor,
+      selectedCity,
+      selectedSize,
+      priceMin,
+      priceMax,
+      sort,
       page,
-      limit: PAGE_SIZE,
-    };
+    });
 
     const cacheKey = buildCacheKey(params);
     const cached = catalogResultCache.get(cacheKey);
@@ -355,7 +477,7 @@ export default function CatalogPage() {
         setLoading(false);
       }
     }
-  }, [debouncedSearch, selectedCategory, selectedColor, selectedCity, selectedSize, priceMinValue, priceMaxValue, sort, page]);
+  }, [debouncedSearch, selectedCategory, selectedColor, selectedCity, selectedSize, priceMin, priceMax, sort, page]);
 
   useEffect(() => {
     loadDresses();
