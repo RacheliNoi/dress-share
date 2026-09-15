@@ -77,7 +77,7 @@ export default function HowItWorks() {
   }, []);
 
   return (
-    <section className="border-t border-line bg-accent-soft/25">
+    <section id="how-it-works" className="scroll-mt-20 border-t border-line bg-accent-soft/25">
       <div
         ref={sectionRef}
         className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20"

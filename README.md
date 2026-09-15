@@ -14,7 +14,7 @@ UI is in Hebrew with full RTL support.
 - Availability-by-date filtering, layered on top of the paginated results
 - Downloadable PDF catalog (`/catalog-pdf`) via the browser's own print-to-PDF, listing every approved dress with a real clickable link to its page — for anyone who can browse the images offline but can't reach the live site to click through directly
 - Returning to the catalog (or favorites) from a dress page via its "back" button restores the exact scroll position, pagination page, and active filters/sort/search instead of jumping back to page 1 at the top — a `router.back()` real history pop, paired with an in-memory cache of both the last fetched results and the view state itself, so the grid re-renders at full height on the same page instantly instead of flashing an empty loading skeleton first (which would otherwise cut the browser's own scroll restoration short)
-- "איך זה עובד" (how it works) section below the grid — four numbered steps from browsing to renting, revealed with a staggered scroll-in animation the first time it enters the viewport
+- "איך זה עובד" (how it works) section below the grid — four numbered steps from browsing to renting, revealed with a staggered scroll-in animation the first time it enters the viewport, with a small bouncing arrow under the title bar that smooth-scrolls straight to it
 
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review

@@ -81,3 +81,28 @@ body {
 .animate-fade-scale-in {
   animation: fade-scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+@keyframes scroll-cue-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(5px); }
+}
+
+@keyframes scroll-cue-ping {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  80%, 100% { transform: scale(1.9); opacity: 0; }
+}
+
+.animate-scroll-cue-bounce {
+  animation: scroll-cue-bounce 1.7s ease-in-out infinite;
+}
+
+.animate-scroll-cue-ping {
+  animation: scroll-cue-ping 2.1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-scroll-cue-bounce,
+  .animate-scroll-cue-ping {
+    animation: none;
+  }
+}

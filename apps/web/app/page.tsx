@@ -754,7 +754,7 @@ export default function CatalogPage() {
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
         {/* Compact title bar - same structure/size/spacing as before, just
             the headline in the brand's maroon and one added subtitle line. */}
-        <section className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
+        <section className="mb-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-accent">✦ קטלוג שמלות להשכרה</p>
 
@@ -777,6 +777,42 @@ export default function CatalogPage() {
             הורדת קטלוג כ-PDF
           </Link>
         </section>
+
+        {/* Scroll cue - normal document flow (not absolutely positioned
+            over the title bar above), since that title bar wraps onto two
+            rows on narrow screens and an absolutely-positioned cue ended up
+            overlapping the PDF button there. Invites scrolling down to the
+            "how it works" steps, all the way below the grid/pagination. */}
+        <div className="mb-4 flex justify-center sm:mb-6">
+          <button
+            type="button"
+            onClick={() =>
+              document
+                .getElementById("how-it-works")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+            aria-label="גלילה אל איך זה עובד"
+            className="group relative flex h-9 w-9 items-center justify-center"
+          >
+            <span
+              className="animate-scroll-cue-ping absolute inset-0 rounded-full bg-accent-soft-strong"
+              aria-hidden
+            />
+            <span className="animate-scroll-cue-bounce relative flex h-8 w-8 items-center justify-center rounded-full bg-white text-accent-deep shadow-sm ring-1 ring-line-strong transition group-hover:text-accent group-hover:ring-accent">
+              <svg
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                aria-hidden
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </span>
+          </button>
+        </div>
 
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_272px] lg:items-start lg:gap-8">
           {/* dresses.length > 0 covers the normal case; hasActiveFilters
