@@ -18,6 +18,7 @@ UI is in Hebrew with full RTL support.
 
 **Marketing**
 - A standalone, animated "story"-format promo page at `/promo.html` (`apps/web/public/promo.html`) — a self-contained static file (own HTML/CSS/JS, no dependency on the rest of the app or any external account) meant to be shared directly for real distribution. Payment-by-credit-card is explicitly marked "coming soon" there, since it isn't live yet.
+- Per-dress Open Graph/Twitter Card metadata — sharing a specific dress's link shows that dress's own name, city/category, and photo, not the site's generic brand card. `app/dress/[id]/page.tsx` is a real Server Component with a `generateMetadata` that fetches server-side (crawlers never run the client-side fetch the page content itself uses) against a dedicated single-dress endpoint (`GET /dresses/approved/:id`) rather than the paginated catalog list
 
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review

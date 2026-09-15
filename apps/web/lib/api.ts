@@ -220,12 +220,12 @@ export function getApprovedDresses(params?: CatalogFilterParams) {
   return request<CatalogPage>(`/dresses/approved${buildCatalogQuery(params)}`);
 }
 
-// There is no GET /dresses/:id endpoint on the backend, so a single dress is
-// resolved by fetching the approved catalog (unpaginated, since no
-// page/limit is passed) and matching the id.
-export async function getApprovedDressById(id: number) {
-  const { dresses } = await getApprovedDresses();
-  return dresses.find((dress) => dress.id === id);
+// Resolves null both for a genuinely missing id and for one that exists but
+// isn't APPROVED (pending/draft/rejected) - the backend query itself
+// excludes those, not a post-hoc check here, so this can never leak an
+// unapproved dress's details through the public detail page.
+export function getApprovedDressById(id: number) {
+  return request<Dress | null>(`/dresses/approved/${id}`);
 }
 
 // Fire-and-forget public view counter, bumped once when the dress detail

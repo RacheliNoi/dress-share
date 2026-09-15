@@ -76,6 +76,16 @@ export class DressesController {
     });
   }
 
+  // Public, unauthenticated - single-dress counterpart to /approved, mainly
+  // for the frontend's server-rendered generateMetadata (per-dress Open
+  // Graph image/title), which only needs one dress and shouldn't have to
+  // fetch the whole catalog for it. Placed above the owner-only ':id'-less
+  // routes so it can't collide with anything.
+  @Get('approved/:id')
+  findApprovedById(@Param('id') id: string) {
+    return this.dressesService.findApprovedById(Number(id));
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post()
   create(

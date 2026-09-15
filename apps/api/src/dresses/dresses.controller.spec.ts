@@ -19,6 +19,7 @@ describe('DressesController', () => {
   let prisma: {
     dress: {
       findMany: jest.Mock;
+      findFirst: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
@@ -41,6 +42,7 @@ describe('DressesController', () => {
     prisma = {
       dress: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
@@ -290,6 +292,33 @@ describe('DressesController', () => {
         expect(response.body.dresses).toEqual([{ id: 5, sizes: [{ price: 200 }] }]);
         expect(response.body.total).toBe(1);
       });
+    });
+  });
+
+  describe('GET /dresses/approved/:id', () => {
+    it('is publicly accessible and returns the dress when found and approved', async () => {
+      prisma.dress.findFirst.mockResolvedValue({ id: 5, status: DressStatus.APPROVED });
+
+      const response = await request(app.getHttpServer())
+        .get('/dresses/approved/5')
+        .expect(200);
+
+      expect(response.body).toEqual({ id: 5, status: DressStatus.APPROVED });
+      expect(prisma.dress.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 5, status: DressStatus.APPROVED },
+        }),
+      );
+    });
+
+    it('returns an empty body (not a 404) when the dress does not exist or is not approved', async () => {
+      prisma.dress.findFirst.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .get('/dresses/approved/999')
+        .expect(200);
+
+      expect(response.body).toEqual({});
     });
   });
 

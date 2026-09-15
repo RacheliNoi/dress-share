@@ -23,6 +23,7 @@ describe('DressesService', () => {
   let prisma: {
     dress: {
       findMany: jest.Mock;
+      findFirst: jest.Mock;
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
@@ -83,6 +84,7 @@ describe('DressesService', () => {
     prisma = {
       dress: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -516,6 +518,30 @@ describe('DressesService', () => {
         expect(result.dresses).toEqual([]);
         expect(result.total).toBe(5);
       });
+    });
+  });
+
+  describe('findApprovedById', () => {
+    it('returns the dress when it exists and is approved', async () => {
+      const approvedDress = { id: 1, name: 'שמלה', status: DressStatus.APPROVED };
+      prisma.dress.findFirst.mockResolvedValue(approvedDress);
+
+      const result = await service.findApprovedById(1);
+
+      expect(result).toEqual(approvedDress);
+      expect(prisma.dress.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1, status: DressStatus.APPROVED },
+        }),
+      );
+    });
+
+    it('returns null for a dress that is not approved (or does not exist) - the query itself excludes it, not a post-hoc check', async () => {
+      prisma.dress.findFirst.mockResolvedValue(null);
+
+      const result = await service.findApprovedById(999);
+
+      expect(result).toBeNull();
     });
   });
 

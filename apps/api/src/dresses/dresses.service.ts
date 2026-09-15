@@ -241,6 +241,34 @@ export class DressesService {
     return { dresses, total };
   }
 
+  // Single-dress counterpart to findApproved, for pages that only need one
+  // dress (the public dress detail page's generateMetadata, in particular -
+  // fetching the entire catalog just to find() one id in it, which is what
+  // the frontend's client-side helper does, isn't something worth paying
+  // for on every server-rendered request). Same select shape and same
+  // status: APPROVED restriction, so it can never leak a draft/pending dress.
+  async findApprovedById(id: number) {
+    return this.prisma.dress.findFirst({
+      where: { id, status: DressStatus.APPROVED },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        color: true,
+        city: true,
+        viewCount: true,
+        status: true,
+        rejectionReason: true,
+        ownerId: true,
+        createdAt: true,
+        updatedAt: true,
+        sizes: { where: LIVE_OR_PENDING_REMOVAL },
+        photos: { where: LIVE_OR_PENDING_REMOVAL, orderBy: { sortOrder: 'asc' } },
+      },
+    });
+  }
+
   // Sorts by each dress's cheapest applicable size price. A dress with no
   // sizes at all always sorts last, regardless of direction - mirrors
   // getMinPrice/sortedDresses in app/page.tsx exactly, so moving this sort
