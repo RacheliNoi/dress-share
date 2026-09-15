@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DressShare — השכרת שמלות בקלות</title>
+<meta name="description" content="קטלוג, תיאום ותשלום במקום אחד — הצטרפו ל-DressShare.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;600;700&family=Rubik:wght@400;500;600;700;800&display=swap">
+<style>
+  :root {
+    --ink: #221f1f;
+    --ink-soft: #6b6260;
+    --ink-faint: #a89e9a;
+    --paper: #fbf6f3;
+    --surface: #ffffff;
+    --surface-sunken: #f3ece7;
+    --line: #e7ddd6;
+    --line-strong: #d8c9c0;
+    --accent: #9c3752;
+    --accent-deep: #7a2a40;
+    --accent-light: #e7a6b7;
+    --accent-soft: #f4dee3;
+    --success: #3f7a5c;
+    --success-soft: #e1efe6;
+    --warning: #b07c2c;
+    --warning-soft: #f6ead2;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  body {
+    direction: rtl;
+    font-family: 'Rubik', 'Segoe UI', Arial, sans-serif;
+    padding: clamp(20px, 4vw, 44px) clamp(16px, 5vw, 48px) 64px;
+  }
+
+  h1, h2, h3 { font-family: 'Frank Ruhl Libre', Georgia, serif; text-wrap: balance; margin: 0; }
+
+  .brand-row {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+
+  .brand-mark {
+    font-family: 'Frank Ruhl Libre', Georgia, serif;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+  }
+  .brand-mark b { color: var(--accent); }
+
+  /* ---------- Stage ---------- */
+
+  .stage-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .stage {
+    position: relative;
+    width: min(380px, 84vw);
+    aspect-ratio: 9 / 16;
+    max-height: min(660px, 72vh);
+    border-radius: 28px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 30px 60px -25px rgba(34, 31, 31, 0.35), 0 0 0 1px var(--line);
+  }
+
+  .progress-row {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 5;
+    display: flex;
+    gap: 5px;
+  }
+
+  .progress-seg {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.35);
+    overflow: hidden;
+  }
+
+  .stage[data-scene-theme="light"] .progress-seg { background: rgba(34, 31, 31, 0.14); }
+
+  .progress-seg > i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: #fff;
+    border-radius: 2px;
+  }
+
+  .stage[data-scene-theme="light"] .progress-seg > i { background: var(--accent-deep); }
+
+  .progress-seg.done > i { width: 100%; transition: none; }
+  .progress-seg.active > i { width: 0%; }
+  .progress-seg.active.run > i { width: 100%; transition: width linear; }
+
+  .tap-zones {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    /* Fixed left-to-right regardless of page direction, so "tap right =
+       next" always agrees with the visible prev/next buttons below (also
+       forced ltr) - letting both flip with inherited RTL would put them in
+       conflicting visual positions. */
+    direction: ltr;
+  }
+  .tap-zones button {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 56px 26px 68px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.45s ease;
+  }
+  .scene.active { opacity: 1; visibility: visible; }
+
+  .scene .inner > * {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: none;
+  }
+  .scene.active .inner > * {
+    animation: sceneUp 0.6s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  .scene.active .inner > *:nth-child(1) { animation-delay: .05s; }
+  .scene.active .inner > *:nth-child(2) { animation-delay: .16s; }
+  .scene.active .inner > *:nth-child(3) { animation-delay: .27s; }
+  .scene.active .inner > *:nth-child(4) { animation-delay: .38s; }
+  .scene.active .inner > *:nth-child(5) { animation-delay: .49s; }
+
+  @keyframes sceneUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene { transition: none; }
+    .scene .inner > * { animation: none !important; opacity: 1 !important; transform: none !important; }
+  }
+
+  .scene .inner { position: relative; z-index: 2; }
+
+  /* dark, brand-colored scenes */
+  .scene-dark { background: linear-gradient(160deg, var(--accent-deep), #5c1f30 78%); color: var(--accent-soft); }
+  .scene-dark .eyebrow-s { color: var(--accent-light); }
+  .scene-dark h2 { color: #fff; }
+  .scene-dark p { color: rgba(255,255,255,0.82); }
+
+  /* light, paper scenes */
+  .scene-light { background: var(--surface); color: var(--ink); }
+  .scene-light .eyebrow-s { color: var(--accent); }
+  .scene-light h2 { color: var(--accent-deep); }
+  .scene-light p { color: var(--ink-soft); }
+
+  .eyebrow-s {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .scene h2 {
+    margin-top: 10px;
+    font-size: clamp(22px, 6vw, 27px);
+    line-height: 1.22;
+    font-weight: 600;
+  }
+
+  .scene p.lede {
+    margin-top: 12px;
+    font-size: 14.5px;
+    line-height: 1.6;
+    max-width: 30ch;
+  }
+
+  .logo-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    font-family: 'Frank Ruhl Libre', Georgia, serif;
+    font-size: 30px;
+    font-weight: 700;
+  }
+  .scene-dark .logo-mark { background: rgba(255,255,255,0.92); }
+
+  .wordmark {
+    margin-top: 14px;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .wordmark b { color: var(--accent-light); }
+  .scene-light .wordmark b { color: var(--accent); }
+
+  /* step list */
+  .steps {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+  .step-dot {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+  }
+  .scene-dark .step-dot { background: rgba(255,255,255,0.16); color: #fff; }
+  .step-dot svg { width: 14px; height: 14px; }
+
+  /* problem scene chat bubbles */
+  .chatpile { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .bubble {
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: #fff;
+    padding: 7px 12px;
+    border-radius: 14px 14px 14px 4px;
+    font-size: 12.5px;
+    max-width: 76%;
+  }
+  .bubble.strike { text-decoration: line-through; opacity: 0.55; }
+  .bubble.right { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: rgba(255,255,255,0.22); }
+
+  /* email mock */
+  .email-card {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: 0 12px 24px -16px rgba(34,31,31,0.3);
+  }
+  .email-card .em-top { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-faint); }
+  .email-card .em-top svg { width: 15px; height: 15px; color: var(--accent); }
+  .email-card .em-title { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .email-card .em-body { margin-top: 3px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    background: var(--warning-soft);
+    color: var(--warning);
+  }
+
+  .card-mini {
+    margin-top: 18px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.24);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-mini svg { width: 22px; height: 22px; flex-shrink: 0; color: #fff; }
+  .card-mini span { font-size: 12.5px; color: rgba(255,255,255,0.88); }
+
+  .cta-btn {
+    position: relative;
+    z-index: 6;
+    margin-top: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    color: var(--accent-deep);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 11px 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 14px 28px -14px rgba(0,0,0,0.45);
+  }
+  .cta-btn:hover { background: var(--accent-soft); }
+
+  .url-line { margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.7); }
+
+  /* controls under stage */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    direction: ltr;
+  }
+  .ctrl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ctrl-btn svg { width: 16px; height: 16px; }
+
+  .scene-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .scene-dots button {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    background: var(--line-strong);
+    cursor: pointer;
+  }
+  .scene-dots button.active { background: var(--accent); width: 18px; border-radius: 4px; }
+
+  /* ---------- Companion section ---------- */
+
+  .companion {
+    max-width: 880px;
+    margin: 56px auto 0;
+  }
+
+  .companion-head {
+    text-align: center;
+    margin-bottom: 26px;
+  }
+  .companion-head h2 {
+    font-size: clamp(20px, 3vw, 25px);
+    font-weight: 600;
+    color: var(--accent-deep);
+  }
+  .companion-head p {
+    margin-top: 8px;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  .side-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 720px) {
+    .side-grid { grid-template-columns: 1fr; }
+  }
+
+  .side-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 22px 22px 24px;
+  }
+  .side-card h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .side-card .tag {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+  }
+  .feat-list {
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .feat-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+  }
+  .feat-list li svg {
+    flex-shrink: 0;
+    width: 17px;
+    height: 17px;
+    margin-top: 2px;
+    color: var(--success);
+  }
+  .feat-list li.soon svg { color: var(--warning); }
+  .feat-list li b { color: var(--ink); font-weight: 600; }
+
+  .soon-note {
+    max-width: 880px;
+    margin: 18px auto 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  .final-cta {
+    max-width: 520px;
+    margin: 44px auto 0;
+    text-align: center;
+  }
+  .final-cta a.big-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    background: var(--accent-deep);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 13px 28px;
+    border-radius: 999px;
+    text-decoration: none;
+  }
+  .final-cta a.big-btn:hover { background: var(--accent); }
+  .final-cta .fine { margin-top: 10px; font-size: 12px; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+
+<div class="brand-row">
+  <span class="brand-mark">Dress<b>Share</b></span>
+</div>
+
+<div class="stage-wrap">
+  <div class="stage" id="stage" data-scene-theme="dark">
+    <div class="progress-row" id="progressRow"></div>
+    <div class="tap-zones">
+      <button type="button" id="zonePrev" aria-label="הסצנה הקודמת"></button>
+      <button type="button" id="zoneNext" aria-label="הסצנה הבאה"></button>
+    </div>
+
+    <!-- Scene 1: Hero -->
+    <section class="scene scene-dark active" data-theme="dark">
+      <div class="inner" style="text-align:center;">
+        <div class="logo-mark">D</div>
+        <div class="wordmark">Dress<b>Share</b></div>
+        <h2>השמלה שתעשה<br>את השמחה שלך</h2>
+        <p class="lede" style="margin-inline:auto;">השכרת שמלות בקלות — קטלוג, תיאום ותשלום, במקום אחד.</p>
+      </div>
+    </section>
+
+    <!-- Scene 2: The problem -->
+    <section class="scene scene-dark" data-theme="dark">
+      <div class="inner">
+        <span class="eyebrow-s">המצב היום</span>
+        <h2>הודעות שהולכות לאיבוד, ותיאומים שאף אחד לא זוכר</h2>
+        <div class="chatpile">
+          <div class="bubble strike">היי, השמלה עוד פנויה לשבת?</div>
+          <div class="bubble right strike">רגע בודקת ומחזירה לך 🙏</div>
+          <div class="bubble strike">מישהי כבר ענתה לה בכלל?</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 3: Solution -->
+    <section class="scene scene-light" data-theme="light">
+      <div class="inner" style="text-align:center;">
+        <span class="eyebrow-s">הפתרון</span>
+        <h2>הכל במקום אחד</h2>
+        <p class="lede" style="margin-inline:auto;">קטלוג, זמינות בזמן אמת, צ'אט מובנה ותשלום — בלי לצאת מהאתר.</p>
+      </div>
+    </section>
+
+    <!-- Scene 4: Renter journey -->
+    <section class="scene scene-light" data-theme="light">
+      <div class="inner">
+        <span class="eyebrow-s">למחפשות שמלה</span>
+        <h2>בלי כאבי ראש, מהחיפוש ועד התיאום</h2>
+        <div class="steps">
+          <div class="step"><span class="step-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>מעיינות בקטלוג</div>
+          <div class="step"><span class="step-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>בוחרות תאריכים</div>
+          <div class="step"><span class="step-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11Z"/></svg></span>שולחות התעניינות</div>
+          <div class="step"><span class="step-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>מתאמות ישר בצ'אט</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 5: Owner journey -->
+    <section class="scene scene-dark" data-theme="dark">
+      <div class="inner">
+        <span class="eyebrow-s">למשכירות השמלה</span>
+        <h2>תזכורת ישר לתיבה, בכל פעם שמישהי מתעניינת</h2>
+        <div class="email-card">
+          <div class="em-top">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+            DressShare
+          </div>
+          <div class="em-title">מישהי מתעניינת בשמלה שלך 👗</div>
+          <div class="em-body">מישהי סימנה עניין בשמלת הערב הכחולה לתאריך 14.3. היכנסי לאתר כדי לאשר ולתאם.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 6: Payment - coming soon -->
+    <section class="scene scene-dark" data-theme="dark">
+      <div class="inner" style="text-align:center;">
+        <span class="badge">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          בקרוב
+        </span>
+        <h2 style="margin-top:14px;">תשלום באשראי, ישירות באתר</h2>
+        <p class="lede" style="margin-inline:auto;">בלי מעברים בין אפליקציות — כל התהליך יתנהל במקום אחד.</p>
+        <div class="card-mini">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+          <span>בפיתוח פעיל — נעדכן ברגע שזה עולה</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 7: CTA -->
+    <section class="scene scene-dark" data-theme="dark">
+      <div class="inner" style="text-align:center;">
+        <div class="logo-mark">D</div>
+        <h2 style="margin-top:14px;">מוכנות להתחיל?</h2>
+        <p class="lede" style="margin-inline:auto;">גלו את השמלה הבאה שלכן, או פרסמו את הראשונה משלכן.</p>
+        <a class="cta-btn" href="https://dressshare.co.il" target="_blank" rel="noopener noreferrer">
+          לכניסה לאתר
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <div class="url-line">dressshare.co.il</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="prevBtn" aria-label="הקודם">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M13 6l-6 6 6 6"/></svg>
+    </button>
+    <button class="ctrl-btn" id="playBtn" aria-label="השהיה/המשך">
+      <svg id="playIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    </button>
+    <button class="ctrl-btn" id="nextBtn" aria-label="הבא">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M11 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+
+  <div class="scene-dots" id="sceneDots"></div>
+</div>
+
+<div class="companion">
+  <div class="companion-head">
+    <h2>כל מה שמחכה לכן ב-DressShare</h2>
+    <p>בין אם אתן מחפשות את השמלה לרגע הבא שלכן, או שיש לכן שמלה שמחכה להזדמנות שלה — הכל במקום אחד.</p>
+  </div>
+
+  <div class="side-grid">
+    <div class="side-card">
+      <span class="tag">למחפשות שמלה</span>
+      <h3>שוכרות</h3>
+      <ul class="feat-list">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>קטלוג מלא</b> עם חיפוש, סינון לפי קטגוריה/צבע/עיר/מידה, וזמינות לפי תאריך</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>סימון עניין בלחיצה</b> — הבעלים מקבלת התראה ומאשרת, בלי טלפונים</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>צ'אט מובנה</b> לכל בקשה, ומועדפים לשמירת שמלות לפעם הבאה</span>
+        </li>
+        <li class="soon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          <span><b>תשלום באשראי באתר</b> — בקרוב</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="side-card">
+      <span class="tag">למשכירות השמלה</span>
+      <h3>בעלות שמלות</h3>
+      <ul class="feat-list">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>ניהול לוח זמנים והשכרות</b> במקום אחד — זמינות, חסימת תאריכים, ומעקב בקשות</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>מייל אוטומטי בכל פעם שמישהי מתעניינת</b> — אף פנייה לא מתפספסת</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>שיפור תמונות אוטומטי</b> — טשטוש פנים ורקע נקי, בלי עלות נוספת</span>
+        </li>
+        <li class="soon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          <span><b>קבלת תשלום באשראי דרך האתר</b> — בקרוב</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="soon-note">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    פריטים המסומנים "בקרוב" נמצאים בפיתוח ועדיין לא זמינים באתר בפועל.
+  </div>
+
+  <div class="final-cta">
+    <h2 style="font-size: 19px; color: var(--accent-deep);">מוכנות לנסות?</h2>
+    <a class="big-btn" href="https://dressshare.co.il" target="_blank" rel="noopener noreferrer">
+      כניסה ל-DressShare
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <div class="fine">dressshare.co.il</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var scenes = Array.prototype.slice.call(stage.querySelectorAll('.scene'));
+  var progressRow = document.getElementById('progressRow');
+  var sceneDots = document.getElementById('sceneDots');
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var DURATION = 4800;
+
+  var current = 0;
+  var playing = !reduceMotion;
+  var timer = null;
+  var segStartTime = 0;
+  var segRemaining = DURATION;
+
+  scenes.forEach(function (scene, i) {
+    var seg = document.createElement('div');
+    seg.className = 'progress-seg';
+    var fill = document.createElement('i');
+    seg.appendChild(fill);
+    progressRow.appendChild(seg);
+
+    var dot = document.createElement('button');
+    dot.type = 'button';
+    dot.setAttribute('aria-label', 'סצנה ' + (i + 1));
+    dot.addEventListener('click', function () { goTo(i); });
+    sceneDots.appendChild(dot);
+  });
+
+  var segs = Array.prototype.slice.call(progressRow.children);
+  var dots = Array.prototype.slice.call(sceneDots.children);
+
+  function render() {
+    scenes.forEach(function (scene, i) {
+      scene.classList.toggle('active', i === current);
+    });
+    stage.setAttribute('data-scene-theme', scenes[current].getAttribute('data-theme'));
+    segs.forEach(function (seg, i) {
+      seg.classList.remove('done', 'active', 'run');
+      var fill = seg.firstChild;
+      fill.style.transition = 'none';
+      if (i < current) {
+        seg.classList.add('done');
+      } else if (i === current) {
+        seg.classList.add('active');
+        fill.style.width = '0%';
+      } else {
+        fill.style.width = '0%';
+      }
+    });
+    dots.forEach(function (dot, i) { dot.classList.toggle('active', i === current); });
+  }
+
+  function startSegment(remaining) {
+    var seg = segs[current];
+    var fill = seg.firstChild;
+    seg.classList.add('run');
+    // force reflow so the transition actually starts from the current width
+    fill.getBoundingClientRect();
+    fill.style.transition = 'width ' + remaining + 'ms linear';
+    fill.style.width = '100%';
+    segStartTime = Date.now();
+    segRemaining = remaining;
+  }
+
+  function clearTimer() {
+    if (timer) { clearTimeout(timer); timer = null; }
+  }
+
+  function scheduleAdvance(remaining) {
+    clearTimer();
+    if (!playing) return;
+    startSegment(remaining);
+    timer = setTimeout(function () {
+      goTo((current + 1) % scenes.length);
+    }, remaining);
+  }
+
+  function goTo(index) {
+    current = index;
+    render();
+    if (playing) scheduleAdvance(DURATION);
+  }
+
+  function setPlaying(next) {
+    if (next === playing) return;
+    playing = next;
+    var icon = document.getElementById('playIcon');
+    if (playing) {
+      icon.innerHTML = '<rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect>';
+      scheduleAdvance(segRemaining > 0 ? segRemaining : DURATION);
+    } else {
+      icon.innerHTML = '<path d="M8 5v14l11-7z"></path>';
+      clearTimer();
+      var elapsed = Date.now() - segStartTime;
+      segRemaining = Math.max(300, segRemaining - elapsed);
+      var seg = segs[current];
+      var fill = seg.firstChild;
+      var computed = getComputedStyle(fill).width;
+      fill.style.transition = 'none';
+      fill.style.width = computed;
+    }
+  }
+
+  document.getElementById('nextBtn').addEventListener('click', function () { goTo((current + 1) % scenes.length); });
+  document.getElementById('prevBtn').addEventListener('click', function () { goTo((current - 1 + scenes.length) % scenes.length); });
+  document.getElementById('zoneNext').addEventListener('click', function () { goTo((current + 1) % scenes.length); });
+  document.getElementById('zonePrev').addEventListener('click', function () { goTo((current - 1 + scenes.length) % scenes.length); });
+  var userPaused = reduceMotion;
+
+  document.getElementById('playBtn').addEventListener('click', function () {
+    userPaused = playing;
+    setPlaying(!playing);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight') goTo((current + 1) % scenes.length);
+    if (e.key === 'ArrowLeft') goTo((current - 1 + scenes.length) % scenes.length);
+    if (e.key === ' ') { e.preventDefault(); userPaused = playing; setPlaying(!playing); }
+  });
+
+  // Hover pauses without counting as an explicit user pause, so leaving the
+  // stage resumes autoplay - unless the user had already paused it
+  // themselves (via the button/spacebar), which sticks until they resume it
+  // the same way.
+  stage.addEventListener('mouseenter', function () { setPlaying(false); });
+  stage.addEventListener('mouseleave', function () { if (!userPaused) setPlaying(true); });
+
+  render();
+  if (playing) scheduleAdvance(DURATION);
+})();
+</script>
+
+</body>
+</html>

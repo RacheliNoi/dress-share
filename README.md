@@ -16,6 +16,9 @@ UI is in Hebrew with full RTL support.
 - Returning to the catalog (or favorites) from a dress page via its "back" button restores the exact scroll position, pagination page, and active filters/sort/search instead of jumping back to page 1 at the top — a `router.back()` real history pop, paired with an in-memory cache of both the last fetched results and the view state itself, so the grid re-renders at full height on the same page instantly instead of flashing an empty loading skeleton first (which would otherwise cut the browser's own scroll restoration short)
 - "איך זה עובד" (how it works) section below the grid — four numbered steps from browsing to renting, revealed with a staggered scroll-in animation the first time it enters the viewport, with a small bouncing arrow under the title bar that smooth-scrolls straight to it
 
+**Marketing**
+- A standalone, animated "story"-format promo page at `/promo.html` (`apps/web/public/promo.html`) — a self-contained static file (own HTML/CSS/JS, no dependency on the rest of the app or any external account) meant to be shared directly for real distribution. Payment-by-credit-card is explicitly marked "coming soon" there, since it isn't live yet.
+
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
 - Editing an already-approved listing doesn't affect what's publicly visible until an admin approves the edit — proposed changes are held in a separate "pending" shadow (`pendingDetails`, `pendingAction: ADD/REMOVE` on sizes/photos) rather than mutating the live row
