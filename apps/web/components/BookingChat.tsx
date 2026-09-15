@@ -87,6 +87,26 @@ export default function BookingChat({ bookingId }: { bookingId: number }) {
 
   return (
     <div className="rounded-2xl border border-line bg-surface-sunken/40 p-3">
+      <div className="mb-2 flex items-start gap-2 rounded-xl bg-accent-soft/40 px-3 py-2 text-xs leading-5 text-accent-deep">
+        <svg
+          className="mt-0.5 h-4 w-4 shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden
+        >
+          <path d="M12 3 4 6v6c0 4.5 3.2 7.7 8 9 4.8-1.3 8-4.5 8-9V6l-8-3Z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+
+        <p>
+          <b className="font-bold">לתשומת לבכן:</b> הצ&apos;אט מיועד לתיאום
+          טכני של ההשכרה (תאריכים, מידות, מסירה) בלבד — השיחה עשויה להיות
+          מבוקרת.
+        </p>
+      </div>
+
       {loading ? (
         <div className="space-y-2 py-2">
           <div className="h-8 w-2/3 animate-pulse rounded-2xl bg-zinc-200" />

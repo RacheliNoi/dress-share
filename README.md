@@ -38,7 +38,7 @@ UI is in Hebrew with full RTL support.
 - Concurrency-safe: capacity checks and inserts run inside a Postgres `SERIALIZABLE` transaction with automatic retry, so two simultaneous requests for the last unit of a size can't both succeed
 - Stale `INTERESTED` holds that never convert to a confirmed rental auto-expire after 7 days (scheduled job, also runs once on startup so a restart doesn't wait for the next midnight run) and release their date/size back into the calendar
 - Owners can block off date ranges for their own reasons (cleaning, personal use) without creating a fake booking — a separate `DressAvailabilityBlock`, folded into the same public availability feed the calendar reads
-- In-app chat per booking (simple polling, not WebSockets), shared by one component on both the renter's and owner's screens, so fitting/logistics coordination stays on-platform instead of pushing people to WhatsApp before a booking is real
+- In-app chat per booking (simple polling, not WebSockets), shared by one component on both the renter's and owner's screens, so fitting/logistics coordination stays on-platform instead of pushing people to WhatsApp before a booking is real — a standing notice above every chat asks both sides to keep messages to logistics (dates, sizes, handoff) and that conversations may be reviewed
 
 **Renter-facing UI**
 - "מעוניינת בהשכרה" (interested in renting) action on the public dress page, gated to logged-in non-owners — supports picking multiple sizes and multiple units of the same size in one request, respecting each size's real remaining capacity. Size picking is gated behind choosing dates first (capacity is meaningless without a date range), and availability re-fetches on every date change and after a successful submission
