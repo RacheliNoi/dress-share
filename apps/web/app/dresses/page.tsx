@@ -3,7 +3,7 @@
 import { ReactElement, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getToken, logout } from "@/lib/auth";
+import { getToken, getUser, logout, markCameFromDressList } from "@/lib/auth";
 import {
   ApiError,
   Dress,
@@ -112,13 +112,35 @@ barColor: "bg-error",
 },
 };
 
+// Module-scope (not state) so it survives this page unmounting when the
+// owner clicks into one of her dresses, and is still there when she
+// navigates back via router.back() - see the identical, more-detailed
+// comment on catalogResultCache in app/page.tsx for why this is what makes
+// scroll restoration actually work (no loading-skeleton flash on return).
+// Keyed by user id so switching accounts in the same tab never shows a
+// stale list.
+let myDressesCache: { userId: number; dresses: Dress[] } | null = null;
+
+// Same hydration-safe "skip the checkingAuth gate on a later client-side
+// remount" pattern as FavoritesPage - see that file's identical flag for
+// the full reasoning.
+let hasMountedBefore = false;
+
 export default function DressesPage() {
 const router = useRouter();
 
-const [dresses, setDresses] = useState<Dress[]>([]);
-const [loading, setLoading] = useState(true);
+const currentUserId = getUser()?.id;
+const cached =
+  currentUserId !== undefined && myDressesCache?.userId === currentUserId
+    ? myDressesCache
+    : null;
+
+const [dresses, setDresses] = useState<Dress[]>(() => cached?.dresses ?? []);
+const [loading, setLoading] = useState(() => !cached);
 const [error, setError] = useState("");
-const [checkingAuth, setCheckingAuth] = useState(true);
+const [checkingAuth, setCheckingAuth] = useState(() =>
+  hasMountedBefore ? !getToken() : true,
+);
 const [failedImageIds, setFailedImageIds] = useState<Set<number>>(new Set());
 const [pendingDelete, setPendingDelete] = useState<Dress | null>(null);
 const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -126,18 +148,30 @@ const [deleteError, setDeleteError] = useState("");
 
 async function loadDresses() {
 const token = getToken();
+const userId = getUser()?.id;
 
-if (!token) {
+if (!token || userId === undefined) {
   router.push("/login");
   return;
 }
 
-try {
-setLoading(true);
-setError("");
+const hasCache = myDressesCache?.userId === userId;
 
+// A cache hit (returning here via router.back()) renders instantly at
+// the right height instead of the loading skeleton, then this still
+// silently revalidates in the background rather than blocking on it.
+if (hasCache) {
+  setDresses(myDressesCache!.dresses);
+  setError("");
+} else {
+  setLoading(true);
+  setError("");
+}
+
+try {
   const data = await getMyDresses(token);
   setDresses(data);
+  myDressesCache = { userId, dresses: data };
 } catch (err) {
   if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
     logout();
@@ -145,14 +179,20 @@ setError("");
     return;
   }
 
-  setError("לא הצלחנו לטעון את השמלות. נסי שוב.");
+  if (!hasCache) {
+    setError("לא הצלחנו לטעון את השמלות. נסי שוב.");
+  }
 } finally {
-  setLoading(false);
+  if (!hasCache) {
+    setLoading(false);
+  }
 }
 
 }
 
 useEffect(() => {
+hasMountedBefore = true;
+
 if (!getToken()) {
   router.push("/login");
   return;
@@ -208,6 +248,12 @@ async function handleConfirmDelete() {
   try {
     await deleteDress(token, pendingDelete.id);
     setDresses((current) => current.filter((dress) => dress.id !== pendingDelete.id));
+    if (myDressesCache) {
+      myDressesCache = {
+        ...myDressesCache,
+        dresses: myDressesCache.dresses.filter((dress) => dress.id !== pendingDelete.id),
+      };
+    }
     setPendingDelete(null);
   } catch (err) {
     setDeleteError(
@@ -320,6 +366,7 @@ return (<main
             <Link
               key={dress.id}
               href={`/dresses/${dress.id}`}
+              onClick={markCameFromDressList}
               className="animate-fade-scale-in group block overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-200/60 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
               style={{ animationDelay: `${Math.min(index, 10) * 60}ms` }}
             >

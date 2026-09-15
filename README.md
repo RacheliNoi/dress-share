@@ -13,7 +13,7 @@ UI is in Hebrew with full RTL support.
 - Server-side pagination (`page`/`limit`, with total match count)
 - Availability-by-date filtering, layered on top of the paginated results
 - Downloadable PDF catalog (`/catalog-pdf`) via the browser's own print-to-PDF, listing every approved dress with a real clickable link to its page — for anyone who can browse the images offline but can't reach the live site to click through directly
-- Returning to the catalog (or favorites) from a dress page via its "back" button restores the exact scroll position, pagination page, and active filters/sort/search instead of jumping back to page 1 at the top — a `router.back()` real history pop, paired with an in-memory cache of both the last fetched results and the view state itself, so the grid re-renders at full height on the same page instantly instead of flashing an empty loading skeleton first (which would otherwise cut the browser's own scroll restoration short)
+- Returning to the catalog (or favorites, or the owner's own "my dresses" list) from a dress page via its "back" button restores the exact scroll position (and, on the catalog, pagination page and active filters/sort/search too) instead of jumping back to the top — a `router.back()` real history pop, paired with an in-memory cache of the last fetched results (and view state, on the catalog) so the grid re-renders at full height on the same page instantly instead of flashing an empty loading skeleton first (which would otherwise cut the browser's own scroll restoration short)
 - "איך זה עובד" (how it works) section below the grid — four numbered steps from browsing to renting, revealed with a staggered scroll-in animation the first time it enters the viewport, with a small bouncing arrow under the title bar that smooth-scrolls straight to it, and a "back to top" button that appears once scrolled that far back down the other way
 
 **Marketing**
@@ -61,10 +61,12 @@ UI is in Hebrew with full RTL support.
 - Routed through a single `NotificationsService.send()` choke point — the eventual domain-verified `from` address change, or any future provider swap, touches one method, not each trigger site
 
 **Auth & authorization**
-- JWT-based authentication, role-based access control (`USER` / `ADMIN`)
+- JWT-based authentication, role-based access control (`USER` / `ADMIN`) — the API refuses to start without a `JWT_SECRET` env var (no insecure hardcoded fallback)
 - Server-side ownership checks on every mutating endpoint — never trusts a client-supplied owner/role claim
-- Rate-limited (5 requests/minute per IP) on every `/auth` route — blocks brute-force login/credential-stuffing and registration/reset-email spam
-- Login/register support a `?redirect=` target (validated as a same-origin relative path, never an open redirect) — a logged-out visitor who tries to express interest in a dress lands back on that exact dress page after signing in, instead of the homepage; the login↔register cross-link carries the same param through so switching between them doesn't lose it
+- Password strength enforced server-side (min 8 characters, at least one letter and one digit) on register, password change, and password reset alike
+- Rate-limited (5 requests/minute per IP) on every `/auth` route, and on feedback/review submission and dress photo upload — blocks brute-force login/credential-stuffing, registration/reset-email spam, and repeated hits on the CPU-heavy photo-processing pipeline
+- Uploaded photos (dress listings and wardrobe items) are restricted to real image types (JPEG/PNG/WebP/GIF) and capped at 10MB per file — closes a stored-content and resource-exhaustion gap an unrestricted upload would otherwise leave open
+- Login/register support a `?redirect=` target, resolved through the same URL parser the browser's own navigation uses and only trusted when it still resolves to this origin (rather than a naive string-prefix check, which a crafted value using stripped-by-the-parser control characters could bypass) — a logged-out visitor who tries to express interest in a dress lands back on that exact dress page after signing in, instead of the homepage; the login↔register cross-link carries the same param through so switching between them doesn't lose it
 
 **Admin**
 - Review queue for pending listings and pending edits, with approve/reject + rejection reason

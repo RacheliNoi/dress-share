@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { getToken } from "@/lib/auth";
+import { cameFromDressList, getToken } from "@/lib/auth";
 import { ApiError, Dress, getDressImageUrl, getMyDresses } from "@/lib/api";
 import Header from "@/components/Header";
 import DressAvailabilityManager from "@/components/DressAvailabilityManager";
@@ -213,17 +212,31 @@ export default function MyDressDetailsPage() {
   const activePhoto = photos[activePhotoIndex];
   const activePhotoFailed = activePhoto ? failedPhotoIds.has(activePhoto.id) : false;
 
+  // router.back() is a real history pop, so /dresses is restored exactly
+  // where she left it (scroll position, no loading-skeleton flash) - see
+  // the identical goBackToCatalog on the public dress page for why
+  // cameFromDressList() (not window.history.length) is the right signal for
+  // "is that pop actually safe".
+  function goBackToDressList() {
+    if (cameFromDressList()) {
+      router.back();
+    } else {
+      router.push("/dresses");
+    }
+  }
+
   return (
     <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
       <Header />
 
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 lg:py-14">
-        <Link
-          href="/dresses"
+        <button
+          type="button"
+          onClick={goBackToDressList}
           className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-zinc-500 transition hover:text-accent"
         >
           → חזרה לשמלות שלי
-        </Link>
+        </button>
 
         {loading ? (
           <div className="grid gap-8 lg:grid-cols-2">
@@ -244,12 +257,13 @@ export default function MyDressDetailsPage() {
               {error}
             </h1>
 
-            <Link
-              href="/dresses"
+            <button
+              type="button"
+              onClick={goBackToDressList}
               className="mt-7 inline-flex rounded-full bg-zinc-900 px-6 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-zinc-700"
             >
               חזרה לשמלות שלי
-            </Link>
+            </button>
           </div>
         ) : dress ? (
           <div className="grid gap-8 lg:grid-cols-2">

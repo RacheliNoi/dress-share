@@ -72,29 +72,46 @@ export function logout(): void {
 }
 
 // Validates a `?redirect=` query value before ever handing it to router.push
-// - must be a same-origin relative path (a bare "/", never "//" or "/\",
-// both of which a browser can treat as protocol-relative to a different
-// origin) so a crafted login/register link can never send a user off-site
-// after authenticating. Falls back to "/" for anything else, including a
-// missing value.
+// - resolves it exactly the way the browser/router actually will (via the
+// same WHATWG URL parser Next's router uses internally) and only trusts the
+// result if it still lands on this origin. A naive string prefix check
+// (reject "//", "/\\", ...) is NOT enough here: the URL parser silently
+// strips ASCII tab/newline/CR characters anywhere in the input before
+// resolving it, so a value like "/\t/evil.com" passes a prefix check
+// unmodified but actually resolves to https://evil.com/ once navigated to -
+// a real open-redirect bypass. Resolving through URL first means whatever
+// the parser does to the string, this check sees the same final result the
+// navigation would. Falls back to "/" for anything invalid, cross-origin, or
+// missing.
 export function safeRedirectPath(raw: string | null | undefined): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
+  if (!raw || typeof window === "undefined") {
     return "/";
   }
 
-  return raw;
+  try {
+    const resolved = new URL(raw, window.location.origin);
+
+    if (resolved.origin !== window.location.origin) {
+      return "/";
+    }
+
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return "/";
+  }
 }
 
-// Marks that the user reached a dress detail page via an in-app link
-// (catalog or favorites) in this tab. window.history.length is useless for
-// this - browsers already start a fresh tab's history at length 2 (an
-// initial blank document plus the first real page), so it's always
-// "truthy" and can't tell a real in-app back-target apart from one that
-// doesn't exist. This flag is what the dress page's "back to catalog"
-// button checks to decide whether router.back() is actually safe (there's
-// a real previous in-app route in this tab) versus just navigating to "/"
-// directly. Deliberately never cleared - once true for this tab, back()
-// stays safe for the rest of the session.
+// Marks that the user reached a dress detail page via an in-app link (the
+// public catalog, favorites, or the owner's own "my dresses" list) in this
+// tab. window.history.length is useless for this - browsers already start a
+// fresh tab's history at length 2 (an initial blank document plus the first
+// real page), so it's always "truthy" and can't tell a real in-app
+// back-target apart from one that doesn't exist. This flag is what each of
+// those dress detail pages' "back" button checks to decide whether
+// router.back() is actually safe (there's a real previous in-app route in
+// this tab) versus just navigating to the list page directly. Deliberately
+// never cleared - once true for this tab, back() stays safe for the rest of
+// the session.
 export function markCameFromDressList(): void {
   if (typeof window === "undefined") {
     return;
