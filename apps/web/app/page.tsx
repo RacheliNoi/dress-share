@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import DressCard from "@/components/DressCard";
+import HowItWorks from "@/components/HowItWorks";
 import CatalogFilters, { SortOption } from "@/components/CatalogFilters";
 import {
   CatalogFilterParams,
@@ -984,6 +985,8 @@ export default function CatalogPage() {
           </div>
         </div>
       </div>
+
+      <HowItWorks />
     </main>
   );
 }
