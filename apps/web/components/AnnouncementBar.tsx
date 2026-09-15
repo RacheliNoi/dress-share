@@ -47,7 +47,7 @@ export default function AnnouncementBar() {
       className="relative flex flex-wrap items-center justify-center gap-3 bg-accent-deep px-12 py-2.5 text-center text-sm text-white"
     >
       <span className="font-medium">
-        🎉 האתר כרגע בהרצה — הצטרפו כמשכירות והעלו שמלות בחינם!
+        האתר כרגע בהרצה — הצטרפו כמשכירות והעלו שמלות בחינם!
       </span>
 
       <Link

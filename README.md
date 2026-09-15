@@ -20,7 +20,6 @@ UI is in Hebrew with full RTL support.
 - A standalone, animated "story"-format promo page at `/promo.html` (`apps/web/public/promo.html`) — a self-contained static file (own HTML/CSS/JS, no dependency on the rest of the app or any external account) meant to be shared directly for real distribution. Payment-by-credit-card is explicitly marked "coming soon" there, since it isn't live yet.
 - Per-dress Open Graph/Twitter Card metadata — sharing a specific dress's link shows that dress's own name, city/category, and photo, not the site's generic brand card. `app/dress/[id]/page.tsx` is a real Server Component with a `generateMetadata` that fetches server-side (crawlers never run the client-side fetch the page content itself uses) against a dedicated single-dress endpoint (`GET /dresses/approved/:id`) rather than the paginated catalog list
 - A dismissible announcement bar above the header on the catalog page advertising the free launch period, with a CTA straight to registration (or the new-listing wizard, if already logged in) — dismissal is remembered per-browser (`localStorage`) so it doesn't nag a returning visitor
-- A "site is in its free launch period" banner on both owner-facing listing screens (the dress list and the new-listing wizard) — purely informational copy, no backend enforcement tied to it
 
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
