@@ -8,12 +8,14 @@ import {
   ApiError,
   BookingStatus,
   BookingWithDress,
+  createReview,
   getDressImageUrl,
   getMyBookingsAsRenter,
 } from "@/lib/api";
 import Header from "@/components/Header";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import BookingChat from "@/components/BookingChat";
+import StarRating from "@/components/ui/StarRating";
 
 // Labels written from the renter's own point of view - this page shows a
 // renter their OWN requests, so "מישהו מתעניין" ("someone is interested," a
@@ -44,6 +46,54 @@ export default function MyRequestsPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [failedImageIds, setFailedImageIds] = useState<Set<number>>(new Set());
   const [openChatId, setOpenChatId] = useState<number | null>(null);
+
+  const [openReviewId, setOpenReviewId] = useState<number | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+
+  function toggleReviewForm(bookingId: number) {
+    if (openReviewId === bookingId) {
+      setOpenReviewId(null);
+      return;
+    }
+
+    setOpenReviewId(bookingId);
+    setReviewRating(0);
+    setReviewComment("");
+    setReviewError("");
+  }
+
+  async function handleSubmitReview(bookingId: number) {
+    const token = getToken();
+
+    if (!token || reviewRating < 1) {
+      return;
+    }
+
+    setReviewSubmitting(true);
+    setReviewError("");
+
+    try {
+      const review = await createReview(token, bookingId, reviewRating, reviewComment);
+      // Patches the one booking in place - matches the review the backend
+      // just created, so the "rate it" prompt disappears immediately
+      // without waiting on (or triggering) a full reload.
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === bookingId ? { ...booking, review } : booking,
+        ),
+      );
+      setOpenReviewId(null);
+    } catch (err) {
+      setReviewError(
+        err instanceof ApiError ? err.message : "השליחה נכשלה. נסי שוב.",
+      );
+    } finally {
+      setReviewSubmitting(false);
+    }
+  }
 
   async function loadBookings() {
     const token = getToken();
@@ -165,6 +215,14 @@ export default function MyRequestsPage() {
               };
 
               const isChatOpen = openChatId === booking.id;
+              const isReviewOpen = openReviewId === booking.id;
+              // Derived, not a status the backend ever sets - nothing here
+              // moves a booking to BookingStatus.COMPLETED, so "the rental
+              // is over" is just RENTED plus a past end date. The backend
+              // re-checks this exact condition on submit regardless.
+              const canReview =
+                booking.status === "RENTED" &&
+                new Date(booking.endDate) < new Date();
 
               return (
                 <li
@@ -216,19 +274,88 @@ export default function MyRequestsPage() {
                         {formatDate(booking.startDate)} – {formatDate(booking.endDate)}
                       </p>
 
-                      <button
-                        type="button"
-                        onClick={() => setOpenChatId(isChatOpen ? null : booking.id)}
-                        className="mt-2 text-xs font-bold text-accent underline underline-offset-4"
-                      >
-                        {isChatOpen ? "סגירת הצ'אט" : "צ'אט עם בעלת השמלה"}
-                      </button>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <button
+                          type="button"
+                          onClick={() => setOpenChatId(isChatOpen ? null : booking.id)}
+                          className="text-xs font-bold text-accent underline underline-offset-4"
+                        >
+                          {isChatOpen ? "סגירת הצ'אט" : "צ'אט עם בעלת השמלה"}
+                        </button>
+
+                        {booking.review ? (
+                          <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                            הדירוג שלך:
+                            <StarRating rating={booking.review.rating} />
+                          </span>
+                        ) : (
+                          canReview && (
+                            <button
+                              type="button"
+                              onClick={() => toggleReviewForm(booking.id)}
+                              className="text-xs font-bold text-accent underline underline-offset-4"
+                            >
+                              {isReviewOpen ? "סגירה" : "דרגי את החוויה"}
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   {isChatOpen && (
                     <div className="border-t border-zinc-100 p-4">
                       <BookingChat bookingId={booking.id} />
+                    </div>
+                  )}
+
+                  {isReviewOpen && (
+                    <div className="border-t border-zinc-100 p-4">
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            aria-label={`דירוג ${star} מתוך 5`}
+                            className="p-0.5"
+                          >
+                            <svg
+                              className={`h-6 w-6 ${
+                                star <= reviewRating ? "text-warning" : "text-zinc-300"
+                              }`}
+                              viewBox="0 0 24 24"
+                              fill={star <= reviewRating ? "currentColor" : "none"}
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              aria-hidden
+                            >
+                              <path d="m12 2.5 2.9 6.3 6.9.8-5.1 4.8 1.4 6.8-6.1-3.4-6.1 3.4 1.4-6.8-5.1-4.8 6.9-.8Z" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+
+                      <textarea
+                        value={reviewComment}
+                        onChange={(event) => setReviewComment(event.target.value)}
+                        placeholder="ספרי על החוויה (לא חובה)"
+                        rows={2}
+                        className="mt-2 w-full rounded-xl border border-line-strong bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                      />
+
+                      {reviewError && (
+                        <p className="mt-1 text-xs text-error">{reviewError}</p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleSubmitReview(booking.id)}
+                        disabled={reviewSubmitting || reviewRating < 1}
+                        className="mt-2 rounded-full bg-ink px-4 py-2 text-sm font-bold text-white transition hover:bg-ink/80 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {reviewSubmitting ? "שולחת..." : "שליחת דירוג"}
+                      </button>
                     </div>
                   )}
                 </li>

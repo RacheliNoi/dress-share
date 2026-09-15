@@ -42,6 +42,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   bookingMessages     BookingMessage[]
   favorites           Favorite[]
+  reviews             Review[]
 }
 
 // A password-reset request creates exactly one of these rows. Only a hash of
@@ -88,6 +89,12 @@ model Dress {
   // fire-and-forget endpoint, not part of the pendingDetails edit-shadow
   // system below, since it's a live counter rather than editable content.
   viewCount       Int         @default(0)
+  // Denormalized from Review - recomputed (via aggregate, not incremental
+  // math, to avoid floating-point drift) every time a review is created for
+  // this dress. Read directly by the catalog/detail queries so showing a
+  // rating never costs a join or a live aggregate on every page view.
+  averageRating   Float       @default(0)
+  reviewCount     Int         @default(0)
   status          DressStatus @default(DRAFT)
   rejectionReason String?
   ownerId         Int
@@ -117,6 +124,7 @@ model Dress {
   bookings           Booking[]
   availabilityBlocks DressAvailabilityBlock[]
   favoritedBy        Favorite[]
+  reviews            Review[]
 
   @@index([ownerId])
   @@index([status])
@@ -227,9 +235,30 @@ model Booking {
   renter User? @relation(fields: [renterId], references: [id], onDelete: SetNull)
 
   messages BookingMessage[]
+  review   Review?
 
   @@index([dressId, startDate, endDate])
   @@index([renterId])
+}
+
+// One review per booking (@@unique below), left by the renter once the
+// rental period is genuinely over - "over" is derived (RENTED +
+// endDate in the past), not a status transition, since nothing else in
+// this codebase ever moves a booking to the COMPLETED enum value either.
+model Review {
+  id        Int      @id @default(autoincrement())
+  bookingId Int      @unique
+  dressId   Int
+  renterId  Int
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  dress   Dress   @relation(fields: [dressId], references: [id], onDelete: Cascade)
+  renter  User    @relation(fields: [renterId], references: [id], onDelete: Cascade)
+
+  @@index([dressId])
 }
 
 enum BookingStatus {

@@ -612,6 +612,10 @@ export class BookingsService {
             },
           },
         },
+        // null once the rental is over and no review has been left yet -
+        // lets "my requests" show a "rate it" prompt without a second
+        // request per booking, same reasoning as the lead photo above.
+        review: true,
       },
       orderBy: { startDate: 'asc' },
     });

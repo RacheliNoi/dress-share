@@ -5,6 +5,7 @@ import { CSSProperties, useState } from "react";
 import { Dress, getDressImageUrl } from "@/lib/api";
 import { markCameFromDressList } from "@/lib/auth";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import StarRating from "@/components/ui/StarRating";
 
 function formatShortDate(iso: string) {
   return new Intl.DateTimeFormat("he-IL", {
@@ -121,6 +122,12 @@ export default function DressCard({
             <h3 className="truncate text-base font-black text-zinc-900 sm:text-lg">
               {dress.name}
             </h3>
+
+            {dress.reviewCount > 0 && (
+              <div className="mt-1">
+                <StarRating rating={dress.averageRating} count={dress.reviewCount} />
+              </div>
+            )}
 
             <p className="mt-1 truncate text-xs text-zinc-500 sm:text-sm">
               {dress.category || "ללא קטגוריה"}

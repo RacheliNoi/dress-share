@@ -55,6 +55,9 @@ export type Dress = {
   city: string | null;
   // Public dress/[id] page views only - see incrementDressView.
   viewCount: number;
+  // Denormalized from Review - see refreshDressRating on the backend.
+  averageRating: number;
+  reviewCount: number;
   status: DressStatus;
   rejectionReason: string | null;
   ownerId: number;
@@ -324,16 +327,50 @@ export function getDressBookings(token: string, dressId: number) {
 // caller, with just enough of the related dress (name + lead photo) to
 // render a card. dress is always present (GET /bookings/as-renter always
 // includes it), never optional here.
+export type Review = {
+  id: number;
+  bookingId: number;
+  dressId: number;
+  renterId: number;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+};
+
+export type ReviewWithRenter = Review & {
+  renter: { name: string | null };
+};
+
 export type BookingWithDress = Booking & {
   dress: {
     id: number;
     name: string;
     photos: DressPhoto[];
   };
+  // null until the renter leaves a review for this (completed) booking -
+  // lets "my requests" show a "rate it" prompt without a second request.
+  review: Review | null;
 };
 
 export function getMyBookingsAsRenter(token: string) {
   return request<BookingWithDress[]>("/bookings/as-renter", { token });
+}
+
+export function createReview(
+  token: string,
+  bookingId: number,
+  rating: number,
+  comment?: string,
+) {
+  return request<Review>("/reviews", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ bookingId, rating, comment }),
+  });
+}
+
+export function getDressReviews(dressId: number) {
+  return request<ReviewWithRenter[]>(`/reviews?dressId=${dressId}`);
 }
 
 // Owner-only date hold, deliberately not a Booking - no renter, no size,

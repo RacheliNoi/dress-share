@@ -6,13 +6,31 @@ import Header from "@/components/Header";
 import DressAvailabilityCalendar from "@/components/DressAvailabilityCalendar";
 import InterestedBookingButton from "@/components/InterestedBookingButton";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
-import { Dress, getApprovedDressById, getDressImageUrl, incrementDressView } from "@/lib/api";
+import StarRating from "@/components/ui/StarRating";
+import {
+  Dress,
+  ReviewWithRenter,
+  getApprovedDressById,
+  getDressImageUrl,
+  getDressReviews,
+  incrementDressView,
+} from "@/lib/api";
 import { cameFromDressList } from "@/lib/auth";
+
+function formatReviewDate(iso: string) {
+  return new Intl.DateTimeFormat("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(iso));
+}
 
 export default function DressDetailClient({ id }: { id: string }) {
   const router = useRouter();
 
   const [dress, setDress] = useState<Dress | null>(null);
+  const [reviews, setReviews] = useState<ReviewWithRenter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
@@ -66,6 +84,29 @@ export default function DressDetailClient({ id }: { id: string }) {
 
     load();
   }, [id]);
+
+  // Separate from the dress load above (dress.reviewCount is just a number,
+  // not the review list itself) - only fires once there's an approved dress
+  // to show reviews for, not on every render.
+  useEffect(() => {
+    if (!dress) {
+      return;
+    }
+
+    let cancelled = false;
+
+    getDressReviews(dress.id)
+      .then((data) => {
+        if (!cancelled) {
+          setReviews(data);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dress]);
 
   const photos = dress
     ? [...dress.photos].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -201,6 +242,16 @@ export default function DressDetailClient({ id }: { id: string }) {
                 {dress.name}
               </h1>
 
+              {dress.reviewCount > 0 && (
+                <div className="mt-2">
+                  <StarRating
+                    rating={dress.averageRating}
+                    count={dress.reviewCount}
+                    size="md"
+                  />
+                </div>
+              )}
+
               <p className="mt-1 text-xs font-medium text-zinc-400">
                 {dress.viewCount} {dress.viewCount === 1 ? "צפייה" : "צפיות"}
               </p>
@@ -254,6 +305,43 @@ export default function DressDetailClient({ id }: { id: string }) {
             </div>
           </div>
         ) : null}
+
+        {dress && reviews.length > 0 && (
+          <div className="mt-12 max-w-2xl">
+            <h2 className="font-display flex items-center gap-3 text-2xl font-semibold text-zinc-900">
+              ביקורות
+              <StarRating rating={dress.averageRating} count={dress.reviewCount} size="md" />
+            </h2>
+
+            <ul className="mt-6 space-y-4">
+              {reviews.map((review) => (
+                <li
+                  key={review.id}
+                  className="rounded-[20px] bg-white p-5 shadow-sm ring-1 ring-line"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-bold text-zinc-900">
+                      {review.renter.name || "שוכרת"}
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      {formatReviewDate(review.createdAt)}
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5">
+                    <StarRating rating={review.rating} />
+                  </div>
+
+                  {review.comment && (
+                    <p className="mt-3 text-sm leading-6 text-zinc-600">
+                      {review.comment}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </main>
   );
