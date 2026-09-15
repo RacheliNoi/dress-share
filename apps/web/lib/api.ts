@@ -700,10 +700,16 @@ export type Feedback = {
   id: number;
   message: string;
   createdAt: string;
-  user: { id: number; name: string | null; email: string };
+  // null for an anonymous submission (no one was logged in when it was
+  // sent) - the feature is deliberately open to the public, not just
+  // registered users.
+  user: { id: number; name: string | null; email: string } | null;
 };
 
-export function submitFeedback(token: string, message: string) {
+// token is optional - feedback is open to the public. When present, the
+// submission is attributed to that logged-in user; when omitted, it's
+// anonymous.
+export function submitFeedback(token: string | undefined, message: string) {
   return request<{ id: number }>("/feedback", {
     method: "POST",
     token,

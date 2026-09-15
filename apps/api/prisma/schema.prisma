@@ -278,11 +278,17 @@ model Review {
 // folded into any approval workflow like the Dress pending queue is.
 model Feedback {
   id        Int      @id @default(autoincrement())
-  userId    Int
+  // Optional - the public can send feedback with no account at all, not
+  // just logged-in users. Attributed to the caller when a valid token IS
+  // present (OptionalJwtAuthGuard), left null otherwise. onDelete: SetNull
+  // (not Cascade) so deleting a user account doesn't also delete feedback
+  // they left while logged in - it just becomes anonymous, same as
+  // Booking.renter's identical reasoning.
+  userId    Int?
   message   String
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
 }

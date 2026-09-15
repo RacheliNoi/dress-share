@@ -7,7 +7,9 @@ const MAX_MESSAGE_LENGTH = 2000;
 export class FeedbackService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: number, message: string) {
+  // userId is null for an anonymous (not logged in) submission - see
+  // Feedback.userId's schema comment.
+  async create(userId: number | null, message: string) {
     const trimmed = (message ?? '').trim();
 
     if (!trimmed) {

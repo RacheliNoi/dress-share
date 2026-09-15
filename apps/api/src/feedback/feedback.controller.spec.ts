@@ -57,11 +57,21 @@ describe('FeedbackController', () => {
   });
 
   describe('POST /feedback', () => {
-    it('rejects unauthenticated requests (401)', async () => {
+    it('allows an unauthenticated request - feedback is open to the public', async () => {
+      prisma.feedback.create.mockResolvedValue({
+        id: 1,
+        userId: null,
+        message: 'רעיון',
+      });
+
       await request(app.getHttpServer())
         .post('/feedback')
         .send({ message: 'רעיון' })
-        .expect(401);
+        .expect(201);
+
+      expect(prisma.feedback.create).toHaveBeenCalledWith({
+        data: { userId: null, message: 'רעיון' },
+      });
     });
 
     it('400s on an empty message', async () => {
@@ -74,7 +84,7 @@ describe('FeedbackController', () => {
       expect(prisma.feedback.create).not.toHaveBeenCalled();
     });
 
-    it('creates feedback under the caller userId from their own JWT', async () => {
+    it('creates feedback under the caller userId from their own JWT when logged in', async () => {
       prisma.feedback.create.mockResolvedValue({
         id: 1,
         userId: 1,
@@ -89,6 +99,24 @@ describe('FeedbackController', () => {
 
       expect(prisma.feedback.create).toHaveBeenCalledWith({
         data: { userId: 1, message: 'רעיון טוב' },
+      });
+    });
+
+    it('treats an invalid/expired token as anonymous rather than rejecting', async () => {
+      prisma.feedback.create.mockResolvedValue({
+        id: 1,
+        userId: null,
+        message: 'רעיון',
+      });
+
+      await request(app.getHttpServer())
+        .post('/feedback')
+        .set('Authorization', 'Bearer not-a-real-jwt')
+        .send({ message: 'רעיון' })
+        .expect(201);
+
+      expect(prisma.feedback.create).toHaveBeenCalledWith({
+        data: { userId: null, message: 'רעיון' },
       });
     });
   });

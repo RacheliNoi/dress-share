@@ -187,7 +187,7 @@ export default function AdminFeedbackPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-bold text-zinc-900">
-                    {item.user.name || item.user.email}
+                    {item.user ? item.user.name || item.user.email : "אנונימית (לא מחוברת)"}
                   </p>
 
                   <div className="flex items-center gap-3">
@@ -223,7 +223,7 @@ export default function AdminFeedbackPage() {
         title="למחוק את המשוב?"
         description={
           pendingDelete
-            ? `המשוב מ"${pendingDelete.user.name || pendingDelete.user.email}" יימחק לצמיתות. אי אפשר לבטל את זה.${deleteError ? ` ${deleteError}` : ""}`
+            ? `המשוב מ"${pendingDelete.user ? pendingDelete.user.name || pendingDelete.user.email : "אנונימית (לא מחוברת)"}" יימחק לצמיתות. אי אפשר לבטל את זה.${deleteError ? ` ${deleteError}` : ""}`
             : undefined
         }
         confirmLabel="מחיקה"

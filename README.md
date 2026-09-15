@@ -20,7 +20,7 @@ UI is in Hebrew with full RTL support.
 - A standalone, animated "story"-format promo page at `/promo.html` (`apps/web/public/promo.html`) — a self-contained static file (own HTML/CSS/JS, no dependency on the rest of the app or any external account) meant to be shared directly for real distribution. Payment-by-credit-card is explicitly marked "coming soon" there, since it isn't live yet.
 - Per-dress Open Graph/Twitter Card metadata — sharing a specific dress's link shows that dress's own name, city/category, and photo, not the site's generic brand card. `app/dress/[id]/page.tsx` is a real Server Component with a `generateMetadata` that fetches server-side (crawlers never run the client-side fetch the page content itself uses) against a dedicated single-dress endpoint (`GET /dresses/approved/:id`) rather than the paginated catalog list
 - A dismissible announcement bar above the header on the catalog page advertising the free launch period, with a CTA straight to registration (or the new-listing wizard, if already logged in) — dismissal is remembered per-browser (`localStorage`) so it doesn't nag a returning visitor
-- A floating "משוב" (feedback) button, visible to any logged-in user on every page, opening a small form to send free-text suggestions/bug reports straight to the admin feedback inbox
+- A floating "משוב" (feedback) button, visible to every visitor on every page — logged in or not, since the goal is real feedback from the public, not just registered users — opening a small form to send free-text suggestions/bug reports straight to the admin feedback inbox. Attributed to a logged-in sender automatically (via an optional-auth guard that never blocks the request either way); left anonymous otherwise
 
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
@@ -72,7 +72,7 @@ UI is in Hebrew with full RTL support.
 
 **Admin**
 - Review queue for pending listings and pending edits, with approve/reject + rejection reason
-- A feedback inbox (`/admin/feedback`) listing free-text suggestions/bug reports submitted by users, most recent first, with the sender's name/email, and a delete action per entry so handled/irrelevant feedback doesn't pile up indefinitely
+- A feedback inbox (`/admin/feedback`) listing free-text suggestions/bug reports submitted by anyone (logged in or not), most recent first, with the sender's name/email when known or marked anonymous when not, and a delete action per entry so handled/irrelevant feedback doesn't pile up indefinitely
 
 ## Tech stack
 

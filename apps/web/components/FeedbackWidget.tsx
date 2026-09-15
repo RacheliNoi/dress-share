@@ -1,31 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-import { getToken, isAuthenticated } from "@/lib/auth";
+import { getToken } from "@/lib/auth";
 import { ApiError, submitFeedback } from "@/lib/api";
 
 const MAX_LENGTH = 2000;
 
-// Mounted once in the root layout - starts hidden on every render (including
-// the pre-hydration one) and only turns on from an effect after mount, same
-// hydration-mismatch reasoning as AnnouncementBar: a first server-side render
-// never sees a token. Re-checks on every pathname change (not just once on
-// mount) since the layout persists across client-side navigation, so a
-// mount-only check would miss the token a login/register page just set via
-// router.push, only picking it up on a full page reload.
+// Mounted once in the root layout, visible to every visitor - logged in or
+// not (we want feedback from the general public, not just registered
+// users). A logged-in visitor's submission is still attributed to her
+// (handleSubmit sends her token when there is one); an anonymous visitor's
+// isn't, which the backend accepts either way.
 export default function FeedbackWidget() {
-  const pathname = usePathname();
-  const [authed, setAuthed] = useState(false);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
-
-  useEffect(() => {
-    setAuthed(isAuthenticated());
-  }, [pathname]);
 
   useEffect(() => {
     if (!open) {
@@ -42,10 +33,6 @@ export default function FeedbackWidget() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
-  if (!authed) {
-    return null;
-  }
-
   function openWidget() {
     setOpen(true);
     setSent(false);
@@ -58,10 +45,9 @@ export default function FeedbackWidget() {
   }
 
   async function handleSubmit() {
-    const token = getToken();
     const trimmed = message.trim();
 
-    if (!token || !trimmed) {
+    if (!trimmed) {
       return;
     }
 
@@ -69,7 +55,7 @@ export default function FeedbackWidget() {
     setError("");
 
     try {
-      await submitFeedback(token, trimmed);
+      await submitFeedback(getToken() ?? undefined, trimmed);
       setSent(true);
       setMessage("");
     } catch (err) {

@@ -59,5 +59,19 @@ describe('FeedbackService', () => {
         data: { userId: 1, message: 'רעיון טוב' },
       });
     });
+
+    it('creates anonymous feedback (userId: null) for a caller who is not logged in', async () => {
+      prisma.feedback.create.mockResolvedValue({
+        id: 1,
+        userId: null,
+        message: 'רעיון',
+      });
+
+      await service.create(null, 'רעיון');
+
+      expect(prisma.feedback.create).toHaveBeenCalledWith({
+        data: { userId: null, message: 'רעיון' },
+      });
+    });
   });
 });
