@@ -492,12 +492,13 @@ describe('DressesController', () => {
       expect(prisma.dress.delete).not.toHaveBeenCalled();
     });
 
-    it('rejects deleting an already-approved dress', async () => {
+    it('rejects deleting an APPROVED dress with real (priced) booking history', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         ownerId: 7,
         status: DressStatus.APPROVED,
         photos: [],
+        bookings: [{ price: 150 }],
       });
 
       await request(app.getHttpServer())
@@ -506,6 +507,24 @@ describe('DressesController', () => {
         .expect(400);
 
       expect(prisma.dress.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows the owner to delete an APPROVED dress with no real booking history', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        photos: [],
+        bookings: [],
+      });
+      prisma.dress.delete.mockResolvedValue({ id: 1 });
+
+      await request(app.getHttpServer())
+        .delete('/dresses/1')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(200);
+
+      expect(prisma.dress.delete).toHaveBeenCalledWith({ where: { id: 1 } });
     });
 
     it('allows the owner to delete their own not-yet-approved dress', async () => {

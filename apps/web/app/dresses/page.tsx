@@ -347,21 +347,24 @@ return (<main
                   </span>
                 </div>
 
-                {dress.status !== "APPROVED" && (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setDeleteError("");
-                      setPendingDelete(dress);
-                    }}
-                    aria-label="מחיקת השמלה"
-                    className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-error shadow-sm backdrop-blur transition hover:bg-error hover:text-white"
-                  >
-                    {TrashIcon}
-                  </button>
-                )}
+                {/* Shown regardless of status - the backend is the source
+                    of truth on whether this particular dress is actually
+                    deletable (blocked only for an APPROVED dress with real,
+                    priced booking history), and surfaces a clear reason via
+                    deleteError when it isn't. */}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setDeleteError("");
+                    setPendingDelete(dress);
+                  }}
+                  aria-label="מחיקת השמלה"
+                  className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-error shadow-sm backdrop-blur transition hover:bg-error hover:text-white"
+                >
+                  {TrashIcon}
+                </button>
 
                 {dress.photos.length > 1 && (
                   <div className="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
@@ -444,7 +447,7 @@ return (<main
     title="למחוק את השמלה?"
     description={
       pendingDelete
-        ? `"${pendingDelete.name}" תימחק לצמיתות, כולל התמונות שהועלו עבורה. אי אפשר לבטל את זה.${deleteError ? ` ${deleteError}` : ""}`
+        ? `"${pendingDelete.name}" תימחק לצמיתות, כולל התמונות שהועלו עבורה${pendingDelete.status === "APPROVED" ? " והיא תוסר מהקטלוג הציבורי" : ""}. אי אפשר לבטל את זה.${deleteError ? ` ${deleteError}` : ""}`
         : undefined
     }
     confirmLabel="מחיקת השמלה"

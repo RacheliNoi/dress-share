@@ -1103,16 +1103,24 @@ export class DressesService {
     });
   }
 
-  // Only for a dress that never went live (DRAFT/AI_PROCESSING/AI_READY/
-  // OWNER_REVIEW/PENDING_APPROVAL/REJECTED) - an APPROVED dress is blocked
-  // even if pendingReviewSubmittedAt is set (mid-edit), since it's already
-  // public and may carry real bookings/reviews (both onDelete: Cascade,
-  // so they'd silently vanish too). Sizes/photos cascade-delete with the
-  // row; uploaded files don't, so they're cleaned up explicitly after.
+  // A dress that never went live (DRAFT/AI_PROCESSING/AI_READY/OWNER_REVIEW/
+  // PENDING_APPROVAL/REJECTED) can always be hard-deleted - it never had
+  // bookings. An APPROVED dress (even mid-edit, pendingReviewSubmittedAt
+  // set) is only blocked when it has REAL booking history: `price` is only
+  // ever written once a booking reaches RENTED (see rent()/create() above),
+  // so a booking with a null price was never more than an INTERESTED hold -
+  // even if it later auto-expired to CANCELLED, it never represented a real
+  // transaction. Reviews can only exist for a RENTED booking, so this check
+  // covers them too without a separate query. Sizes/photos/bookings/reviews
+  // all cascade-delete with the row; uploaded files don't, so they're
+  // cleaned up explicitly after.
   async remove(id: number, ownerId: number) {
     const dress = await this.prisma.dress.findUnique({
       where: { id },
-      include: { photos: true },
+      include: {
+        photos: true,
+        bookings: { select: { price: true } },
+      },
     });
 
     if (!dress || dress.ownerId !== ownerId) {
@@ -1120,9 +1128,15 @@ export class DressesService {
     }
 
     if (dress.status === DressStatus.APPROVED) {
-      throw new BadRequestException(
-        'לא ניתן למחוק שמלה שכבר אושרה ופורסמה בקטלוג',
+      const hasRealBookingHistory = dress.bookings.some(
+        (booking) => booking.price !== null,
       );
+
+      if (hasRealBookingHistory) {
+        throw new BadRequestException(
+          'לא ניתן למחוק שמלה עם היסטוריית השכרות אמיתית',
+        );
+      }
     }
 
     const deleted = await this.prisma.dress.delete({

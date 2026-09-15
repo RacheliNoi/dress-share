@@ -2073,22 +2073,50 @@ describe('DressesService', () => {
         ownerId: 7,
         status: DressStatus.DRAFT,
         photos: [],
+        bookings: [],
       });
 
       await expect(service.remove(1, 999)).rejects.toThrow(ForbiddenException);
       expect(prisma.dress.delete).not.toHaveBeenCalled();
     });
 
-    it('throws BadRequestException for an already-approved dress', async () => {
+    it('throws BadRequestException for an APPROVED dress with a real (priced) booking', async () => {
       prisma.dress.findUnique.mockResolvedValue({
         id: 1,
         ownerId: 7,
         status: DressStatus.APPROVED,
         photos: [],
+        bookings: [{ price: 150 }],
       });
 
       await expect(service.remove(1, 7)).rejects.toThrow(BadRequestException);
       expect(prisma.dress.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows deleting an APPROVED dress with no bookings', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        photos: [],
+        bookings: [],
+      });
+      prisma.dress.delete.mockResolvedValue({ id: 1 });
+
+      await expect(service.remove(1, 7)).resolves.toEqual({ id: 1 });
+    });
+
+    it('allows deleting an APPROVED dress whose only bookings were unconverted INTERESTED holds (price still null, even if since auto-expired to CANCELLED)', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        photos: [],
+        bookings: [{ price: null }, { price: null }],
+      });
+      prisma.dress.delete.mockResolvedValue({ id: 1 });
+
+      await expect(service.remove(1, 7)).resolves.toEqual({ id: 1 });
     });
 
     it('deletes a PENDING_APPROVAL dress owned by the caller and cleans up its photo files', async () => {
