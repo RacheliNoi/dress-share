@@ -19,7 +19,7 @@ describe('AdminService', () => {
     };
     dressPhoto: { deleteMany: jest.Mock; updateMany: jest.Mock };
     dressSize: { deleteMany: jest.Mock; updateMany: jest.Mock };
-    feedback: { findMany: jest.Mock };
+    feedback: { findMany: jest.Mock; deleteMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let authService: { adminInitiatePasswordReset: jest.Mock };
@@ -33,7 +33,7 @@ describe('AdminService', () => {
       },
       dressPhoto: { deleteMany: jest.fn(), updateMany: jest.fn() },
       dressSize: { deleteMany: jest.fn(), updateMany: jest.fn() },
-      feedback: { findMany: jest.fn() },
+      feedback: { findMany: jest.fn(), deleteMany: jest.fn() },
       $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     };
     authService = {
@@ -86,6 +86,24 @@ describe('AdminService', () => {
           user: { select: { id: true, name: true, email: true } },
         },
       });
+    });
+  });
+
+  describe('removeFeedback', () => {
+    it('deletes the feedback row by id', async () => {
+      prisma.feedback.deleteMany.mockResolvedValue({ count: 1 });
+
+      await service.removeFeedback(1);
+
+      expect(prisma.feedback.deleteMany).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
+    });
+
+    it('does not throw when there was nothing to remove', async () => {
+      prisma.feedback.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.removeFeedback(999)).resolves.toBeUndefined();
     });
   });
 

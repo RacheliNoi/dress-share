@@ -1103,17 +1103,40 @@ export class DressesService {
     });
   }
 
+  // Only for a dress that never went live (DRAFT/AI_PROCESSING/AI_READY/
+  // OWNER_REVIEW/PENDING_APPROVAL/REJECTED) - an APPROVED dress is blocked
+  // even if pendingReviewSubmittedAt is set (mid-edit), since it's already
+  // public and may carry real bookings/reviews (both onDelete: Cascade,
+  // so they'd silently vanish too). Sizes/photos cascade-delete with the
+  // row; uploaded files don't, so they're cleaned up explicitly after.
   async remove(id: number, ownerId: number) {
     const dress = await this.prisma.dress.findUnique({
       where: { id },
+      include: { photos: true },
     });
 
     if (!dress || dress.ownerId !== ownerId) {
       throw new ForbiddenException('אין הרשאה למחוק את השמלה הזו');
     }
 
-    return this.prisma.dress.delete({
+    if (dress.status === DressStatus.APPROVED) {
+      throw new BadRequestException(
+        'לא ניתן למחוק שמלה שכבר אושרה ופורסמה בקטלוג',
+      );
+    }
+
+    const deleted = await this.prisma.dress.delete({
       where: { id },
     });
+
+    for (const photo of dress.photos) {
+      await this.deleteUploadedFile(photo.originalUrl);
+
+      if (photo.processedUrl) {
+        await this.deleteUploadedFile(photo.processedUrl);
+      }
+    }
+
+    return deleted;
   }
 }

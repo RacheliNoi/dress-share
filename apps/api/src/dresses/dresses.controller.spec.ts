@@ -23,6 +23,7 @@ describe('DressesController', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
+      delete: jest.Mock;
     };
     dressPhoto: {
       findUnique: jest.Mock;
@@ -46,6 +47,7 @@ describe('DressesController', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
+        delete: jest.fn(),
       },
       dressPhoto: {
         findUnique: jest.fn(),
@@ -466,6 +468,61 @@ describe('DressesController', () => {
         .expect(404);
 
       expect(prisma.dressPhoto.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('DELETE /dresses/:id', () => {
+    it('rejects unauthenticated requests', async () => {
+      await request(app.getHttpServer()).delete('/dresses/1').expect(401);
+    });
+
+    it("rejects deleting another owner's dress", async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 999,
+        status: DressStatus.DRAFT,
+        photos: [],
+      });
+
+      await request(app.getHttpServer())
+        .delete('/dresses/1')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(403);
+
+      expect(prisma.dress.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting an already-approved dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        photos: [],
+      });
+
+      await request(app.getHttpServer())
+        .delete('/dresses/1')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(400);
+
+      expect(prisma.dress.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows the owner to delete their own not-yet-approved dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.PENDING_APPROVAL,
+        photos: [],
+      });
+      prisma.dress.delete.mockResolvedValue({ id: 1 });
+
+      await request(app.getHttpServer())
+        .delete('/dresses/1')
+        .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(200);
+
+      expect(prisma.dress.delete).toHaveBeenCalledWith({ where: { id: 1 } });
     });
   });
 });

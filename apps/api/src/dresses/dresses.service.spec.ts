@@ -29,6 +29,7 @@ describe('DressesService', () => {
       update: jest.Mock;
       updateMany: jest.Mock;
       count: jest.Mock;
+      delete: jest.Mock;
     };
     dressPhoto: {
       findUnique: jest.Mock;
@@ -90,6 +91,7 @@ describe('DressesService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
+        delete: jest.fn(),
       },
       dressPhoto: {
         findUnique: jest.fn(),
@@ -2054,6 +2056,72 @@ describe('DressesService', () => {
       prisma.dress.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.incrementViewCount(999)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('remove', () => {
+    it('throws ForbiddenException when the dress does not exist', async () => {
+      prisma.dress.findUnique.mockResolvedValue(null);
+
+      await expect(service.remove(999, 7)).rejects.toThrow(ForbiddenException);
+      expect(prisma.dress.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the caller is not the owner', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.DRAFT,
+        photos: [],
+      });
+
+      await expect(service.remove(1, 999)).rejects.toThrow(ForbiddenException);
+      expect(prisma.dress.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException for an already-approved dress', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.APPROVED,
+        photos: [],
+      });
+
+      await expect(service.remove(1, 7)).rejects.toThrow(BadRequestException);
+      expect(prisma.dress.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes a PENDING_APPROVAL dress owned by the caller and cleans up its photo files', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.PENDING_APPROVAL,
+        photos: [
+          { id: 5, originalUrl: '/uploads/photo-5.jpg', processedUrl: '/uploads/photo-5-processed.jpg' },
+        ],
+      });
+      prisma.dress.delete.mockResolvedValue({ id: 1 });
+
+      const result = await service.remove(1, 7);
+
+      expect(prisma.dress.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(unlink).toHaveBeenCalledWith(expect.stringContaining('photo-5.jpg'));
+      expect(unlink).toHaveBeenCalledWith(
+        expect.stringContaining('photo-5-processed.jpg'),
+      );
+      expect(result).toEqual({ id: 1 });
+    });
+
+    it('allows deleting a REJECTED dress too', async () => {
+      prisma.dress.findUnique.mockResolvedValue({
+        id: 1,
+        ownerId: 7,
+        status: DressStatus.REJECTED,
+        photos: [],
+      });
+      prisma.dress.delete.mockResolvedValue({ id: 1 });
+
+      await expect(service.remove(1, 7)).resolves.toEqual({ id: 1 });
     });
   });
 });

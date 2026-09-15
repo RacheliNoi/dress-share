@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getToken, getUser } from "@/lib/auth";
-import { ApiError, Feedback, getFeedback } from "@/lib/api";
+import { ApiError, Feedback, deleteFeedback, getFeedback } from "@/lib/api";
 import Header from "@/components/Header";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("he-IL", {
@@ -24,6 +25,9 @@ export default function AdminFeedbackPage() {
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Feedback | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   async function loadFeedback() {
     const token = getToken();
@@ -72,6 +76,29 @@ export default function AdminFeedbackPage() {
 
   if (checkingAuth) {
     return null;
+  }
+
+  async function handleConfirmDelete() {
+    const token = getToken();
+
+    if (!token || !pendingDelete) {
+      return;
+    }
+
+    setDeletingId(pendingDelete.id);
+    setDeleteError("");
+
+    try {
+      await deleteFeedback(token, pendingDelete.id);
+      setFeedback((current) => current.filter((item) => item.id !== pendingDelete.id));
+      setPendingDelete(null);
+    } catch (err) {
+      setDeleteError(
+        err instanceof ApiError ? err.message : "מחיקת המשוב נכשלה. נסי שוב.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -163,9 +190,23 @@ export default function AdminFeedbackPage() {
                     {item.user.name || item.user.email}
                   </p>
 
-                  <p className="text-xs text-zinc-400">
-                    {formatDate(item.createdAt)}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-zinc-400">
+                      {formatDate(item.createdAt)}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError("");
+                        setPendingDelete(item);
+                      }}
+                      aria-label="מחיקת המשוב"
+                      className="text-xs font-bold text-error underline-offset-4 transition hover:underline"
+                    >
+                      מחיקה
+                    </button>
+                  </div>
                 </div>
 
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
@@ -176,6 +217,21 @@ export default function AdminFeedbackPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="למחוק את המשוב?"
+        description={
+          pendingDelete
+            ? `המשוב מ"${pendingDelete.user.name || pendingDelete.user.email}" יימחק לצמיתות. אי אפשר לבטל את זה.${deleteError ? ` ${deleteError}` : ""}`
+            : undefined
+        }
+        confirmLabel="מחיקה"
+        danger
+        loading={deletingId === pendingDelete?.id}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </main>
   );
 }

@@ -26,6 +26,7 @@ describe('AdminController', () => {
     };
     feedback: {
       findMany: jest.Mock;
+      deleteMany: jest.Mock;
     };
   };
 
@@ -53,6 +54,7 @@ describe('AdminController', () => {
       },
       feedback: {
         findMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
     };
 
@@ -144,6 +146,34 @@ describe('AdminController', () => {
       expect(prisma.feedback.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
       );
+    });
+  });
+
+  describe('DELETE /admin/feedback/:id', () => {
+    it('rejects unauthenticated requests', async () => {
+      await request(app.getHttpServer()).delete('/admin/feedback/1').expect(401);
+    });
+
+    it('rejects a USER (not an admin)', async () => {
+      await request(app.getHttpServer())
+        .delete('/admin/feedback/1')
+        .set('Authorization', `Bearer ${tokenFor(1, 'USER')}`)
+        .expect(403);
+
+      expect(prisma.feedback.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('allows an ADMIN to delete a feedback entry', async () => {
+      prisma.feedback.deleteMany.mockResolvedValue({ count: 1 });
+
+      await request(app.getHttpServer())
+        .delete('/admin/feedback/1')
+        .set('Authorization', `Bearer ${tokenFor(2, 'ADMIN')}`)
+        .expect(200);
+
+      expect(prisma.feedback.deleteMany).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
     });
   });
 

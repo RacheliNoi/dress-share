@@ -480,6 +480,15 @@ export function getMyDresses(token: string) {
   return request<Dress[]>("/dresses", { token });
 }
 
+// Only for a dress that hasn't been approved yet (DRAFT/pending review/
+// rejected) - the backend rejects deleting an already-approved dress.
+export function deleteDress(token: string, dressId: number) {
+  return request<Dress>(`/dresses/${dressId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function createDress(
   token: string,
   data: {
@@ -687,4 +696,11 @@ export function submitFeedback(token: string, message: string) {
 
 export function getFeedback(token: string) {
   return request<Feedback[]>("/admin/feedback", { token });
+}
+
+export function deleteFeedback(token: string, feedbackId: number) {
+  return request<void>(`/admin/feedback/${feedbackId}`, {
+    method: "DELETE",
+    token,
+  });
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -25,6 +26,11 @@ export class AdminController {
   @Get('feedback')
   findFeedback() {
     return this.adminService.findFeedback();
+  }
+
+  @Delete('feedback/:id')
+  removeFeedback(@Param('id') id: string) {
+    return this.adminService.removeFeedback(Number(id));
   }
 
   @Patch('dresses/:id/approve')

@@ -8,11 +8,13 @@ import {
   ApiError,
   Dress,
   DressStatus,
+  deleteDress,
   getDressImageUrl,
   getMyDresses,
 } from "@/lib/api";
 import Header from "@/components/Header";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 // Small line-art status icons, drawn in the same stroke-only style as the
 // DressPlaceholder illustration, so status reads as a design element (a
@@ -49,6 +51,16 @@ const XIcon = (
   <svg {...iconProps}>
     <path d="M18 6 6 18" />
     <path d="M6 6l12 12" />
+  </svg>
+);
+
+const TrashIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+    <path d="M3 6h18" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
   </svg>
 );
 
@@ -108,6 +120,9 @@ const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
 const [checkingAuth, setCheckingAuth] = useState(true);
 const [failedImageIds, setFailedImageIds] = useState<Set<number>>(new Set());
+const [pendingDelete, setPendingDelete] = useState<Dress | null>(null);
+const [deletingId, setDeletingId] = useState<number | null>(null);
+const [deleteError, setDeleteError] = useState("");
 
 async function loadDresses() {
 const token = getToken();
@@ -178,6 +193,29 @@ if (min === max) {
 
 return `${min}–${max} ₪`;
 
+}
+
+async function handleConfirmDelete() {
+  const token = getToken();
+
+  if (!token || !pendingDelete) {
+    return;
+  }
+
+  setDeletingId(pendingDelete.id);
+  setDeleteError("");
+
+  try {
+    await deleteDress(token, pendingDelete.id);
+    setDresses((current) => current.filter((dress) => dress.id !== pendingDelete.id));
+    setPendingDelete(null);
+  } catch (err) {
+    setDeleteError(
+      err instanceof ApiError ? err.message : "מחיקת השמלה נכשלה. נסי שוב.",
+    );
+  } finally {
+    setDeletingId(null);
+  }
 }
 
 return (<main
@@ -309,6 +347,22 @@ return (<main
                   </span>
                 </div>
 
+                {dress.status !== "APPROVED" && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setDeleteError("");
+                      setPendingDelete(dress);
+                    }}
+                    aria-label="מחיקת השמלה"
+                    className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-error shadow-sm backdrop-blur transition hover:bg-error hover:text-white"
+                  >
+                    {TrashIcon}
+                  </button>
+                )}
+
                 {dress.photos.length > 1 && (
                   <div className="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
                     📷 {dress.photos.length} תמונות
@@ -384,6 +438,21 @@ return (<main
       </div>
     )}
   </div>
+
+  <ConfirmDialog
+    open={pendingDelete !== null}
+    title="למחוק את השמלה?"
+    description={
+      pendingDelete
+        ? `"${pendingDelete.name}" תימחק לצמיתות, כולל התמונות שהועלו עבורה. אי אפשר לבטל את זה.${deleteError ? ` ${deleteError}` : ""}`
+        : undefined
+    }
+    confirmLabel="מחיקת השמלה"
+    danger
+    loading={deletingId === pendingDelete?.id}
+    onConfirm={handleConfirmDelete}
+    onCancel={() => setPendingDelete(null)}
+  />
 </main>
 
 );

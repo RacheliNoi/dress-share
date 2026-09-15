@@ -79,6 +79,12 @@ export class AdminService {
     });
   }
 
+  // Idempotent - deleteMany on an already-removed (or never-existent) row is
+  // a no-op rather than a 404, so a doubled click never surfaces an error.
+  async removeFeedback(id: number): Promise<void> {
+    await this.prisma.feedback.deleteMany({ where: { id } });
+  }
+
   private async deleteUploadedFile(url: string) {
     const filePath = join(UPLOADS_DIR, basename(url));
 
