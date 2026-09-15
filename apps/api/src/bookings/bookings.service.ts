@@ -22,6 +22,10 @@ const ACTIVE_BOOKING_STATUSES = [
   BookingStatus.RENTED,
 ];
 
+// Matches Feedback's identical cap - without one, a chat message body had
+// no length limit at all (only a non-empty check).
+const MAX_MESSAGE_BODY_LENGTH = 2000;
+
 // How long an INTERESTED hold (fitting-coordination phase, not yet a
 // confirmed rental) is allowed to sit before it's treated as abandoned and
 // released back into the calendar. Same "plain tunable constant" pattern as
@@ -935,6 +939,10 @@ export class BookingsService {
 
     if (!trimmed) {
       throw new BadRequestException('לא ניתן לשלוח הודעה ריקה');
+    }
+
+    if (trimmed.length > MAX_MESSAGE_BODY_LENGTH) {
+      throw new BadRequestException('ההודעה ארוכה מדי');
     }
 
     const message = await this.prisma.bookingMessage.create({

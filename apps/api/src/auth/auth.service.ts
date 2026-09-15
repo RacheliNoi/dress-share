@@ -40,6 +40,8 @@ export class AuthService {
       throw new ConflictException('משתמש עם האימייל הזה כבר קיים');
     }
 
+    this.assertPasswordIsValid(data.password);
+
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     const user = await this.prisma.user.create({

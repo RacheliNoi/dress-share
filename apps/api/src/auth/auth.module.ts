@@ -5,10 +5,21 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+// No fallback secret on purpose - a hardcoded default here would be visible
+// to anyone who's seen this source (it's what was here before), letting
+// them forge valid tokens (including admin ones) for any deployment that
+// forgot to set this. Failing loudly at startup is far safer than silently
+// running with a known-insecure secret.
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    'JWT_SECRET environment variable is required (see .env.example) - refusing to start with an insecure default.',
+  );
+}
+
 @Module({
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dev-secret-change-me',
+      secret: process.env.JWT_SECRET,
       signOptions: {
         expiresIn: '7d',
       },
@@ -22,6 +33,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
   ],
   controllers: [AuthController],
   providers: [AuthService],
-  exports: [JwtModule, AuthService],
+  // ThrottlerModule exported too - FeedbackModule/ReviewsModule/DressesModule
+  // (all of which already import AuthModule for JwtService) reuse the same
+  // ThrottlerGuard/config for their own spam/abuse-prone routes, instead of
+  // each registering its own separate ThrottlerModule.forRoot(...).
+  exports: [JwtModule, AuthService, ThrottlerModule],
 })
 export class AuthModule {}

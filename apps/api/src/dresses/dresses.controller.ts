@@ -13,11 +13,13 @@ import {
 } from '@nestjs/common';
 
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { memoryStorage } from 'multer';
 import { DressesService } from './dresses.service';
 import type { CatalogSortOption } from './dresses.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { imageUploadOptions } from '../common/image-upload-options';
 
 // Query params always arrive as strings (or are absent/omitted) - never
 // trusted as-is for a field that's an Int column in Postgres
@@ -188,14 +190,20 @@ cancelPendingSizeChange(
   );
 }
 
-@UseGuards(JwtAuthGuard)
+// Rate-limited (see AuthModule's ThrottlerModule config, reused here) - this
+// route runs a real CPU-heavy pipeline per file (sharp resize/backdrop
+// replacement, a TensorFlow face-detection pass), which had no limit at all
+// on how fast it could be triggered repeatedly.
+@UseGuards(JwtAuthGuard, ThrottlerGuard)
 @Post(':id/photos')
 @UseInterceptors(
   // Buffers only, in memory - no disk write here at all. DressesService
   // decides where each file actually ends up (R2, falling back to local
   // disk only if R2 is unreachable or unconfigured - see StorageService),
   // so filename/key generation lives there too, not in this multer config.
-  FilesInterceptor('images', 10, { storage: memoryStorage() }),
+  // imageUploadOptions adds the type/size restrictions Multer doesn't
+  // enforce on its own - see that file for why they matter.
+  FilesInterceptor('images', 10, imageUploadOptions(memoryStorage())),
 )
 addPhotos(
   @Param('id') id: string,

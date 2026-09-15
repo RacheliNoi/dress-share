@@ -5,14 +5,6 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ClothingItemsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
-    return this.prisma.clothingItem.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
-
   async findByUser(userId: number) {
     return this.prisma.clothingItem.findMany({
       where: {

@@ -67,8 +67,12 @@ function RegisterForm() {
           onChange={(event) => setPassword(event.target.value)}
           placeholder="סיסמה"
           required
-          minLength={6}
+          minLength={8}
         />
+
+        <p className="-mt-2 text-xs text-ink-faint">
+          הסיסמה חייבת לכלול לפחות 8 תווים, עם אות אחת וספרה אחת לפחות.
+        </p>
 
         {error && <FormMessage variant="error">{error}</FormMessage>}
 

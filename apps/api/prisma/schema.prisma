@@ -240,6 +240,10 @@ model Booking {
 
   @@index([dressId, startDate, endDate])
   @@index([renterId])
+  // Scans exactly this shape daily (BookingExpiryTask: stale INTERESTED
+  // holds past their cutoff, and ones due an expiry-warning email) - without
+  // it, that query is a sequential scan over every booking ever created.
+  @@index([status, createdAt])
 }
 
 // One review per booking (@@unique below), left by the renter once the

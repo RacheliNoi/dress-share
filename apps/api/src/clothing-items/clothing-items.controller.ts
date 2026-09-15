@@ -15,6 +15,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { imageUploadOptions } from '../common/image-upload-options';
 
 @Controller('clothing-items')
 export class ClothingItemsController {
@@ -31,15 +32,18 @@ export class ClothingItemsController {
    @UseGuards(JwtAuthGuard)
    @Post()
    @UseInterceptors(
-    FileInterceptor('image', {
-        storage: diskStorage({
-        destination: './uploads',
-        filename: (_req, file, callback) => {
+    FileInterceptor(
+      'image',
+      imageUploadOptions(
+        diskStorage({
+          destination: './uploads',
+          filename: (_req, file, callback) => {
             const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
             callback(null, uniqueName);
-        },
+          },
         }),
-    }),
+      ),
+    ),
     )
    create(
     @UploadedFile() file: Express.Multer.File,

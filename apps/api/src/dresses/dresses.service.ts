@@ -329,6 +329,22 @@ export class DressesService {
     }
   }
 
+  // Mirrors BookingsService's identical check (kept separate rather than
+  // shared, matching how this codebase already inlines small validators per
+  // module) - without it, a non-numeric price from the controller's
+  // Number(body.price) becomes NaN, which Prisma then rejects with a raw,
+  // unhandled 500 instead of a clean Hebrew 400 like every other validation
+  // failure here.
+  private assertValidPrice(price: number | undefined) {
+    if (price === undefined) {
+      return;
+    }
+
+    if (Number.isNaN(price) || price < 0) {
+      throw new BadRequestException('מחיר אינו תקין');
+    }
+  }
+
   private isUniqueConstraintError(error: unknown): boolean {
     return Boolean(
       error &&
@@ -386,6 +402,7 @@ export class DressesService {
 
     this.assertEditable(dress);
     this.assertValidQuantity(data.quantity);
+    this.assertValidPrice(data.price);
 
     try {
       return await this.prisma.dressSize.create({
@@ -431,6 +448,7 @@ export class DressesService {
 
     this.assertEditable(existingSize.dress);
     this.assertValidQuantity(data.quantity);
+    this.assertValidPrice(data.price);
 
     if (existingSize.dress.status !== DressStatus.APPROVED) {
       // DRAFT/REJECTED - direct update, unchanged behavior.

@@ -66,6 +66,64 @@ describe('AuthService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('register', () => {
+    it('throws ConflictException when the email is already taken', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 1 });
+
+      await expect(
+        service.register({ email: 'taken@test.com', password: 'ValidPass1' }),
+      ).rejects.toThrow('משתמש עם האימייל הזה כבר קיים');
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a password shorter than 8 characters', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.register({ email: 'new@test.com', password: 'Short1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a password with no digit', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.register({ email: 'new@test.com', password: 'NoDigitsHere' }),
+      ).rejects.toThrow('הסיסמה חייבת לכלול לפחות אות אחת וספרה אחת');
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('creates the user and returns an access token for a valid password', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({
+        id: 1,
+        email: 'new@test.com',
+        name: 'New User',
+        role: 'USER',
+      });
+
+      const result = await service.register({
+        email: 'new@test.com',
+        password: 'ValidPass1',
+        name: 'New User',
+      });
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ email: 'new@test.com', name: 'New User' }),
+        }),
+      );
+      expect(result.user).toEqual({
+        id: 1,
+        email: 'new@test.com',
+        name: 'New User',
+        role: 'USER',
+      });
+      expect(typeof result.accessToken).toBe('string');
+    });
+  });
+
   describe('changePassword', () => {
     const existingHash = bcrypt.hashSync('CurrentPass1', 10);
 

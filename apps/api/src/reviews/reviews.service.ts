@@ -7,6 +7,10 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingStatus } from '../../generated/prisma/enums';
 
+// Matches Feedback's identical cap - without one, a review comment had no
+// length limit at all.
+const MAX_COMMENT_LENGTH = 2000;
+
 @Injectable()
 export class ReviewsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -69,6 +73,12 @@ export class ReviewsService {
       );
     }
 
+    const trimmedComment = comment?.trim() || null;
+
+    if (trimmedComment && trimmedComment.length > MAX_COMMENT_LENGTH) {
+      throw new BadRequestException('התגובה ארוכה מדי');
+    }
+
     try {
       const review = await this.prisma.review.create({
         data: {
@@ -76,7 +86,7 @@ export class ReviewsService {
           dressId: booking.dressId,
           renterId,
           rating,
-          comment: comment?.trim() || null,
+          comment: trimmedComment,
         },
       });
 
