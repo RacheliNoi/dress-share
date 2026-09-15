@@ -1699,6 +1699,52 @@ describe('BookingsService', () => {
         NotFoundException,
       );
     });
+
+    it('lets the renter withdraw their own INTERESTED booking', async () => {
+      prisma.booking.findUnique.mockResolvedValue({
+        id: 1,
+        dressId: 1,
+        status: BookingStatus.INTERESTED,
+        renterId: 42,
+        dress: { ...approvedDress, ownerId: 999 },
+      });
+      prisma.booking.delete.mockResolvedValue({ id: 1 });
+
+      await service.cancelOrRemove(1, 42);
+
+      expect(prisma.booking.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+
+    it('rejects a renter trying to cancel their own already-RENTED booking (owner must)', async () => {
+      prisma.booking.findUnique.mockResolvedValue({
+        id: 1,
+        dressId: 1,
+        status: BookingStatus.RENTED,
+        renterId: 42,
+        dress: { ...approvedDress, ownerId: 999 },
+      });
+
+      await expect(service.cancelOrRemove(1, 42)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+      expect(prisma.booking.delete).not.toHaveBeenCalled();
+    });
+
+    it("rejects a renter trying to cancel someone else's INTERESTED booking", async () => {
+      prisma.booking.findUnique.mockResolvedValue({
+        id: 1,
+        dressId: 1,
+        status: BookingStatus.INTERESTED,
+        renterId: 42,
+        dress: { ...approvedDress, ownerId: 999 },
+      });
+
+      await expect(service.cancelOrRemove(1, 7)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.booking.delete).not.toHaveBeenCalled();
+    });
   });
 
   describe('expireStaleInterestedBookings', () => {

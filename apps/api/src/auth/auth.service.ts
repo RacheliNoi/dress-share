@@ -134,9 +134,15 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(data.newPassword, 10);
 
-    await this.prisma.user.update({
+    // Bumping tokenVersion invalidates every token issued before this
+    // moment - including any device a stolen/shared password might have
+    // been used to log into - the instant a password actually changes.
+    // That also invalidates the token this very request just authenticated
+    // with, so a fresh one (carrying the new version) is issued below to
+    // keep the current session itself logged in.
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
     });
 
     // A password change is an implicit "I still have access" signal, so any
@@ -144,7 +150,25 @@ export class AuthService {
     // be an unnecessary lingering way into the account.
     await this.prisma.passwordResetToken.deleteMany({ where: { userId } });
 
-    return { message: 'הסיסמה עודכנה בהצלחה' };
+    return {
+      message: 'הסיסמה עודכנה בהצלחה',
+      accessToken: this.createAccessToken(updatedUser),
+    };
+  }
+
+  // Explicit "log out everywhere" action - bumps tokenVersion with no
+  // password change involved, so every token issued before this call
+  // (every other device/tab/session) stops being accepted by JwtAuthGuard
+  // immediately. Unlike changePassword, no fresh token is issued: the
+  // caller explicitly asked to be logged out, including this device - the
+  // frontend clears its own stored token right after calling this.
+  async logoutAllDevices(userId: number) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+
+    return { message: 'התנתקת מכל המכשירים' };
   }
 
   async requestPasswordReset(email: string) {
@@ -192,9 +216,14 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(data.newPassword, 10);
 
     await this.prisma.$transaction([
+      // tokenVersion bump invalidates every session logged in before this
+      // reset - the same reasoning as changePassword, doubly relevant here
+      // since a password reset often means "someone else may have access".
+      // No fresh token is issued here (unlike changePassword) - the
+      // frontend sends a resetting user to /login afterward regardless.
       this.prisma.user.update({
         where: { id: resetToken.userId },
-        data: { passwordHash },
+        data: { passwordHash, tokenVersion: { increment: 1 } },
       }),
       // Delete every outstanding token for this user, not just the one that
       // was used, so a token issued earlier can't still be redeemed later.
@@ -284,11 +313,13 @@ export class AuthService {
     id: number;
     email: string;
     role: string;
+    tokenVersion: number;
   }) {
     return this.jwtService.sign({
       sub: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
   }
 }

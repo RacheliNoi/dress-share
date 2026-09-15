@@ -12,6 +12,7 @@ describe('BookingsController', () => {
   let app: INestApplication;
   let jwtService: JwtService;
   let prisma: {
+    user: { findUnique: jest.Mock };
     dress: { findUnique: jest.Mock };
     booking: {
       findFirst: jest.Mock;
@@ -48,11 +49,18 @@ describe('BookingsController', () => {
       sub: userId,
       email: `user${userId}@test.com`,
       role: 'USER',
+      tokenVersion: 0,
     });
   }
 
   beforeEach(async () => {
     prisma = {
+      // JwtAuthGuard checks this on every authenticated request now (see
+      // User.tokenVersion's schema comment) - every tokenFor() token above
+      // is signed with tokenVersion: 0, so this default keeps every
+      // existing authenticated-route test passing without having to touch
+      // each one individually.
+      user: { findUnique: jest.fn().mockResolvedValue({ tokenVersion: 0 }) },
       dress: { findUnique: jest.fn() },
       booking: {
         findFirst: jest.fn(),
@@ -652,6 +660,24 @@ describe('BookingsController', () => {
       await request(app.getHttpServer())
         .delete('/bookings/1')
         .set('Authorization', `Bearer ${tokenFor(7)}`)
+        .expect(200);
+
+      expect(prisma.booking.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+
+    it('lets the renter withdraw their own INTERESTED booking', async () => {
+      prisma.booking.findUnique.mockResolvedValue({
+        id: 1,
+        dressId: 1,
+        status: BookingStatus.INTERESTED,
+        renterId: 42,
+        dress: { ...approvedDress, ownerId: 999 },
+      });
+      prisma.booking.delete.mockResolvedValue({ id: 1 });
+
+      await request(app.getHttpServer())
+        .delete('/bookings/1')
+        .set('Authorization', `Bearer ${tokenFor(42)}`)
         .expect(200);
 
       expect(prisma.booking.delete).toHaveBeenCalledWith({ where: { id: 1 } });

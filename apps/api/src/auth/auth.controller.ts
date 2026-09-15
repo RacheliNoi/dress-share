@@ -49,6 +49,12 @@ export class AuthController {
     return this.authService.changePassword(user.sub, body);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('logout-all-devices')
+  logoutAllDevices(@CurrentUser() user: { sub: number }) {
+    return this.authService.logoutAllDevices(user.sub);
+  }
+
   @Post('forgot-password')
   forgotPassword(@Body() body: { email: string }) {
     return this.authService.requestPasswordReset(body.email);

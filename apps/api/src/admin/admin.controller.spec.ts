@@ -35,6 +35,7 @@ describe('AdminController', () => {
       sub: userId,
       email: `user${userId}@test.com`,
       role,
+      tokenVersion: 0,
     });
   }
 
@@ -45,8 +46,15 @@ describe('AdminController', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      // JwtAuthGuard checks this on every authenticated request now (see
+      // User.tokenVersion's schema comment) - every tokenFor() token above
+      // is signed with tokenVersion: 0, so this default keeps every
+      // existing authenticated-route test passing without having to touch
+      // each one individually. The two reset-password tests below also use
+      // this same mock for their own domain lookup (a DIFFERENT user id),
+      // so they override it with an id-branching implementation instead.
       user: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ tokenVersion: 0 }),
       },
       passwordResetToken: {
         create: jest.fn(),
@@ -281,10 +289,14 @@ describe('AdminController', () => {
     });
 
     it('allows an ADMIN to initiate a reset without ever seeing passwordHash', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: 5,
-        email: 'target@test.com',
-      });
+      // Branches on id: 5 is the target user this test is actually about,
+      // any other id (2, the calling admin) is JwtAuthGuard's own
+      // tokenVersion check on the caller - both go through this same mock.
+      prisma.user.findUnique.mockImplementation(({ where }: { where: { id: number } }) =>
+        where.id === 5
+          ? Promise.resolve({ id: 5, email: 'target@test.com' })
+          : Promise.resolve({ tokenVersion: 0 }),
+      );
       prisma.passwordResetToken.create.mockResolvedValue({});
 
       const response = await request(app.getHttpServer())
@@ -304,7 +316,13 @@ describe('AdminController', () => {
     });
 
     it('returns 404 for a user that does not exist', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      // 999 (the nonexistent target) resolves null; any other id (2, the
+      // calling admin) is JwtAuthGuard's own tokenVersion check.
+      prisma.user.findUnique.mockImplementation(({ where }: { where: { id: number } }) =>
+        where.id === 999
+          ? Promise.resolve(null)
+          : Promise.resolve({ tokenVersion: 0 }),
+      );
 
       await request(app.getHttpServer())
         .post('/admin/users/999/reset-password')

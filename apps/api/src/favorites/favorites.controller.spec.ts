@@ -11,6 +11,7 @@ describe('FavoritesController', () => {
   let app: INestApplication;
   let jwtService: JwtService;
   let prisma: {
+    user: { findUnique: jest.Mock };
     dress: { findUnique: jest.Mock };
     favorite: {
       upsert: jest.Mock;
@@ -24,11 +25,18 @@ describe('FavoritesController', () => {
       sub: userId,
       email: `user${userId}@test.com`,
       role: 'USER',
+      tokenVersion: 0,
     });
   }
 
   beforeEach(async () => {
     prisma = {
+      // JwtAuthGuard checks this on every authenticated request now (see
+      // User.tokenVersion's schema comment) - every tokenFor() token above
+      // is signed with tokenVersion: 0, so this default keeps every
+      // existing authenticated-route test passing without having to touch
+      // each one individually.
+      user: { findUnique: jest.fn().mockResolvedValue({ tokenVersion: 0 }) },
       dress: { findUnique: jest.fn() },
       favorite: {
         upsert: jest.fn(),

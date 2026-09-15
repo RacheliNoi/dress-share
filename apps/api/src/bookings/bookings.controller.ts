@@ -125,6 +125,9 @@ export class BookingsController {
     });
   }
 
+  // Available to the dress owner (any status) or the renter (INTERESTED
+  // only, to withdraw their own not-yet-confirmed interest) - enforced in
+  // the service.
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() user: { sub: number }) {

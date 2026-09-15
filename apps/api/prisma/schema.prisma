@@ -34,6 +34,13 @@ model User {
   passwordHash        String?
   name                String?
   role                UserRole             @default(USER)
+  // Embedded in every issued JWT and checked on every authenticated
+  // request (JwtAuthGuard) - bumping this instantly invalidates every
+  // token issued before the bump, since none of them carry the new value
+  // anymore. That's what makes "log out of all devices" (and forcing every
+  // other session out the moment a password changes) possible at all with
+  // an otherwise-stateless JWT that has no server-side session/blacklist.
+  tokenVersion        Int                  @default(0)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   clothingItems       ClothingItem[]

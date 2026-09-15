@@ -145,10 +145,27 @@ export function changePassword(
     confirmPassword: string;
   },
 ) {
-  return request<{ message: string }>("/auth/change-password", {
+  // A password change bumps tokenVersion server-side (invalidating every
+  // other session), which also invalidates the token this very request
+  // authenticated with - accessToken here is a fresh one for this device,
+  // which the caller must store to stay logged in.
+  return request<{ message: string; accessToken: string }>(
+    "/auth/change-password",
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+// Bumps the caller's tokenVersion server-side with no password change -
+// every token issued before this call (every other device/tab/session,
+// including this one) stops being accepted immediately.
+export function logoutAllDevices(token: string) {
+  return request<{ message: string }>("/auth/logout-all-devices", {
     method: "POST",
     token,
-    body: JSON.stringify(data),
   });
 }
 

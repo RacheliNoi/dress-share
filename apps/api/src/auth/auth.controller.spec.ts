@@ -29,6 +29,7 @@ describe('AuthController', () => {
       sub: userId,
       email: `user${userId}@test.com`,
       role: 'USER',
+      tokenVersion: 0,
     });
   }
 
@@ -84,9 +85,12 @@ describe('AuthController', () => {
     });
 
     it('rejects the wrong current password', async () => {
+      // Also what JwtAuthGuard's own tokenVersion check reads, since this
+      // is the same user (id: 1) the caller's token was signed for.
       prisma.user.findUnique.mockResolvedValue({
         id: 1,
         passwordHash: bcrypt.hashSync('CurrentPass1', 10),
+        tokenVersion: 0,
       });
 
       await request(app.getHttpServer())
@@ -106,6 +110,7 @@ describe('AuthController', () => {
       prisma.user.findUnique.mockResolvedValue({
         id: 1,
         passwordHash: bcrypt.hashSync('CurrentPass1', 10),
+        tokenVersion: 0,
       });
 
       await request(app.getHttpServer())
@@ -125,8 +130,14 @@ describe('AuthController', () => {
       prisma.user.findUnique.mockResolvedValue({
         id: 1,
         passwordHash: bcrypt.hashSync('CurrentPass1', 10),
+        tokenVersion: 0,
       });
-      prisma.user.update.mockResolvedValue({ id: 1 });
+      prisma.user.update.mockResolvedValue({
+        id: 1,
+        email: 'user1@test.com',
+        role: 'USER',
+        tokenVersion: 1,
+      });
 
       const response = await request(app.getHttpServer())
         .post('/auth/change-password')
@@ -142,6 +153,29 @@ describe('AuthController', () => {
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 1 } }),
       );
+    });
+  });
+
+  describe('POST /auth/logout-all-devices', () => {
+    it('rejects an unauthenticated request', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/logout-all-devices')
+        .expect(401);
+    });
+
+    it("bumps the caller's own tokenVersion", async () => {
+      prisma.user.findUnique.mockResolvedValue({ tokenVersion: 0 });
+      prisma.user.update.mockResolvedValue({ id: 1, tokenVersion: 1 });
+
+      await request(app.getHttpServer())
+        .post('/auth/logout-all-devices')
+        .set('Authorization', `Bearer ${tokenFor(1)}`)
+        .expect(201);
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { tokenVersion: { increment: 1 } },
+      });
     });
   });
 

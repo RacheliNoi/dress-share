@@ -199,7 +199,16 @@ describe('AuthService', () => {
       expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
         where: { userId: 1 },
       });
-      expect(result).toEqual({ message: expect.any(String) });
+      // A fresh access token is issued alongside the message - bumping
+      // tokenVersion (see the data.tokenVersion assertion this test could
+      // add, but the DB-side effect is already covered by updateArgs above)
+      // invalidates the very token this request authenticated with, so the
+      // caller needs a new one to stay logged in on this device.
+      expect(result).toEqual({
+        message: expect.any(String),
+        accessToken: expect.any(String),
+      });
+      expect(updateArgs.data.tokenVersion).toEqual({ increment: 1 });
     });
 
     it('throws when the user cannot be found', async () => {
@@ -212,6 +221,20 @@ describe('AuthService', () => {
           confirmPassword: 'NewPassword1',
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('logoutAllDevices', () => {
+    it('bumps tokenVersion for the given user', async () => {
+      prisma.user.update.mockResolvedValue({ id: 1, tokenVersion: 1 });
+
+      const result = await service.logoutAllDevices(1);
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { tokenVersion: { increment: 1 } },
+      });
+      expect(result).toEqual({ message: expect.any(String) });
     });
   });
 

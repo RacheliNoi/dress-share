@@ -17,6 +17,7 @@ describe('UsersController', () => {
   let prisma: {
     user: {
       findMany: jest.Mock;
+      findUnique: jest.Mock;
     };
   };
 
@@ -25,6 +26,7 @@ describe('UsersController', () => {
       sub: userId,
       email: `user${userId}@test.com`,
       role,
+      tokenVersion: 0,
     });
   }
 
@@ -32,6 +34,10 @@ describe('UsersController', () => {
     prisma = {
       user: {
         findMany: jest.fn(),
+        // JwtAuthGuard checks this on every authenticated request now (see
+        // User.tokenVersion's schema comment) - every tokenFor() token
+        // above is signed with tokenVersion: 0.
+        findUnique: jest.fn().mockResolvedValue({ tokenVersion: 0 }),
       },
     };
 

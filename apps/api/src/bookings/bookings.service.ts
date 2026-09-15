@@ -801,16 +801,40 @@ export class BookingsService {
 
   // RENTED represents a real, previously-confirmed rental - cancelling one
   // is a business event worth keeping a record of, so it's soft-cancelled
-  // (status -> CANCELLED) rather than deleted. INTERESTED is just a loose,
-  // unconfirmed hold with no transaction behind it, so removing one is a
-  // hard delete - there's nothing meaningful to preserve. Either way, once
-  // CANCELLED (or deleted), the booking no longer counts toward any size's
-  // used quantity - assertCapacityAvailable only ever looks at
-  // ACTIVE_BOOKING_STATUSES.
-  async cancelOrRemove(bookingId: number, ownerId: number) {
-    const booking = await this.loadOwnedBooking(bookingId, ownerId);
+  // (status -> CANCELLED) rather than deleted, and only the dress owner may
+  // do it (backing out of an already-confirmed rental needs the owner
+  // involved, not a unilateral self-service cancel). INTERESTED is just a
+  // loose, unconfirmed hold with no transaction behind it - both the owner
+  // AND the renter who made it can remove one on their own, and it's a hard
+  // delete since there's nothing meaningful to preserve (this is what lets
+  // a renter withdraw interest instead of waiting up to 7 days for the
+  // auto-expiry job). Either way, once CANCELLED (or deleted), the booking
+  // no longer counts toward any size's used quantity -
+  // assertCapacityAvailable only ever looks at ACTIVE_BOOKING_STATUSES.
+  async cancelOrRemove(bookingId: number, userId: number) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, status: true, renterId: true, dress: { select: { ownerId: true } } },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('ההזמנה לא נמצאה');
+    }
+
+    const isOwner = booking.dress.ownerId === userId;
+    const isRenter = booking.renterId === userId;
+
+    if (!isOwner && !isRenter) {
+      throw new ForbiddenException('אין הרשאה לנהל את ההזמנה הזו');
+    }
 
     if (booking.status === BookingStatus.RENTED) {
+      if (!isOwner) {
+        throw new ForbiddenException(
+          'רק בעלת השמלה יכולה לבטל השכרה שכבר אושרה',
+        );
+      }
+
       return this.prisma.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.CANCELLED },

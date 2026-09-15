@@ -8,6 +8,7 @@ import {
   ApiError,
   BookingStatus,
   BookingWithDress,
+  cancelBooking,
   createReview,
   getDressImageUrl,
   getMyBookingsAsRenter,
@@ -16,6 +17,7 @@ import Header from "@/components/Header";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import BookingChat from "@/components/BookingChat";
 import StarRating from "@/components/ui/StarRating";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 // Labels written from the renter's own point of view - this page shows a
 // renter their OWN requests, so "מישהו מתעניין" ("someone is interested," a
@@ -52,6 +54,10 @@ export default function MyRequestsPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState("");
+
+  const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
+  const [cancelingId, setCancelingId] = useState<number | null>(null);
+  const [cancelError, setCancelError] = useState("");
 
   function toggleReviewForm(bookingId: number) {
     if (openReviewId === bookingId) {
@@ -92,6 +98,36 @@ export default function MyRequestsPage() {
       );
     } finally {
       setReviewSubmitting(false);
+    }
+  }
+
+  // Only ever offered for an INTERESTED booking (see the button's own
+  // status check below) - the backend hard-deletes it outright rather than
+  // soft-cancelling, since a not-yet-confirmed hold has nothing meaningful
+  // to preserve, so it's removed from the list entirely on success rather
+  // than patched to a CANCELLED badge.
+  async function handleConfirmCancel() {
+    const token = getToken();
+
+    if (!token || pendingCancelId === null) {
+      return;
+    }
+
+    setCancelingId(pendingCancelId);
+    setCancelError("");
+
+    try {
+      await cancelBooking(token, pendingCancelId);
+      setBookings((current) =>
+        current.filter((booking) => booking.id !== pendingCancelId),
+      );
+      setPendingCancelId(null);
+    } catch (err) {
+      setCancelError(
+        err instanceof ApiError ? err.message : "ביטול העניין נכשל. נסי שוב.",
+      );
+    } finally {
+      setCancelingId(null);
     }
   }
 
@@ -299,6 +335,19 @@ export default function MyRequestsPage() {
                             </button>
                           )
                         )}
+
+                        {booking.status === "INTERESTED" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCancelError("");
+                              setPendingCancelId(booking.id);
+                            }}
+                            className="text-xs font-bold text-error underline underline-offset-4"
+                          >
+                            ביטול העניין
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -364,6 +413,17 @@ export default function MyRequestsPage() {
           </ul>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingCancelId !== null}
+        title="לבטל את ההתעניינות?"
+        description={`ההתעניינות תוסר לצמיתות. אי אפשר לבטל את זה.${cancelError ? ` ${cancelError}` : ""}`}
+        confirmLabel="ביטול ההתעניינות"
+        danger
+        loading={cancelingId === pendingCancelId}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setPendingCancelId(null)}
+      />
     </main>
   );
 }
