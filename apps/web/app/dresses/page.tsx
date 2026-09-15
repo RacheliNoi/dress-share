@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import Header from "@/components/Header";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import FreeLaunchBanner from "@/components/ui/FreeLaunchBanner";
 
 // Small line-art status icons, drawn in the same stroke-only style as the
 // DressPlaceholder illustration, so status reads as a design element (a
@@ -213,6 +214,8 @@ return (<main
         הוספת שמלה חדשה
       </a>
     </section>
+
+    <FreeLaunchBanner />
 
     {/* Error */}
     {error && (

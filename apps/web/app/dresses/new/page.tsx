@@ -22,6 +22,7 @@ import Header from "@/components/Header";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
 import PhotoGuidelineNotice from "@/components/ui/PhotoGuidelineNotice";
+import FreeLaunchBanner from "@/components/ui/FreeLaunchBanner";
 import PhotoEditModal from "@/components/PhotoEditModal";
 import SizeFacts from "@/components/ui/SizeFacts";
 import InfoTooltip from "@/components/ui/InfoTooltip";
@@ -311,6 +312,10 @@ export default function NewDressPage() {
         <p className="mt-2 text-sm text-zinc-500">
           מלאי את פרטי השמלה, הוסיפי מידות ותמונות, ושלחי לאישור מנהל.
         </p>
+
+        <div className="mt-5">
+          <FreeLaunchBanner />
+        </div>
 
         {!submitted && (
           <ol className="mt-7 flex items-start gap-2">
