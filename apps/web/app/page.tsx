@@ -791,25 +791,30 @@ export default function CatalogPage() {
                 .getElementById("how-it-works")
                 ?.scrollIntoView({ behavior: "smooth" })
             }
-            aria-label="גלילה אל איך זה עובד"
-            className="group relative flex h-9 w-9 items-center justify-center"
+            className="group flex flex-col items-center gap-1.5"
           >
-            <span
-              className="animate-scroll-cue-ping absolute inset-0 rounded-full bg-accent-soft-strong"
-              aria-hidden
-            />
-            <span className="animate-scroll-cue-bounce relative flex h-8 w-8 items-center justify-center rounded-full bg-white text-accent-deep shadow-sm ring-1 ring-line-strong transition group-hover:text-accent group-hover:ring-accent">
-              <svg
-                viewBox="0 0 24 24"
-                width="15"
-                height="15"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
+            <span className="relative flex h-9 w-9 items-center justify-center">
+              <span
+                className="animate-scroll-cue-ping absolute inset-0 rounded-full bg-accent-soft-strong"
                 aria-hidden
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
+              />
+              <span className="animate-scroll-cue-bounce relative flex h-8 w-8 items-center justify-center rounded-full bg-white text-accent-deep shadow-sm ring-1 ring-line-strong transition group-hover:text-accent group-hover:ring-accent">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  aria-hidden
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </span>
+            </span>
+
+            <span className="text-xs font-medium text-zinc-400 transition group-hover:text-accent">
+              איך זה עובד
             </span>
           </button>
         </div>
