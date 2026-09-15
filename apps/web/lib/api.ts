@@ -669,3 +669,22 @@ export function rejectDress(token: string, dressId: number, reason: string) {
     body: JSON.stringify({ reason }),
   });
 }
+
+export type Feedback = {
+  id: number;
+  message: string;
+  createdAt: string;
+  user: { id: number; name: string | null; email: string };
+};
+
+export function submitFeedback(token: string, message: string) {
+  return request<{ id: number }>("/feedback", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ message }),
+  });
+}
+
+export function getFeedback(token: string) {
+  return request<Feedback[]>("/admin/feedback", { token });
+}

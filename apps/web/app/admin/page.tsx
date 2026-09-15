@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { getToken, getUser } from "@/lib/auth";
 import {
   ApiError,
@@ -127,6 +128,19 @@ export default function AdminDashboardPage() {
       <Header />
 
       <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:py-14">
+        <div className="mb-6 flex gap-2">
+          <span className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-white">
+            שמלות ממתינות
+          </span>
+
+          <Link
+            href="/admin/feedback"
+            className="rounded-full px-4 py-2 text-sm font-bold text-zinc-500 transition hover:bg-white hover:text-zinc-900"
+          >
+            משוב
+          </Link>
+        </div>
+
         <section className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-2 text-sm font-medium text-accent">

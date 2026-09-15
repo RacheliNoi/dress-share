@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { FeedbackModule } from './feedback/feedback.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     AdminModule,
     FavoritesModule,
     ReviewsModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService],

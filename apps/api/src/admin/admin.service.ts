@@ -68,6 +68,17 @@ export class AdminService {
     });
   }
 
+  async findFeedback() {
+    return this.prisma.feedback.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+  }
+
   private async deleteUploadedFile(url: string) {
     const filePath = join(UPLOADS_DIR, basename(url));
 

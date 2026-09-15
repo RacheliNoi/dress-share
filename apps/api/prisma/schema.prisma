@@ -43,6 +43,7 @@ model User {
   bookingMessages     BookingMessage[]
   favorites           Favorite[]
   reviews             Review[]
+  feedback            Feedback[]
 }
 
 // A password-reset request creates exactly one of these rows. Only a hash of
@@ -259,6 +260,20 @@ model Review {
   renter  User    @relation(fields: [renterId], references: [id], onDelete: Cascade)
 
   @@index([dressId])
+}
+
+// Free-text suggestion/bug report a logged-in user can send from anywhere on
+// the site (see FeedbackWidget on the frontend) - read-only for admins, not
+// folded into any approval workflow like the Dress pending queue is.
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 enum BookingStatus {

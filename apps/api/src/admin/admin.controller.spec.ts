@@ -24,6 +24,9 @@ describe('AdminController', () => {
       create: jest.Mock;
       deleteMany: jest.Mock;
     };
+    feedback: {
+      findMany: jest.Mock;
+    };
   };
 
   function tokenFor(userId: number, role: 'USER' | 'ADMIN') {
@@ -47,6 +50,9 @@ describe('AdminController', () => {
       passwordResetToken: {
         create: jest.fn(),
         deleteMany: jest.fn(),
+      },
+      feedback: {
+        findMany: jest.fn(),
       },
     };
 
@@ -108,6 +114,35 @@ describe('AdminController', () => {
             ],
           },
         }),
+      );
+    });
+  });
+
+  describe('GET /admin/feedback', () => {
+    it('rejects unauthenticated requests', async () => {
+      await request(app.getHttpServer()).get('/admin/feedback').expect(401);
+    });
+
+    it('rejects a USER (not an admin)', async () => {
+      await request(app.getHttpServer())
+        .get('/admin/feedback')
+        .set('Authorization', `Bearer ${tokenFor(1, 'USER')}`)
+        .expect(403);
+    });
+
+    it('allows an ADMIN and returns all feedback', async () => {
+      prisma.feedback.findMany.mockResolvedValue([
+        { id: 1, message: 'רעיון', user: { id: 1, name: 'דנה', email: 'd@test.com' } },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/admin/feedback')
+        .set('Authorization', `Bearer ${tokenFor(2, 'ADMIN')}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(prisma.feedback.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
       );
     });
   });

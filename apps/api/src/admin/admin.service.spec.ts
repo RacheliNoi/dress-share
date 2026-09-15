@@ -19,6 +19,7 @@ describe('AdminService', () => {
     };
     dressPhoto: { deleteMany: jest.Mock; updateMany: jest.Mock };
     dressSize: { deleteMany: jest.Mock; updateMany: jest.Mock };
+    feedback: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let authService: { adminInitiatePasswordReset: jest.Mock };
@@ -32,6 +33,7 @@ describe('AdminService', () => {
       },
       dressPhoto: { deleteMany: jest.fn(), updateMany: jest.fn() },
       dressSize: { deleteMany: jest.fn(), updateMany: jest.fn() },
+      feedback: { findMany: jest.fn() },
       $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     };
     authService = {
@@ -69,6 +71,21 @@ describe('AdminService', () => {
           },
         }),
       );
+    });
+  });
+
+  describe('findFeedback', () => {
+    it('lists all feedback, most recent first, with the sender name/email', async () => {
+      prisma.feedback.findMany.mockResolvedValue([]);
+
+      await service.findFeedback();
+
+      expect(prisma.feedback.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
     });
   });
 

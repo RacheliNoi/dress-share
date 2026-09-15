@@ -22,6 +22,11 @@ export class AdminController {
     return this.adminService.findPendingDresses();
   }
 
+  @Get('feedback')
+  findFeedback() {
+    return this.adminService.findFeedback();
+  }
+
   @Patch('dresses/:id/approve')
   approveDress(@Param('id') id: string) {
     return this.adminService.approveDress(Number(id));

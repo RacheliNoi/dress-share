@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Frank_Ruhl_Libre, Geist_Mono, Rubik } from "next/font/google";
 import "./globals.css";
 import WelcomeNotice from "@/components/WelcomeNotice";
+import FeedbackWidget from "@/components/FeedbackWidget";
 import Footer from "@/components/Footer";
 
 const rubik = Rubik({
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="flex-1">{children}</div>
         <Footer />
         <WelcomeNotice />
+        <FeedbackWidget />
       </body>
     </html>
   );
