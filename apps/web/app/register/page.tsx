@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { markWelcomeNoticePending, setToken, setUser } from "@/lib/auth";
+import { setToken, setUser } from "@/lib/auth";
 import { register, ApiError } from "@/lib/api";
 import Header from "@/components/Header";
 import Button from "@/components/ui/Button";
@@ -30,7 +30,6 @@ export default function RegisterPage() {
 
       setToken(data.accessToken);
       setUser(data.user);
-      markWelcomeNoticePending();
       router.push("/");
     } catch (err) {
       setError(

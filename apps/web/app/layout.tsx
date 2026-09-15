@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Frank_Ruhl_Libre, Geist_Mono, Rubik } from "next/font/google";
 import "./globals.css";
-import WelcomeNotice from "@/components/WelcomeNotice";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import Footer from "@/components/Footer";
 
@@ -58,7 +57,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <div className="flex-1">{children}</div>
         <Footer />
-        <WelcomeNotice />
         <FeedbackWidget />
       </body>
     </html>

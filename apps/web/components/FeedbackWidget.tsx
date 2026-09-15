@@ -7,12 +7,11 @@ import { ApiError, submitFeedback } from "@/lib/api";
 
 const MAX_LENGTH = 2000;
 
-// Mounted once in the root layout, alongside WelcomeNotice - starts hidden on
-// every render (including the pre-hydration one) and only turns on from an
-// effect after mount, same hydration-mismatch reasoning as WelcomeNotice and
-// AnnouncementBar: a first server-side render never sees a token. Re-checks
-// on every pathname change (not just once on mount) for the same reason as
-// WelcomeNotice - the layout persists across client-side navigation, so a
+// Mounted once in the root layout - starts hidden on every render (including
+// the pre-hydration one) and only turns on from an effect after mount, same
+// hydration-mismatch reasoning as AnnouncementBar: a first server-side render
+// never sees a token. Re-checks on every pathname change (not just once on
+// mount) since the layout persists across client-side navigation, so a
 // mount-only check would miss the token a login/register page just set via
 // router.push, only picking it up on a full page reload.
 export default function FeedbackWidget() {

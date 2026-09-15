@@ -503,14 +503,21 @@ export default function NewDressPage() {
                   className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
                 />
 
-                <input
-                  type="number"
-                  min={0}
-                  value={priceValue}
-                  onChange={(event) => setPriceValue(event.target.value)}
-                  placeholder="מחיר (₪)"
-                  className="min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-                />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-zinc-500">מחיר (₪)</span>
+                    <InfoTooltip text="בעת סגירת השכרה ייגבה מהמשכירה אחוז מסוים כדמי שימוש במערכת." />
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={priceValue}
+                    onChange={(event) => setPriceValue(event.target.value)}
+                    placeholder="מחיר (₪)"
+                    aria-label="מחיר (₪)"
+                    className="w-full min-w-0 rounded-[10px] border border-line-strong bg-surface px-4 py-3 text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+                  />
+                </div>
 
                 <div>
                   <div className="mb-1.5 flex items-center gap-1.5">
