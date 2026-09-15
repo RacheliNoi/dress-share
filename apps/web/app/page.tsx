@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
+import AnnouncementBar from "@/components/AnnouncementBar";
 import DressCard from "@/components/DressCard";
 import HowItWorks from "@/components/HowItWorks";
 import CatalogFilters, { SortOption } from "@/components/CatalogFilters";
@@ -749,6 +750,7 @@ export default function CatalogPage() {
 
   return (
     <main dir="rtl" className="min-h-screen bg-[#faf9f7] text-zinc-900">
+      <AnnouncementBar />
       <Header />
 
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
