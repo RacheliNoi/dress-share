@@ -21,6 +21,7 @@ UI is in Hebrew with full RTL support.
 
 **Listings**
 - Full lifecycle: draft → pending approval → approved / rejected, with admin review
+- Photo upload (both the initial listing flow and later edits) shows a standing notice asking owners to photograph the dress on a hanger, not worn — keeps photos accessible to visitors behind content filters that block images of people
 - Editing an already-approved listing doesn't affect what's publicly visible until an admin approves the edit — proposed changes are held in a separate "pending" shadow (`pendingDetails`, `pendingAction: ADD/REMOVE` on sizes/photos) rather than mutating the live row
 - Per-size inventory (multiple physical units per size)
 - City (owner-set, searchable/filterable like category and color)

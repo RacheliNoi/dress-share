@@ -25,6 +25,7 @@ import {
 import Header from "@/components/Header";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import DressPlaceholder from "@/components/ui/DressPlaceholder";
+import PhotoGuidelineNotice from "@/components/ui/PhotoGuidelineNotice";
 import PhotoEditModal from "@/components/PhotoEditModal";
 import SizeFacts from "@/components/ui/SizeFacts";
 import InfoTooltip from "@/components/ui/InfoTooltip";
@@ -1066,6 +1067,8 @@ export default function EditDressPage() {
                   </p>
                 </div>
               )}
+
+              <PhotoGuidelineNotice />
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <label
