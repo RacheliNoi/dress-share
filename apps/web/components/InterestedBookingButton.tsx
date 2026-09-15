@@ -148,7 +148,7 @@ export default function InterestedBookingButton({
 
   function openModal() {
     if (!user) {
-      router.push("/login");
+      router.push(`/login?redirect=${encodeURIComponent(`/dress/${dressId}`)}`);
       return;
     }
 

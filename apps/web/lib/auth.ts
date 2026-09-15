@@ -71,6 +71,20 @@ export function logout(): void {
   removeUser();
 }
 
+// Validates a `?redirect=` query value before ever handing it to router.push
+// - must be a same-origin relative path (a bare "/", never "//" or "/\",
+// both of which a browser can treat as protocol-relative to a different
+// origin) so a crafted login/register link can never send a user off-site
+// after authenticating. Falls back to "/" for anything else, including a
+// missing value.
+export function safeRedirectPath(raw: string | null | undefined): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
+    return "/";
+  }
+
+  return raw;
+}
+
 // Marks that the user reached a dress detail page via an in-app link
 // (catalog or favorites) in this tab. window.history.length is useless for
 // this - browsers already start a fresh tab's history at length 2 (an

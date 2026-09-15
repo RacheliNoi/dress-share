@@ -1,17 +1,20 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { setToken, setUser } from "@/lib/auth";
+import { safeRedirectPath, setToken, setUser } from "@/lib/auth";
 import { register, ApiError } from "@/lib/api";
 import Header from "@/components/Header";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import FormMessage from "@/components/ui/FormMessage";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawRedirect = searchParams.get("redirect");
+  const redirectTarget = safeRedirectPath(rawRedirect);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,7 +33,7 @@ export default function RegisterPage() {
 
       setToken(data.accessToken);
       setUser(data.user);
-      router.push("/");
+      router.push(redirectTarget);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "שגיאה בהרשמה",
@@ -41,6 +44,58 @@ export default function RegisterPage() {
   }
 
   return (
+    <>
+      <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
+        <TextField
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="שם מלא"
+        />
+
+        <TextField
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="אימייל"
+          required
+        />
+
+        <TextField
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="סיסמה"
+          required
+          minLength={6}
+        />
+
+        {error && <FormMessage variant="error">{error}</FormMessage>}
+
+        <Button type="submit" disabled={loading} fullWidth>
+          {loading ? "נרשמת..." : "הרשמה"}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-ink-soft">
+        כבר יש לך חשבון?{" "}
+        <Link
+          href={
+            rawRedirect
+              ? `/login?redirect=${encodeURIComponent(rawRedirect)}`
+              : "/login"
+          }
+          className="font-medium text-ink underline underline-offset-4"
+        >
+          התחברות
+        </Link>
+      </p>
+    </>
+  );
+}
+
+export default function RegisterPage() {
+  return (
     <main dir="rtl" className="min-h-screen bg-paper text-ink">
       <Header />
 
@@ -50,47 +105,13 @@ export default function RegisterPage() {
             הרשמה
           </h1>
 
-          <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-            <TextField
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="שם מלא"
-            />
-
-            <TextField
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="אימייל"
-              required
-            />
-
-            <TextField
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="סיסמה"
-              required
-              minLength={6}
-            />
-
-            {error && <FormMessage variant="error">{error}</FormMessage>}
-
-            <Button type="submit" disabled={loading} fullWidth>
-              {loading ? "נרשמת..." : "הרשמה"}
-            </Button>
-          </form>
-
-          <p className="mt-6 text-center text-sm text-ink-soft">
-            כבר יש לך חשבון?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-ink underline underline-offset-4"
-            >
-              התחברות
-            </Link>
-          </p>
+          <Suspense
+            fallback={
+              <div className="mt-6 h-72 animate-pulse rounded-2xl bg-surface-sunken" />
+            }
+          >
+            <RegisterForm />
+          </Suspense>
         </div>
       </div>
     </main>

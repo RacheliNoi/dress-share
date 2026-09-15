@@ -229,6 +229,36 @@ export default function CatalogPage() {
   // the real server state, not just clicks made this session.
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
 
+  // Shows the "back to top" button once the "how it works" section (the
+  // same anchor the scroll-cue button above targets) has started entering
+  // the viewport from below - a scroll-position threshold rather than an
+  // IntersectionObserver on that section, since the footer sits right below
+  // it: isIntersecting would flip back to false while still deep in the
+  // page (footer visible), incorrectly hiding the button exactly when it's
+  // most useful. Checking "has the section's top reached the BOTTOM of the
+  // viewport" (scrollY + innerHeight >= offsetTop) rather than "reached the
+  // TOP of the viewport" (scrollY >= offsetTop) matters on short pages/tall
+  // viewports: the latter can be mathematically unreachable if there isn't
+  // a full viewport's worth of content below the section to scroll through,
+  // permanently hiding the button.
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    function handleScroll() {
+      const howItWorks = document.getElementById("how-it-works");
+
+      setShowBackToTop(
+        howItWorks
+          ? window.scrollY + window.innerHeight >= howItWorks.offsetTop
+          : window.scrollY >= window.innerHeight,
+      );
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -1030,6 +1060,29 @@ export default function CatalogPage() {
       </div>
 
       <HowItWorks />
+
+      {showBackToTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="חזרה לראש הדף"
+          className="fixed bottom-24 left-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-ink text-white shadow-[0_12px_30px_-10px_rgba(34,31,31,0.4)] transition hover:-translate-y-0.5 hover:bg-ink/85 sm:bottom-6 sm:left-6"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M18 15l-6-6-6 6" />
+          </svg>
+        </button>
+      )}
     </main>
   );
 }
